@@ -17,6 +17,7 @@ from quantcore.validation.metrics import (
 )
 from quantcore.validation.purged_kfold import PurgedKFold, PurgedSplit
 from quantcore.validation.cpcv import CombinatorialPurgedKFold, CPCVSplit
+from quantcore.validation.walk_forward import WalkForward, WalkForwardSplit
 
 __all__ = [
     # lookahead
@@ -40,4 +41,7 @@ __all__ = [
     # cpcv
     "CombinatorialPurgedKFold",
     "CPCVSplit",
+    # walk-forward
+    "WalkForward",
+    "WalkForwardSplit",
 ]
