@@ -16,6 +16,7 @@ from quantcore.validation.metrics import (
     tail_ratio,
 )
 from quantcore.validation.purged_kfold import PurgedKFold, PurgedSplit
+from quantcore.validation.cpcv import CombinatorialPurgedKFold, CPCVSplit
 
 __all__ = [
     # lookahead
@@ -33,6 +34,10 @@ __all__ = [
     "sortino_ratio",
     "stationary_bootstrap_indices",
     "tail_ratio",
+    # purged k-fold
     "PurgedKFold",
     "PurgedSplit",
+    # cpcv
+    "CombinatorialPurgedKFold",
+    "CPCVSplit",
 ]
