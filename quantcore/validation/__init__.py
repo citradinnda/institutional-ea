@@ -18,6 +18,12 @@ from quantcore.validation.metrics import (
 from quantcore.validation.purged_kfold import PurgedKFold, PurgedSplit
 from quantcore.validation.cpcv import CombinatorialPurgedKFold, CPCVSplit
 from quantcore.validation.walk_forward import WalkForward, WalkForwardSplit
+from .deflated_sharpe import (
+    DSRResult,
+    PSRResult,
+    deflated_sharpe_ratio,
+    probabilistic_sharpe_ratio,
+)
 
 __all__ = [
     # lookahead
@@ -44,4 +50,9 @@ __all__ = [
     # walk-forward
     "WalkForward",
     "WalkForwardSplit",
+    # deflated sharpe
+    "DSRResult",
+    "PSRResult",
+    "deflated_sharpe_ratio",
+    "probabilistic_sharpe_ratio",
 ]
