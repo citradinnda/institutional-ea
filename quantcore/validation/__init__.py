@@ -27,6 +27,7 @@ from .deflated_sharpe import (
     min_track_record_length_from_returns,
     probabilistic_sharpe_ratio,
 )
+from .reality_check import RealityCheckResult, whites_reality_check
 
 __all__ = [
     # lookahead
@@ -61,4 +62,7 @@ __all__ = [
     "MinTRLResult",
     "min_track_record_length",
     "min_track_record_length_from_returns",
+    # reality check
+    "RealityCheckResult",
+    "whites_reality_check"
 ]
