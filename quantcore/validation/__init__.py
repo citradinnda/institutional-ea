@@ -34,6 +34,8 @@ from .multiple_testing import (
     bonferroni_correction,
     holm_correction,
 )
+# Phase 1.14 — Validator orchestrator
+from quantcore.validation.validator import Validator, ValidatorReport
 
 __all__ = [
     # lookahead
@@ -75,4 +77,7 @@ __all__ = [
     "benjamini_hochberg",
     "bonferroni_correction",
     "holm_correction",
+    # validator
+    "Validator",
+    "ValidatorReport"
 ]
