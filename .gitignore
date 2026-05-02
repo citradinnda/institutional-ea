@@ -8,7 +8,7 @@ venv/
 build/
 dist/
 
-# Data (we never commit data)
+# Data
 /data/
 *.parquet
 *.csv
