@@ -92,33 +92,6 @@ def test_resample_aggregates_volume():
     out = resample(df, "H4")
     assert out["volume"].iloc[0] == df["volume"].iloc[:4].sum()
 
-def resample(df: pd.DataFrame, timeframe: Timeframe) -> pd.DataFrame:
-    """Resample lower-timeframe OHLCV to a higher timeframe.
-
-    Uses MT5-compatible bar labeling: each bar's timestamp is its OPEN time,
-    and the bar contains data from [open_time, open_time + timeframe).
-
-    Example: an H4 bar at 04:00 contains hours 04, 05, 06, 07.
-    """
-    rule_map = {
-        "M1": "1min",
-        "M5": "5min",
-        "M15": "15min",
-        "H1": "1h",
-        "H4": "4h",
-        "D1": "1D",
-    }
-    rule = rule_map[timeframe]
-    out = df.resample(rule, label="left", closed="left").agg(
-        {
-            "open": "first",
-            "high": "max",
-            "low": "min",
-            "close": "last",
-            "volume": "sum",
-        }
-    )
-    return out.dropna()
 
 # ---------- load_parquet round trip ----------
 
