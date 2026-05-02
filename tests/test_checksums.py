@@ -105,15 +105,19 @@ def test_hash_dataframe_is_deterministic():
 def test_hash_dataframe_detects_value_change():
     df1 = _canonical_ohlcv()
     df2 = df1.copy()
-    df2.iloc[0, df2.columns.get_loc("close")] += 1e-9  # tiniest possible perturbation
+    # Use label-based access instead of iloc+get_loc to avoid pandas'
+    # union-typed return from get_loc that confuses static checkers.
+    df2.loc[df2.index[0], "close"] += 1e-9
     assert hash_dataframe(df1).hexdigest != hash_dataframe(df2).hexdigest
 
 
 def test_hash_dataframe_detects_index_change():
     df1 = _canonical_ohlcv()
     df2 = df1.copy()
-    new_idx = df2.index.copy()
-    df2.index = new_idx.shift(1, freq="h")  # shift all timestamps by 1h
+    # Cast to DatetimeIndex explicitly so .shift(freq=...) is visible
+    # to type checkers; the canonical OHLCV invariant guarantees this.
+    assert isinstance(df2.index, pd.DatetimeIndex)
+    df2.index = df2.index.shift(1, freq="h")
     assert hash_dataframe(df1).hexdigest != hash_dataframe(df2).hexdigest
 
 
