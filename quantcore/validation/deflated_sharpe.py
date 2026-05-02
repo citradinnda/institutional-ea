@@ -8,13 +8,18 @@ quantification. Two strategies with the same SR can have wildly different
 statistical confidence: one might be backed by 1000 daily observations of
 near-Gaussian returns, the other by 100 observations of skewed, fat-tailed
 returns. The PSR (Bailey and Lopez de Prado 2012) gives the probability
-that the TRUE Sharpe exceeds a benchmark, accounting for sample size,
-skewness, and kurtosis. The DSR (Bailey and Lopez de Prado 2014) goes
-further: it deflates the benchmark by the expected maximum SR under the
-null, given the number of strategy trials searched. DSR is the antidote
-to backtest overfitting and multiple-testing selection bias -- exactly
-the failure mode that produced graveyard hypotheses H008-H010
-(high-Sharpe-but-fragile).
+that the TRUE Sharpe exceeds a benchmark, accounting for sample
+size, skewness, and kurtosis. The Minimum Track Record Length
+(MinTRL, same paper) inverts the question: how many observations
+are needed before we can claim, with given confidence, that the
+true SR exceeds the benchmark? The DSR (Bailey and Lopez de Prado
+2014) goes further: it deflates the benchmark by the expected
+maximum SR under the null, given the number of strategy trials
+searched. DSR is the antidote to backtest overfitting and
+multiple-testing selection bias -- exactly the failure mode that
+produced graveyard hypotheses H008-H010 (high-Sharpe-but-fragile).
+MinTRL is the antidote to "looks great but the backtest is too
+short to prove it" -- a separate failure mode worth its own gate.
 
 References
 ----------
@@ -37,6 +42,7 @@ and translated to per-period internally as
 """
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass
 
 import numpy as np
@@ -48,8 +54,11 @@ from quantcore.validation.metrics import sharpe_ratio
 __all__ = [
     "PSRResult",
     "DSRResult",
+    "MinTRLResult",
     "probabilistic_sharpe_ratio",
     "deflated_sharpe_ratio",
+    "min_track_record_length",
+    "min_track_record_length_from_returns",
     "expected_max_sharpe",
 ]
 
@@ -413,4 +422,201 @@ def deflated_sharpe_ratio(
         expected_max_sr=expected_max,
         n_trials=n_trials,
         sr_benchmark_deflated=sr_benchmark_deflated,
+    )
+
+# ---------------------------------------------------------------------------
+# Minimum Track Record Length (MinTRL)
+# ---------------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class MinTRLResult:
+    """
+    Result of a Minimum Track Record Length calculation.
+
+    MinTRL answers: how many per-period observations are needed before
+    we can claim, with the given confidence, that the TRUE Sharpe ratio
+    exceeds the benchmark? It is the algebraic inverse of PSR.
+
+    Attributes
+    ----------
+    min_n : int
+        Minimum number of per-period observations required. Set to -1
+        when `feasible == False` (i.e. observed SR <= benchmark, in
+        which case no finite n suffices).
+    min_n_years : float
+        `min_n / periods_per_year` for human-readable display. Set to
+        `float('inf')` in the infeasible case.
+    feasible : bool
+        True iff observed SR strictly exceeds the benchmark. When
+        False, no finite track record can establish the claim because
+        the point estimate is already on the wrong side of the bench.
+    observed_sr : float
+        ANNUALIZED observed Sharpe ratio (echoed back, for display).
+    sr_benchmark : float
+        ANNUALIZED benchmark SR supplied by the caller (echoed back).
+    confidence : float
+        Confidence level in (0, 1) supplied by the caller.
+    skew : float
+        Sample skewness used in the calculation.
+    kurtosis : float
+        Sample EXCESS kurtosis used in the calculation.
+    """
+
+    min_n: int
+    min_n_years: float
+    feasible: bool
+    observed_sr: float
+    sr_benchmark: float
+    confidence: float
+    skew: float
+    kurtosis: float
+
+
+def min_track_record_length(
+    observed_sr: float,
+    skew: float,
+    kurtosis: float,
+    sr_benchmark: float = 0.0,
+    confidence: float = 0.95,
+    periods_per_year: int = 252,
+) -> MinTRLResult:
+    """
+    Minimum Track Record Length (Bailey and Lopez de Prado 2012).
+
+    Solves PSR(SR*) >= confidence for n. Closed form:
+
+        n_min = 1 + (1 - skew*SR + ((kurt-1)/4)*SR^2) * (z / (SR - SR*))^2
+
+    where:
+        SR  = observed PER-PERIOD Sharpe ratio
+        SR* = PER-PERIOD benchmark Sharpe ratio
+        kurt = EXCESS kurtosis
+        z   = Phi^{-1}(confidence)
+
+    WHY a separate gate from PSR: A backtest with PSR = 0.99 on only
+    60 daily bars is statistically meaningless even though the number
+    looks great -- the variance of the Sharpe estimator is huge at
+    n = 60. MinTRL forces sample-size adequacy into the conclusion.
+    A high PSR on a sub-MinTRL track record is the same trap that
+    produced graveyard hypotheses H008-H010.
+
+    Parameters
+    ----------
+    observed_sr : float
+        ANNUALIZED observed Sharpe ratio. Translated to per-period as
+        `observed_sr / sqrt(periods_per_year)` internally.
+    skew : float
+        Sample skewness of returns (population-style, matching PSR).
+    kurtosis : float
+        Sample EXCESS kurtosis of returns (Gaussian = 0).
+    sr_benchmark : float, default 0.0
+        ANNUALIZED benchmark SR.
+    confidence : float, default 0.95
+        Required confidence level, in (0, 1).
+    periods_per_year : int, default 252
+        Annualization factor.
+
+    Returns
+    -------
+    MinTRLResult
+        Frozen dataclass. When `observed_sr <= sr_benchmark` the result
+        is infeasible: `min_n = -1`, `min_n_years = inf`,
+        `feasible = False`.
+    """
+    if periods_per_year < 1:
+        raise ValueError("periods_per_year must be >= 1.")
+    if not (0.0 < confidence < 1.0):
+        raise ValueError("confidence must be in (0, 1) strict.")
+
+    sr_pp = observed_sr / math.sqrt(periods_per_year)
+    sr_bench_pp = sr_benchmark / math.sqrt(periods_per_year)
+
+    # Infeasible: point estimate is already at or below the benchmark.
+    # No finite n can flip the inequality -- the formula's denominator
+    # would be <= 0. Return the explicit sentinel rather than raise.
+    if sr_pp - sr_bench_pp <= 1e-12:
+        return MinTRLResult(
+            min_n=-1,
+            min_n_years=float("inf"),
+            feasible=False,
+            observed_sr=observed_sr,
+            sr_benchmark=sr_benchmark,
+            confidence=confidence,
+            skew=skew,
+            kurtosis=kurtosis,
+        )
+
+    # Variance term from PSR (must stay positive for sane moments).
+    var_term = 1.0 - skew * sr_pp + (kurtosis / 4.0) * (sr_pp**2)
+    if var_term <= 0.0:
+        raise ValueError(
+            "MinTRL variance term non-positive; sample moments are "
+            f"pathological (1 - skew*SR + (kurt-1)/4 * SR^2 = {var_term:.6g})."
+        )
+
+    z = float(norm.ppf(confidence))
+    n_min_real = 1.0 + var_term * (z / (sr_pp - sr_bench_pp)) ** 2
+    # ceil because n must be an integer count of observations and we
+    # want the SMALLEST n that satisfies the inequality, not one less.
+    n_min = int(math.ceil(n_min_real))
+
+    return MinTRLResult(
+        min_n=n_min,
+        min_n_years=n_min / periods_per_year,
+        feasible=True,
+        observed_sr=observed_sr,
+        sr_benchmark=sr_benchmark,
+        confidence=confidence,
+        skew=skew,
+        kurtosis=kurtosis,
+    )
+
+
+def min_track_record_length_from_returns(
+    returns: np.ndarray | pd.Series,
+    sr_benchmark: float = 0.0,
+    confidence: float = 0.95,
+    periods_per_year: int = 252,
+) -> MinTRLResult:
+    """
+    Convenience wrapper: derive observed SR, skew, and kurtosis from a
+    return series, then call `min_track_record_length`.
+
+    WHY: most callers have a return series, not pre-computed moments.
+    This avoids forcing every caller to recompute the same statistics
+    that PSR already computes internally.
+
+    Parameters
+    ----------
+    returns : array-like of shape (n,)
+        Per-period returns. NaNs are dropped.
+    sr_benchmark : float, default 0.0
+        ANNUALIZED benchmark SR.
+    confidence : float, default 0.95
+        Required confidence level, in (0, 1).
+    periods_per_year : int, default 252
+        Annualization factor.
+
+    Returns
+    -------
+    MinTRLResult
+    """
+    arr = _to_1d_array(returns)
+    if arr.size < 2:
+        raise ValueError("MinTRL needs at least 2 return observations.")
+
+    # Reuse the same moment helpers PSR uses, so MinTRL and PSR can never
+    # disagree on what SR/skew/kurtosis the same sample produces.
+    observed_sr_annual = float(sharpe_ratio(arr, periods_per_year=periods_per_year))
+    skew = _sample_skew(arr)
+    ekurt = _sample_excess_kurtosis(arr)
+
+    return min_track_record_length(
+        observed_sr=observed_sr_annual,
+        skew=skew,
+        kurtosis=ekurt,
+        sr_benchmark=sr_benchmark,
+        confidence=confidence,
+        periods_per_year=periods_per_year,
     )

@@ -20,8 +20,11 @@ from quantcore.validation.cpcv import CombinatorialPurgedKFold, CPCVSplit
 from quantcore.validation.walk_forward import WalkForward, WalkForwardSplit
 from .deflated_sharpe import (
     DSRResult,
+    MinTRLResult,
     PSRResult,
     deflated_sharpe_ratio,
+    min_track_record_length,
+    min_track_record_length_from_returns,
     probabilistic_sharpe_ratio,
 )
 
@@ -55,4 +58,7 @@ __all__ = [
     "PSRResult",
     "deflated_sharpe_ratio",
     "probabilistic_sharpe_ratio",
+    "MinTRLResult",
+    "min_track_record_length",
+    "min_track_record_length_from_returns",
 ]
