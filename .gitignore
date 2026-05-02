@@ -9,7 +9,7 @@ build/
 dist/
 
 # Data (we never commit data)
-data/
+/data/
 *.parquet
 *.csv
 
