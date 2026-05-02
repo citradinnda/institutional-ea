@@ -28,6 +28,12 @@ from .deflated_sharpe import (
     probabilistic_sharpe_ratio,
 )
 from .reality_check import RealityCheckResult, whites_reality_check
+from .multiple_testing import (
+    MultipleTestingResult,
+    benjamini_hochberg,
+    bonferroni_correction,
+    holm_correction,
+)
 
 __all__ = [
     # lookahead
@@ -64,5 +70,9 @@ __all__ = [
     "min_track_record_length_from_returns",
     # reality check
     "RealityCheckResult",
-    "whites_reality_check"
+    "whites_reality_check",
+    "MultipleTestingResult",
+    "benjamini_hochberg",
+    "bonferroni_correction",
+    "holm_correction",
 ]
