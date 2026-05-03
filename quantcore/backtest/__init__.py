@@ -13,6 +13,11 @@ from quantcore.backtest.h017_event import (
     backtest_h017_event_driven,
     backtest_h017_event_from_result,
 )
+from quantcore.backtest.h017_strict_event import (
+    StrictH017EventBacktestResult,
+    backtest_h017_strict_event_driven,
+    backtest_h017_strict_event_from_result,
+)
 from quantcore.backtest.portfolio import (
     DEFAULT_INSTRUMENT_SPECS,
     InstrumentSpec,
@@ -35,9 +40,12 @@ __all__ = [
     "InstrumentSpec",
     "PortfolioResult",
     "PositionSize",
+    "StrictH017EventBacktestResult",
     "SymbolCostSpec",
     "backtest_h017_event_driven",
     "backtest_h017_event_from_result",
+    "backtest_h017_strict_event_driven",
+    "backtest_h017_strict_event_from_result",
     "build_portfolio_result",
     "fill_pnl_usd",
     "get_default_cost_spec",
