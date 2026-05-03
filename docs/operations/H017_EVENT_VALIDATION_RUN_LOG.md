@@ -148,3 +148,114 @@ If RESEARCH VALIDATION SUFFICIENT is False, classify the run as pipeline evidenc
 If RESEARCH VALIDATION SUFFICIENT is True but H017 promotable is False, classify the run as research-grade non-promotion evidence.
 
 If RESEARCH VALIDATION SUFFICIENT is True and H017 promotable is True, do not immediately go live. That result should trigger a separate review phase covering drawdown, costs, robustness, operational failure modes, and production readiness.
+
+---
+
+### Run 2026-05-03 — Baseline before additional M1 acquisition
+
+#### Operator context
+
+Run date: 2026-05-03
+
+Data source: Local MetaTrader 5 exports
+
+Broker/account environment: Exness MT5, broker timezone Europe/Athens
+
+MT5 terminal source: Local Windows MT5 terminal
+
+Notes on export process: Baseline run using existing local H4 and M1 files before any additional M1 history acquisition.
+
+#### Local file coverage
+
+USDJPY M1 earliest timestamp: 2026-01-26 03:09:00+00:00
+
+USDJPY M1 latest timestamp: 2026-04-30 07:00:00+00:00
+
+XAUUSD M1 earliest timestamp: 2026-01-20 02:22:00+00:00
+
+XAUUSD M1 latest timestamp: 2026-04-30 07:00:00+00:00
+
+#### Clean common event window
+
+Clean common event window start: 2026-01-26 03:09:00+00:00
+
+Clean common event window end: 2026-04-29 09:00:00+00:00
+
+Common H4 bar count: 411
+
+Minimum required H4 bars: 1512
+
+#### Research sufficiency
+
+RESEARCH VALIDATION SUFFICIENT: False
+
+Coverage failure reasons, if any:
+
+- M1 common start is later than the desired clean H4 start. Desired start was 2021-07-02 00:00:00+00:00. Actual common start was 2026-01-26 03:09:00+00:00.
+- Common H4 sample is shorter than one approximate H4 trading year. Minimum required H4 bars were 1512. Actual common H4 bars were 411.
+
+#### Event-driven backtest output
+
+Fill count: 470
+
+Starting equity: 10000.00 USD
+
+Ending equity: 16145.60 USD
+
+Total return percent: 61.46
+
+Max drawdown: -33.65 percent
+
+Sharpe: 1.3218 annualized
+
+#### H017 claim output
+
+PSR: 0.8662, failed threshold 0.95
+
+MinTRL feasible: True
+
+MinTRL required n: 1034
+
+MinTRL observed n: 470
+
+DSR: Skipped, no sr_estimates provided
+
+H017 promotable: False
+
+#### Interpretation
+
+Pipeline smoke passed: True
+
+Research-grade validation passed: False
+
+Is this run promotable evidence? No.
+
+If not promotable, why not?
+
+The event-driven pipeline works, but the available M1 history is too short for research-grade validation. The profitable short-window result must not be treated as validated edge.
+
+The -33.65 percent drawdown is a serious risk signal, but this short M1 window is still not sufficient for a full research conclusion.
+
+#### Notes
+
+Additional observations:
+
+- H4 data still requires leakage trimming because the early H4 export contains daily bars disguised as H4 bars before 2021-07-02.
+- The current clean common event window starts in 2026, which is much later than the desired clean H4 start of 2021-07-02.
+- H017 remains alive but not promotable.
+
+Operational issues:
+
+- No script failure.
+- No missing file preflight failure.
+- Raw data files remained local and were not committed.
+
+Follow-up action:
+
+Acquire longer broker-native M1 exports for USDJPY and XAUUSD, then rerun:
+
+    python scripts\run_h017_event_real.py
+
+Only consider the run research-grade if the output eventually reports:
+
+    RESEARCH VALIDATION SUFFICIENT: True
