@@ -50,6 +50,17 @@ def _ensure_canonical(df: pd.DataFrame) -> pd.DataFrame:
     df = df[~df.index.duplicated(keep="first")].sort_index()
 
     return df
+# ---------------------------------------------------------------------------
+# Public alias (added Phase 2.6a).
+#
+# WHY: §6 of the project conventions treats `ensure_canonical` as part of the
+# canonical-OHLCV public contract. Other modules (mt5_loader, future Phase 3
+# engine) need to import it by a public name. The original underscore-prefixed
+# definition is retained because tests/test_loaders.py imports it by that name
+# and we never break already-passing tests (Handoff §8). The alias is an
+# identity binding, so behavior is bit-for-bit identical.
+# ---------------------------------------------------------------------------
+ensure_canonical = _ensure_canonical
 
 
 def load_parquet(path: str | Path) -> pd.DataFrame:
