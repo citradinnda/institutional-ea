@@ -1,0 +1,70 @@
+﻿On branch main
+Your branch is up to date with 'origin/main'.
+
+nothing to commit, working tree clean
+--- Required file preflight ---
+all_present: True
+True: C:\Users\equin\Documents\institutional-ea\data\raw\USDJPY\H4.csv
+True: C:\Users\equin\Documents\institutional-ea\data\raw\USDJPY\M1.csv
+True: C:\Users\equin\Documents\institutional-ea\data\raw\XAUUSD\H4.csv
+True: C:\Users\equin\Documents\institutional-ea\data\raw\XAUUSD\M1.csv
+
+--- Loading MT5 exports ---
+
+usdjpy_h4
+  n_input_rows: 8713
+  n_bars: 8713
+  earliest_utc: 2018-07-02 21:00:00+00:00
+  latest_utc: 2026-04-30 05:00:00+00:00
+  broker_tz: Europe/Athens
+
+usdjpy_m1
+  n_input_rows: 1785312
+  n_bars: 1785312
+  earliest_utc: 2018-07-02 21:00:00+00:00
+  latest_utc: 2026-04-30 07:00:00+00:00
+  broker_tz: Europe/Athens
+
+xauusd_h4
+  n_input_rows: 8658
+  n_bars: 8658
+  earliest_utc: 2018-06-27 21:00:00+00:00
+  latest_utc: 2026-04-30 05:00:00+00:00
+  broker_tz: Europe/Athens
+
+xauusd_m1
+  n_input_rows: 1704907
+  n_bars: 1704907
+  earliest_utc: 2018-06-27 21:00:00+00:00
+  latest_utc: 2026-04-30 07:00:00+00:00
+  broker_tz: Europe/Athens
+
+--- Strict common complete H4/M1 bridge-window assessment ---
+candidate_common_h4_count: 8654
+usdjpy_complete_count: 5685
+xauusd_complete_count: 6149
+common_complete_count: 5476
+accepted_count: 5476
+first_accepted_timestamp: 2021-07-02 13:00:00+00:00
+last_accepted_timestamp: 2026-04-30 01:00:00+00:00
+usdjpy_only_complete_count: 209
+xauusd_only_complete_count: 673
+rejected_count: 3178
+
+--- Rejection counts ---
+usdjpy_m1_count_not_expected: 2969
+usdjpy_missing_next_h4_timestamp: 1
+usdjpy_non_4h_next_h4_delta: 1179
+xauusd_m1_count_not_expected: 2505
+xauusd_missing_next_h4_timestamp: 1
+xauusd_non_4h_next_h4_delta: 1193
+
+STRICT BRIDGE-WINDOW PREFLIGHT: PASSED
+No H017 run was performed.
+No files were written.
+
+--- Git status after read-only diagnostic ---
+On branch main
+Your branch is up to date with 'origin/main'.
+
+nothing to commit, working tree clean
