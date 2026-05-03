@@ -1,0 +1,342 @@
+BROKER_NATIVE_EXPANDED_COMMON_WINDOW_DIAGNOSTIC
+
+Phase: 3.26-ai
+Scope: expanded broker-native USDJPY and XAUUSD M1/H4 dense candidate region
+Restrictions: read-only raw data access; no H017 run; no derived dataset writes; no source acceptance.
+DENSE_START_RULE_UTC: 2021-07-01 00:00:00+00:00
+
+
+========================================================================================================================
+SYMBOL_LOAD_SUMMARY: USDJPY
+========================================================================================================================
+M1_PATH: C:\Users\equin\Documents\institutional-ea\data\raw\USDJPY\M1.csv
+H4_PATH: C:\Users\equin\Documents\institutional-ea\data\raw\USDJPY\H4.csv
+M1_RAW_EXISTS: True
+H4_RAW_EXISTS: True
+M1_LOADER_N_INPUT_ROWS: 1785312
+M1_LOADER_N_BARS: 1785312
+M1_LOADER_EARLIEST_UTC: 2018-07-02 21:00:00+00:00
+M1_LOADER_LATEST_UTC: 2026-04-30 07:00:00+00:00
+H4_LOADER_N_INPUT_ROWS: 8713
+H4_LOADER_N_BARS: 8713
+H4_LOADER_EARLIEST_UTC: 2018-07-02 21:00:00+00:00
+H4_LOADER_LATEST_UTC: 2026-04-30 05:00:00+00:00
+DENSE_M1_N_BARS: 1784379
+DENSE_M1_FIRST_UTC: 2021-07-01 21:00:00+00:00
+DENSE_M1_LAST_UTC: 2026-04-30 07:00:00+00:00
+DENSE_M1_HAS_DUPLICATES: False
+DENSE_H4_N_BARS: 7780
+DENSE_H4_FIRST_UTC: 2021-07-01 21:00:00+00:00
+DENSE_H4_LAST_UTC: 2026-04-30 05:00:00+00:00
+DENSE_H4_HAS_DUPLICATES: False
+
+========================================================================================================================
+SYMBOL_LOAD_SUMMARY: XAUUSD
+========================================================================================================================
+M1_PATH: C:\Users\equin\Documents\institutional-ea\data\raw\XAUUSD\M1.csv
+H4_PATH: C:\Users\equin\Documents\institutional-ea\data\raw\XAUUSD\H4.csv
+M1_RAW_EXISTS: True
+H4_RAW_EXISTS: True
+M1_LOADER_N_INPUT_ROWS: 1704907
+M1_LOADER_N_BARS: 1704907
+M1_LOADER_EARLIEST_UTC: 2018-06-27 21:00:00+00:00
+M1_LOADER_LATEST_UTC: 2026-04-30 07:00:00+00:00
+H4_LOADER_N_INPUT_ROWS: 8658
+H4_LOADER_N_BARS: 8658
+H4_LOADER_EARLIEST_UTC: 2018-06-27 21:00:00+00:00
+H4_LOADER_LATEST_UTC: 2026-04-30 05:00:00+00:00
+DENSE_M1_N_BARS: 1703974
+DENSE_M1_FIRST_UTC: 2021-07-01 21:00:00+00:00
+DENSE_M1_LAST_UTC: 2026-04-30 07:00:00+00:00
+DENSE_M1_HAS_DUPLICATES: False
+DENSE_H4_N_BARS: 7725
+DENSE_H4_FIRST_UTC: 2021-07-01 21:00:00+00:00
+DENSE_H4_LAST_UTC: 2026-04-30 05:00:00+00:00
+DENSE_H4_HAS_DUPLICATES: False
+
+========================================================================================================================
+M1_COMMON_WINDOW_SUMMARY
+========================================================================================================================
+COMMON_START_UTC: 2021-07-01 21:00:00+00:00
+COMMON_END_UTC: 2026-04-30 07:00:00+00:00
+CALENDAR_MINUTES_INCLUSIVE: 2539321
+USDJPY_OBSERVED_MINUTES_IN_COMMON_SPAN: 1784379
+XAUUSD_OBSERVED_MINUTES_IN_COMMON_SPAN: 1703974
+SHARED_OBSERVED_MINUTES: 1695042
+USDJPY_ONLY_OBSERVED_MINUTES: 89337
+XAUUSD_ONLY_OBSERVED_MINUTES: 8932
+NEITHER_SYMBOL_CALENDAR_MINUTES: 746010
+SHARED_OBSERVED_PCT_OF_CALENDAR: 66.751781
+USDJPY_ONLY_PCT_OF_CALENDAR: 3.518145
+XAUUSD_ONLY_PCT_OF_CALENDAR: 0.351748
+NEITHER_PCT_OF_CALENDAR: 29.378326
+
+SHARED_OBSERVED_MINUTES_BY_YEAR
+  2021: 171291
+  2022: 350557
+  2023: 351128
+  2024: 354316
+  2025: 353114
+  2026: 114636
+
+USDJPY_ONLY_OBSERVED_MINUTES_BY_YEAR
+  2021: 8869
+  2022: 16881
+  2023: 18434
+  2024: 19316
+  2025: 19165
+  2026: 6672
+
+XAUUSD_ONLY_OBSERVED_MINUTES_BY_YEAR
+  2021: 5793
+  2022: 2347
+  2023: 765
+  2024: 27
+
+NEITHER_SYMBOL_CALENDAR_MINUTES_BY_YEAR
+  2021: 77747
+  2022: 155815
+  2023: 155273
+  2024: 153381
+  2025: 153321
+  2026: 50473
+
+FIRST_20_USDJPY_ONLY_MINUTES
+  2021-07-04 18:07:00+00:00
+  2021-07-04 18:08:00+00:00
+  2021-07-04 18:09:00+00:00
+  2021-07-04 18:10:00+00:00
+  2021-07-04 18:11:00+00:00
+  2021-07-04 18:12:00+00:00
+  2021-07-04 18:13:00+00:00
+  2021-07-04 18:14:00+00:00
+  2021-07-04 18:15:00+00:00
+  2021-07-04 18:16:00+00:00
+  2021-07-04 18:18:00+00:00
+  2021-07-04 18:19:00+00:00
+  2021-07-04 18:20:00+00:00
+  2021-07-04 18:21:00+00:00
+  2021-07-04 18:22:00+00:00
+  2021-07-04 18:23:00+00:00
+  2021-07-04 18:24:00+00:00
+  2021-07-04 18:25:00+00:00
+  2021-07-04 18:26:00+00:00
+  2021-07-04 18:28:00+00:00
+
+FIRST_20_XAUUSD_ONLY_MINUTES
+  2021-07-25 19:13:00+00:00
+  2021-07-25 19:19:00+00:00
+  2021-07-25 19:22:00+00:00
+  2021-07-25 19:23:00+00:00
+  2021-07-25 19:24:00+00:00
+  2021-07-25 19:25:00+00:00
+  2021-07-25 19:26:00+00:00
+  2021-07-25 19:27:00+00:00
+  2021-07-25 19:29:00+00:00
+  2021-07-25 19:31:00+00:00
+  2021-07-25 19:35:00+00:00
+  2021-07-25 19:37:00+00:00
+  2021-07-25 19:48:00+00:00
+  2021-07-25 19:49:00+00:00
+  2021-07-25 19:51:00+00:00
+  2021-07-25 19:52:00+00:00
+  2021-07-25 19:56:00+00:00
+  2021-07-25 19:58:00+00:00
+  2021-07-25 19:59:00+00:00
+  2021-07-25 20:01:00+00:00
+
+FIRST_20_NEITHER_SYMBOL_CALENDAR_MINUTES
+  2021-07-01 21:01:00+00:00
+  2021-07-01 21:02:00+00:00
+  2021-07-01 21:03:00+00:00
+  2021-07-01 21:04:00+00:00
+  2021-07-01 21:05:00+00:00
+  2021-07-01 21:06:00+00:00
+  2021-07-01 21:07:00+00:00
+  2021-07-01 21:08:00+00:00
+  2021-07-01 21:09:00+00:00
+  2021-07-01 21:10:00+00:00
+  2021-07-01 21:11:00+00:00
+  2021-07-01 21:12:00+00:00
+  2021-07-01 21:13:00+00:00
+  2021-07-01 21:14:00+00:00
+  2021-07-01 21:15:00+00:00
+  2021-07-01 21:16:00+00:00
+  2021-07-01 21:17:00+00:00
+  2021-07-01 21:18:00+00:00
+  2021-07-01 21:19:00+00:00
+  2021-07-01 21:20:00+00:00
+
+========================================================================================================================
+H4_M1_COMPLETE_WINDOW_SUMMARY: USDJPY
+========================================================================================================================
+CANDIDATE_H4_WINDOWS_EVALUATED: 7779
+EXACT_4H_NEXT_DELTA_WINDOWS: 7515
+COMPLETE_240_M1_WINDOWS: 5701
+INCOMPLETE_OR_SKIPPED_WINDOWS: 2078
+FIRST_COMPLETE_WINDOW_UTC: 2021-07-02 13:00:00+00:00
+LAST_COMPLETE_WINDOW_UTC: 2026-04-30 01:00:00+00:00
+REASON_COUNTS:
+  complete: 5701
+  incomplete_m1_window: 1814
+  non_4h_next_delta: 264
+
+COMPLETE_WINDOWS_BY_YEAR
+  2021: 326
+  2022: 1035
+  2023: 1170
+  2024: 1366
+  2025: 1377
+  2026: 427
+
+FIRST_20_INCOMPLETE_OR_SKIPPED_H4_WINDOWS
+                    h4_ts                next_h4_ts      next_delta  m1_count               reason
+2021-07-01 21:00:00+00:00 2021-07-02 09:00:00+00:00 0 days 12:00:00       NaN    non_4h_next_delta
+2021-07-02 09:00:00+00:00 2021-07-02 13:00:00+00:00 0 days 04:00:00     143.0 incomplete_m1_window
+2021-07-02 17:00:00+00:00 2021-07-03 21:00:00+00:00 1 days 04:00:00       NaN    non_4h_next_delta
+2021-07-03 21:00:00+00:00 2021-07-04 17:00:00+00:00 0 days 20:00:00       NaN    non_4h_next_delta
+2021-07-04 17:00:00+00:00 2021-07-04 21:00:00+00:00 0 days 04:00:00     168.0 incomplete_m1_window
+2021-07-06 17:00:00+00:00 2021-07-06 21:00:00+00:00 0 days 04:00:00     238.0 incomplete_m1_window
+2021-07-07 17:00:00+00:00 2021-07-07 21:00:00+00:00 0 days 04:00:00     239.0 incomplete_m1_window
+2021-07-09 17:00:00+00:00 2021-07-10 21:00:00+00:00 1 days 04:00:00       NaN    non_4h_next_delta
+2021-07-10 21:00:00+00:00 2021-07-11 17:00:00+00:00 0 days 20:00:00       NaN    non_4h_next_delta
+2021-07-11 17:00:00+00:00 2021-07-11 21:00:00+00:00 0 days 04:00:00     162.0 incomplete_m1_window
+2021-07-12 17:00:00+00:00 2021-07-12 21:00:00+00:00 0 days 04:00:00     238.0 incomplete_m1_window
+2021-07-15 17:00:00+00:00 2021-07-15 21:00:00+00:00 0 days 04:00:00     238.0 incomplete_m1_window
+2021-07-16 17:00:00+00:00 2021-07-17 21:00:00+00:00 1 days 04:00:00       NaN    non_4h_next_delta
+2021-07-17 21:00:00+00:00 2021-07-18 17:00:00+00:00 0 days 20:00:00       NaN    non_4h_next_delta
+2021-07-18 17:00:00+00:00 2021-07-18 21:00:00+00:00 0 days 04:00:00     169.0 incomplete_m1_window
+2021-07-21 17:00:00+00:00 2021-07-21 21:00:00+00:00 0 days 04:00:00     238.0 incomplete_m1_window
+2021-07-22 17:00:00+00:00 2021-07-22 21:00:00+00:00 0 days 04:00:00     238.0 incomplete_m1_window
+2021-07-23 17:00:00+00:00 2021-07-24 21:00:00+00:00 1 days 04:00:00       NaN    non_4h_next_delta
+2021-07-24 21:00:00+00:00 2021-07-25 17:00:00+00:00 0 days 20:00:00       NaN    non_4h_next_delta
+2021-07-25 17:00:00+00:00 2021-07-25 21:00:00+00:00 0 days 04:00:00     135.0 incomplete_m1_window
+
+========================================================================================================================
+H4_M1_COMPLETE_WINDOW_SUMMARY: XAUUSD
+========================================================================================================================
+CANDIDATE_H4_WINDOWS_EVALUATED: 7724
+EXACT_4H_NEXT_DELTA_WINDOWS: 7460
+COMPLETE_240_M1_WINDOWS: 6149
+INCOMPLETE_OR_SKIPPED_WINDOWS: 1575
+FIRST_COMPLETE_WINDOW_UTC: 2021-07-02 13:00:00+00:00
+LAST_COMPLETE_WINDOW_UTC: 2026-04-30 01:00:00+00:00
+REASON_COUNTS:
+  complete: 6149
+  incomplete_m1_window: 1311
+  non_4h_next_delta: 264
+
+COMPLETE_WINDOWS_BY_YEAR
+  2021: 640
+  2022: 1271
+  2023: 1271
+  2024: 1281
+  2025: 1271
+  2026: 415
+
+FIRST_20_INCOMPLETE_OR_SKIPPED_H4_WINDOWS
+                    h4_ts                next_h4_ts      next_delta  m1_count               reason
+2021-07-01 21:00:00+00:00 2021-07-02 09:00:00+00:00 0 days 12:00:00       NaN    non_4h_next_delta
+2021-07-02 09:00:00+00:00 2021-07-02 13:00:00+00:00 0 days 04:00:00     143.0 incomplete_m1_window
+2021-07-02 17:00:00+00:00 2021-07-03 21:00:00+00:00 1 days 04:00:00       NaN    non_4h_next_delta
+2021-07-03 21:00:00+00:00 2021-07-04 17:00:00+00:00 0 days 20:00:00       NaN    non_4h_next_delta
+2021-07-04 17:00:00+00:00 2021-07-04 21:00:00+00:00 0 days 04:00:00     115.0 incomplete_m1_window
+2021-07-05 13:00:00+00:00 2021-07-05 17:00:00+00:00 0 days 04:00:00      60.0 incomplete_m1_window
+2021-07-05 17:00:00+00:00 2021-07-05 21:00:00+00:00 0 days 04:00:00     115.0 incomplete_m1_window
+2021-07-06 17:00:00+00:00 2021-07-06 21:00:00+00:00 0 days 04:00:00     178.0 incomplete_m1_window
+2021-07-07 17:00:00+00:00 2021-07-07 21:00:00+00:00 0 days 04:00:00     178.0 incomplete_m1_window
+2021-07-08 17:00:00+00:00 2021-07-08 21:00:00+00:00 0 days 04:00:00     178.0 incomplete_m1_window
+2021-07-09 17:00:00+00:00 2021-07-10 21:00:00+00:00 1 days 04:00:00       NaN    non_4h_next_delta
+2021-07-10 21:00:00+00:00 2021-07-11 17:00:00+00:00 0 days 20:00:00       NaN    non_4h_next_delta
+2021-07-11 17:00:00+00:00 2021-07-11 21:00:00+00:00 0 days 04:00:00     115.0 incomplete_m1_window
+2021-07-12 17:00:00+00:00 2021-07-12 21:00:00+00:00 0 days 04:00:00     178.0 incomplete_m1_window
+2021-07-13 17:00:00+00:00 2021-07-13 21:00:00+00:00 0 days 04:00:00     178.0 incomplete_m1_window
+2021-07-14 17:00:00+00:00 2021-07-14 21:00:00+00:00 0 days 04:00:00     178.0 incomplete_m1_window
+2021-07-15 17:00:00+00:00 2021-07-15 21:00:00+00:00 0 days 04:00:00     178.0 incomplete_m1_window
+2021-07-16 17:00:00+00:00 2021-07-17 21:00:00+00:00 1 days 04:00:00       NaN    non_4h_next_delta
+2021-07-17 21:00:00+00:00 2021-07-18 17:00:00+00:00 0 days 20:00:00       NaN    non_4h_next_delta
+2021-07-18 17:00:00+00:00 2021-07-18 21:00:00+00:00 0 days 04:00:00     115.0 incomplete_m1_window
+
+========================================================================================================================
+COMMON_COMPLETE_H4_M1_WINDOW_SUMMARY
+========================================================================================================================
+Definition: H4 timestamp is complete-common only if both symbols have a broker-native H4 bar at that timestamp, the next H4 timestamp is exactly four hours later for each symbol, and each symbol has exactly 240 M1 bars inside [H4 timestamp, H4 timestamp + 4 hours).
+COMMON_COMPLETE_H4_WINDOWS: 5476
+USDJPY_ONLY_COMPLETE_H4_WINDOWS: 225
+XAUUSD_ONLY_COMPLETE_H4_WINDOWS: 673
+FIRST_COMMON_COMPLETE_H4_WINDOW_UTC: 2021-07-02 13:00:00+00:00
+LAST_COMMON_COMPLETE_H4_WINDOW_UTC: 2026-04-30 01:00:00+00:00
+
+COMMON_COMPLETE_H4_WINDOWS_BY_YEAR
+  2021: 319
+  2022: 1035
+  2023: 1156
+  2024: 1280
+  2025: 1271
+  2026: 415
+
+USDJPY_ONLY_COMPLETE_H4_WINDOWS_BY_YEAR
+  2021: 7
+  2023: 14
+  2024: 86
+  2025: 106
+  2026: 12
+
+XAUUSD_ONLY_COMPLETE_H4_WINDOWS_BY_YEAR
+  2021: 321
+  2022: 236
+  2023: 115
+  2024: 1
+
+FIRST_20_COMMON_COMPLETE_H4_WINDOWS
+  2021-07-02 13:00:00+00:00
+  2021-07-04 21:00:00+00:00
+  2021-07-05 01:00:00+00:00
+  2021-07-05 05:00:00+00:00
+  2021-07-05 09:00:00+00:00
+  2021-07-05 21:00:00+00:00
+  2021-07-06 01:00:00+00:00
+  2021-07-06 05:00:00+00:00
+  2021-07-06 09:00:00+00:00
+  2021-07-06 13:00:00+00:00
+  2021-07-06 21:00:00+00:00
+  2021-07-07 01:00:00+00:00
+  2021-07-07 05:00:00+00:00
+  2021-07-07 09:00:00+00:00
+  2021-07-07 13:00:00+00:00
+  2021-07-07 21:00:00+00:00
+  2021-07-08 01:00:00+00:00
+  2021-07-08 05:00:00+00:00
+  2021-07-08 09:00:00+00:00
+  2021-07-08 13:00:00+00:00
+
+LAST_20_COMMON_COMPLETE_H4_WINDOWS
+  2026-04-24 05:00:00+00:00
+  2026-04-24 09:00:00+00:00
+  2026-04-24 13:00:00+00:00
+  2026-04-26 21:00:00+00:00
+  2026-04-27 01:00:00+00:00
+  2026-04-27 05:00:00+00:00
+  2026-04-27 09:00:00+00:00
+  2026-04-27 13:00:00+00:00
+  2026-04-27 21:00:00+00:00
+  2026-04-28 01:00:00+00:00
+  2026-04-28 05:00:00+00:00
+  2026-04-28 09:00:00+00:00
+  2026-04-28 13:00:00+00:00
+  2026-04-28 21:00:00+00:00
+  2026-04-29 01:00:00+00:00
+  2026-04-29 05:00:00+00:00
+  2026-04-29 09:00:00+00:00
+  2026-04-29 13:00:00+00:00
+  2026-04-29 21:00:00+00:00
+  2026-04-30 01:00:00+00:00
+
+========================================================================================================================
+DIAGNOSTIC_VERDICT
+========================================================================================================================
+This diagnostic quantifies cross-symbol M1 and H4/M1 common-window coverage only.
+It does not accept expanded broker-native M1 as an H017 validation source.
+H017 remains unauthorized until a later explicit source-acceptance checkpoint.
+The sparse 2018 through 2021-06 prefix remains excluded from validation thinking.
+The next source-quality step should be a missingness-by-time-bucket diagnostic or a focused interpretation checkpoint, not strategy validation.
