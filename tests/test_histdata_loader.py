@@ -72,6 +72,10 @@ def test_load_histdata_m1_csv_metadata_matches_data(tmp_path: Path) -> None:
     assert result.earliest_utc == pd.Timestamp("2021-01-03 17:00:00", tz="UTC")
     assert result.latest_utc == pd.Timestamp("2021-01-03 17:01:00", tz="UTC")
     assert result.source_tz == "UTC"
+    assert result.duplicate_policy == "reject"
+    assert result.n_duplicate_rows_removed == 0
+    assert result.n_duplicate_timestamp_values == 0
+    assert result.duplicate_timestamp_ranges == ()
     assert result.n_missing_minutes == 0
     assert result.missing_minutes == ()
 
@@ -126,6 +130,104 @@ def test_load_histdata_m1_csv_rejects_duplicate_timestamps(tmp_path: Path) -> No
 
     with pytest.raises(ValueError, match="duplicate timestamps"):
         load_histdata_m1_csv(csv)
+
+
+def test_load_histdata_m1_csv_default_duplicate_policy_rejects_exact_duplicates(
+    tmp_path: Path,
+) -> None:
+    csv = tmp_path / "exact_duplicate.csv"
+    _write_histdata_csv(
+        csv,
+        [
+            "2021.01.03,17:00,103.097000,103.160000,103.097000,103.160000,0",
+            "2021.01.03,17:00,103.097000,103.160000,103.097000,103.160000,0",
+        ],
+    )
+
+    with pytest.raises(ValueError, match="duplicate timestamps"):
+        load_histdata_m1_csv(csv)
+
+
+def test_load_histdata_m1_csv_drop_exact_removes_identical_duplicate_rows(
+    tmp_path: Path,
+) -> None:
+    csv = tmp_path / "exact_duplicate_block.csv"
+    _write_histdata_csv(
+        csv,
+        [
+            "2021.10.31,19:00,114.236000,114.236000,114.215000,114.219000,0",
+            "2021.10.31,19:01,114.221000,114.241000,114.216000,114.239000,0",
+            "2021.10.31,19:00,114.236000,114.236000,114.215000,114.219000,0",
+            "2021.10.31,19:01,114.221000,114.241000,114.216000,114.239000,0",
+            "2021.10.31,19:03,114.240000,114.250000,114.230000,114.245000,0",
+        ],
+    )
+
+    result = load_histdata_m1_csv(csv, duplicate_policy="drop_exact")
+
+    assert result.duplicate_policy == "drop_exact"
+    assert result.n_input_rows == 5
+    assert result.n_bars == 3
+    assert result.n_duplicate_rows_removed == 2
+    assert result.n_duplicate_timestamp_values == 2
+    assert result.duplicate_timestamp_ranges == (
+        (
+            pd.Timestamp("2021-10-31 19:00:00", tz="UTC"),
+            pd.Timestamp("2021-10-31 19:01:00", tz="UTC"),
+            2,
+        ),
+    )
+    assert result.earliest_utc == pd.Timestamp("2021-10-31 19:00:00", tz="UTC")
+    assert result.latest_utc == pd.Timestamp("2021-10-31 19:03:00", tz="UTC")
+    assert result.n_missing_minutes == 1
+    assert result.missing_minutes == (
+        pd.Timestamp("2021-10-31 19:02:00", tz="UTC"),
+    )
+
+
+def test_load_histdata_m1_csv_drop_exact_rejects_conflicting_duplicates(
+    tmp_path: Path,
+) -> None:
+    csv = tmp_path / "conflicting_duplicate.csv"
+    _write_histdata_csv(
+        csv,
+        [
+            "2021.01.03,17:00,103.097000,103.160000,103.097000,103.160000,0",
+            "2021.01.03,17:00,103.097000,103.160000,103.097000,103.159000,0",
+        ],
+    )
+
+    with pytest.raises(ValueError, match="conflicting duplicate timestamps"):
+        load_histdata_m1_csv(csv, duplicate_policy="drop_exact")
+
+
+def test_load_histdata_m1_csv_rejects_unknown_duplicate_policy(
+    tmp_path: Path,
+) -> None:
+    csv = tmp_path / "x.csv"
+    _write_histdata_csv(
+        csv,
+        ["2021.01.03,17:00,103.097000,103.160000,103.097000,103.160000,0"],
+    )
+
+    with pytest.raises(ValueError, match="duplicate_policy must be one of"):
+        load_histdata_m1_csv(csv, duplicate_policy="silent")  # type: ignore[arg-type]
+
+
+def test_load_histdata_m1_csv_drop_exact_still_rejects_non_monotonic_timestamps(
+    tmp_path: Path,
+) -> None:
+    csv = tmp_path / "unsorted.csv"
+    _write_histdata_csv(
+        csv,
+        [
+            "2021.01.03,17:01,103.161000,103.161000,103.160000,103.161000,0",
+            "2021.01.03,17:00,103.097000,103.160000,103.097000,103.160000,0",
+        ],
+    )
+
+    with pytest.raises(ValueError, match="non-monotonic timestamps"):
+        load_histdata_m1_csv(csv, duplicate_policy="drop_exact")
 
 
 def test_load_histdata_m1_csv_rejects_non_monotonic_timestamps(
@@ -228,6 +330,10 @@ def test_histdata_m1_load_result_is_frozen() -> None:
         earliest_utc=pd.Timestamp("2021-01-01", tz="UTC"),
         latest_utc=pd.Timestamp("2021-01-01", tz="UTC"),
         source_tz="UTC",
+        duplicate_policy="reject",
+        n_duplicate_rows_removed=0,
+        n_duplicate_timestamp_values=0,
+        duplicate_timestamp_ranges=(),
         n_missing_minutes=0,
         missing_minutes=(),
     )
