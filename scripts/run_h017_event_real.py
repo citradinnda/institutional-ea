@@ -6,6 +6,7 @@ from pathlib import Path
 import pandas as pd
 
 from quantcore.backtest.h017_event import H017EventBacktestResult, backtest_h017_event_driven
+from quantcore.data.coverage import CoverageAssessment, assess_m1_research_coverage
 from quantcore.data.leakage import LeakageScan, detect_d1_leakage, trim_to_common_start
 from quantcore.data.mt5_loader import DEFAULT_BROKER_TZ, MT5LoadResult, load_mt5_csv
 from quantcore.strategy.h017_claim import H017Claim, build_h017_claim
@@ -46,21 +47,6 @@ class CleanMarketData:
     xauusd_scan: LeakageScan
     clean_start_utc: pd.Timestamp
     clean_end_utc: pd.Timestamp
-
-
-@dataclass(frozen=True)
-class CoverageAssessment:
-    """Make data sufficiency explicit so a short smoke run is never mistaken for validation."""
-
-    desired_m1_start_utc: pd.Timestamp
-    actual_common_start_utc: pd.Timestamp
-    actual_common_end_utc: pd.Timestamp
-    n_common_h4_bars: int
-    minimum_research_h4_bars: int
-    meets_desired_m1_start: bool
-    has_minimum_h4_bars: bool
-    research_sufficient: bool
-    reasons: tuple[str, ...]
 
 
 @dataclass(frozen=True)
@@ -213,39 +199,14 @@ def _annualized_sharpe(returns: pd.Series, *, periods_per_year: int) -> float:
 
 
 def _assess_research_coverage(clean: CleanMarketData) -> CoverageAssessment:
-    """Separate an operational smoke pass from enough history for research validation."""
+    """Delegate coverage policy to quantcore so pytest protects the research-sufficiency gate."""
 
-    n_common_h4_bars = min(len(clean.usdjpy_h4), len(clean.xauusd_h4))
-    meets_desired_m1_start = clean.clean_start_utc <= DESIRED_M1_START_UTC
-    has_minimum_h4_bars = n_common_h4_bars >= MIN_RESEARCH_H4_BARS
-
-    reasons: list[str] = []
-    if not meets_desired_m1_start:
-        reasons.append(
-            "M1 common start is later than the desired clean H4 start. "
-            f"desired={DESIRED_M1_START_UTC}, actual={clean.clean_start_utc}"
-        )
-    if not has_minimum_h4_bars:
-        reasons.append(
-            "Common H4 sample is shorter than one approximate H4 trading year. "
-            f"minimum={MIN_RESEARCH_H4_BARS}, actual={n_common_h4_bars}"
-        )
-
-    research_sufficient = meets_desired_m1_start and has_minimum_h4_bars
-
-    if research_sufficient:
-        reasons.append("M1 coverage is sufficient for a first research-grade event validation pass.")
-
-    return CoverageAssessment(
+    return assess_m1_research_coverage(
         desired_m1_start_utc=DESIRED_M1_START_UTC,
         actual_common_start_utc=clean.clean_start_utc,
         actual_common_end_utc=clean.clean_end_utc,
-        n_common_h4_bars=n_common_h4_bars,
+        n_common_h4_bars=min(len(clean.usdjpy_h4), len(clean.xauusd_h4)),
         minimum_research_h4_bars=MIN_RESEARCH_H4_BARS,
-        meets_desired_m1_start=meets_desired_m1_start,
-        has_minimum_h4_bars=has_minimum_h4_bars,
-        research_sufficient=research_sufficient,
-        reasons=tuple(reasons),
     )
 
 
