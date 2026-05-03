@@ -20,6 +20,8 @@ USDJPY_M1_PATH = DATA_ROOT / "USDJPY" / "M1.csv"
 XAUUSD_M1_PATH = DATA_ROOT / "XAUUSD" / "M1.csv"
 
 PERIODS_PER_YEAR_H4 = 1512
+DESIRED_M1_START_UTC = pd.Timestamp("2021-07-02 00:00:00", tz="UTC")
+MIN_RESEARCH_H4_BARS = PERIODS_PER_YEAR_H4
 
 
 @dataclass(frozen=True)
@@ -47,12 +49,28 @@ class CleanMarketData:
 
 
 @dataclass(frozen=True)
+class CoverageAssessment:
+    """Make data sufficiency explicit so a short smoke run is never mistaken for validation."""
+
+    desired_m1_start_utc: pd.Timestamp
+    actual_common_start_utc: pd.Timestamp
+    actual_common_end_utc: pd.Timestamp
+    n_common_h4_bars: int
+    minimum_research_h4_bars: int
+    meets_desired_m1_start: bool
+    has_minimum_h4_bars: bool
+    research_sufficient: bool
+    reasons: tuple[str, ...]
+
+
+@dataclass(frozen=True)
 class EventSmokeResult:
-    """Bundle event backtest and claim so this script has one auditable return object."""
+    """Bundle event backtest, claim, and coverage so the smoke result is auditable."""
 
     backtest: H017EventBacktestResult
     claim: H017Claim
     annualized_sharpe: float
+    coverage: CoverageAssessment
 
 
 def _require_file(path: Path) -> None:
@@ -194,6 +212,43 @@ def _annualized_sharpe(returns: pd.Series, *, periods_per_year: int) -> float:
     return float(clean_returns.mean() / std * (periods_per_year**0.5))
 
 
+def _assess_research_coverage(clean: CleanMarketData) -> CoverageAssessment:
+    """Separate an operational smoke pass from enough history for research validation."""
+
+    n_common_h4_bars = min(len(clean.usdjpy_h4), len(clean.xauusd_h4))
+    meets_desired_m1_start = clean.clean_start_utc <= DESIRED_M1_START_UTC
+    has_minimum_h4_bars = n_common_h4_bars >= MIN_RESEARCH_H4_BARS
+
+    reasons: list[str] = []
+    if not meets_desired_m1_start:
+        reasons.append(
+            "M1 common start is later than the desired clean H4 start. "
+            f"desired={DESIRED_M1_START_UTC}, actual={clean.clean_start_utc}"
+        )
+    if not has_minimum_h4_bars:
+        reasons.append(
+            "Common H4 sample is shorter than one approximate H4 trading year. "
+            f"minimum={MIN_RESEARCH_H4_BARS}, actual={n_common_h4_bars}"
+        )
+
+    research_sufficient = meets_desired_m1_start and has_minimum_h4_bars
+
+    if research_sufficient:
+        reasons.append("M1 coverage is sufficient for a first research-grade event validation pass.")
+
+    return CoverageAssessment(
+        desired_m1_start_utc=DESIRED_M1_START_UTC,
+        actual_common_start_utc=clean.clean_start_utc,
+        actual_common_end_utc=clean.clean_end_utc,
+        n_common_h4_bars=n_common_h4_bars,
+        minimum_research_h4_bars=MIN_RESEARCH_H4_BARS,
+        meets_desired_m1_start=meets_desired_m1_start,
+        has_minimum_h4_bars=has_minimum_h4_bars,
+        research_sufficient=research_sufficient,
+        reasons=tuple(reasons),
+    )
+
+
 def run_smoke() -> EventSmokeResult:
     """Run the real-data event backtest end-to-end as an operational gate, not a promotion claim."""
 
@@ -219,6 +274,7 @@ def run_smoke() -> EventSmokeResult:
             result.portfolio.returns,
             periods_per_year=PERIODS_PER_YEAR_H4,
         ),
+        coverage=_assess_research_coverage(clean),
     )
 
 
@@ -252,6 +308,24 @@ def _print_leakage_summary(name: str, scan: LeakageScan) -> None:
         f"weekend_dates={_count_or_len(scan.weekend_dates)} "
         f"total_dates={scan.total_dates}"
     )
+
+
+def _print_coverage_summary(coverage: CoverageAssessment) -> None:
+    """Print a blunt research-sufficiency warning before anyone interprets performance."""
+
+    print("Coverage guard")
+    print("-" * 40)
+    print(f"desired_m1_start_utc={coverage.desired_m1_start_utc}")
+    print(f"actual_common_start_utc={coverage.actual_common_start_utc}")
+    print(f"actual_common_end_utc={coverage.actual_common_end_utc}")
+    print(f"n_common_h4_bars={coverage.n_common_h4_bars}")
+    print(f"minimum_research_h4_bars={coverage.minimum_research_h4_bars}")
+    print(f"meets_desired_m1_start={coverage.meets_desired_m1_start}")
+    print(f"has_minimum_h4_bars={coverage.has_minimum_h4_bars}")
+    print(f"research_sufficient={coverage.research_sufficient}")
+
+    for reason in coverage.reasons:
+        print(f"- {reason}")
 
 
 def main() -> None:
@@ -290,6 +364,10 @@ def main() -> None:
     print(f"XAUUSD M1 bars={len(clean.xauusd_m1)}")
     print()
 
+    coverage = _assess_research_coverage(clean)
+    _print_coverage_summary(coverage)
+    print()
+
     result = backtest_h017_event_driven(
         usdjpy_h4=clean.usdjpy_h4,
         xauusd_h4=clean.xauusd_h4,
@@ -320,6 +398,17 @@ def main() -> None:
     print("H017 claim on realistic event-driven returns")
     print("-" * 40)
     print(claim.summary)
+    print()
+
+    print("Operational verdict")
+    print("-" * 40)
+    print("PIPELINE SMOKE PASSED: True")
+    print(f"RESEARCH VALIDATION SUFFICIENT: {coverage.research_sufficient}")
+    if not coverage.research_sufficient:
+        print(
+            "Interpretation: the event pipeline works, but the available M1 history is too short "
+            "to treat this as a research-grade validation result."
+        )
 
 
 if __name__ == "__main__":
