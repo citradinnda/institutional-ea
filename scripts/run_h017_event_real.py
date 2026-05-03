@@ -7,6 +7,7 @@ import pandas as pd
 
 from quantcore.backtest.h017_event import H017EventBacktestResult, backtest_h017_event_driven
 from quantcore.data.coverage import CoverageAssessment, assess_m1_research_coverage
+from quantcore.data.preflight import require_existing_files
 from quantcore.data.leakage import LeakageScan, detect_d1_leakage, trim_to_common_start
 from quantcore.data.mt5_loader import DEFAULT_BROKER_TZ, MT5LoadResult, load_mt5_csv
 from quantcore.strategy.h017_claim import H017Claim, build_h017_claim
@@ -59,18 +60,13 @@ class EventSmokeResult:
     coverage: CoverageAssessment
 
 
-def _require_file(path: Path) -> None:
-    """Fail early with a clear path because MT5 exports are local and intentionally gitignored."""
-
-    if not path.exists():
-        raise FileNotFoundError(f"Required MT5 export not found: {path}")
-
-
 def _load_market_data() -> LoadedMarketData:
     """Load all four MT5 exports before trimming so coverage problems are visible."""
 
-    for path in [USDJPY_H4_PATH, XAUUSD_H4_PATH, USDJPY_M1_PATH, XAUUSD_M1_PATH]:
-        _require_file(path)
+    require_existing_files(
+        [USDJPY_H4_PATH, XAUUSD_H4_PATH, USDJPY_M1_PATH, XAUUSD_M1_PATH],
+        label="MT5 export",
+    )
 
     return LoadedMarketData(
         usdjpy_h4=load_mt5_csv(USDJPY_H4_PATH),
