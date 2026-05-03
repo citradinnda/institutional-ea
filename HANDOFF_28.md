@@ -107,7 +107,7 @@ GitHub remote:
 
     https://github.com/citradinnda/institutional-ea.git
 
-Current latest commit immediately before this handoff is committed:
+Current latest project commit immediately before this handoff is committed:
 
     61b822e Document expanded broker-native H4 M1 aggregation diagnostic
 
@@ -115,7 +115,7 @@ Expected latest commit after this handoff is committed:
 
     Add handoff document #28 after expanded broker-native M1 diagnostics
 
-Recent commits:
+Recent commit context:
 
     61b822e Document expanded broker-native H4 M1 aggregation diagnostic
     66faeb3 Document expanded broker-native M1 coverage density diagnostic
@@ -127,6 +127,11 @@ Recent commits:
     f6b93c8 Add handoff document #27 after HistData path decision checkpoint
     b8f58c5 Document HistData path decision checkpoint
     b43dfe5 Document H4 construction decision checkpoint
+    3cdeaca Document broker H4 M1 alignment diagnostic
+    6a48870 Document broker H4 M1 loaded shape inspection
+    545b5c7 Add handoff document #26 after broker H4 M1 preflight
+    82c68fa Document broker H4 M1 alignment preflight
+    043de0d Add broker H4 M1 alignment diagnostic plan
 
 Known note:
 
@@ -205,7 +210,8 @@ Current rule:
 
 - do not commit raw data,
 - do not commit large derived data,
-- do not write derived data before explicit authorization.
+- do not write derived data before explicit authorization,
+- do not modify raw vendor/broker files.
 
 ## Current Important Paths
 
@@ -247,11 +253,156 @@ Recent docs added after HANDOFF_27:
     C:\Users\equin\Documents\institutional-ea\docs\operations\BROKER_NATIVE_EXPANDED_H4_M1_AGGREGATION_COMPATIBILITY_DIAGNOSTIC.md
     C:\Users\equin\Documents\institutional-ea\docs\operations\BROKER_NATIVE_EXPANDED_H4_M1_AGGREGATION_COMPATIBILITY_DIAGNOSTIC_OUTPUT.txt
 
+Important earlier docs:
+
+    C:\Users\equin\Documents\institutional-ea\docs\operations\HISTDATA_PATH_DECISION_CHECKPOINT.md
+    C:\Users\equin\Documents\institutional-ea\docs\operations\H4_CONSTRUCTION_DECISION_CHECKPOINT.md
+    C:\Users\equin\Documents\institutional-ea\docs\operations\BROKER_H4_M1_ALIGNMENT_DIAGNOSTIC.md
+    C:\Users\equin\Documents\institutional-ea\docs\operations\BROKER_H4_M1_LOADED_SHAPE_INSPECTION.md
+    C:\Users\equin\Documents\institutional-ea\docs\operations\BROKER_H4_M1_ALIGNMENT_PREFLIGHT.md
+    C:\Users\equin\Documents\institutional-ea\docs\operations\BROKER_MISMATCH_ASSESSMENT.md
+    C:\Users\equin\Documents\institutional-ea\docs\operations\BROKER_SHORT_WINDOW_SESSION_DIAGNOSTIC.md
+    C:\Users\equin\Documents\institutional-ea\docs\operations\H017_EVENT_VALIDATION_RUN_LOG.md
+
 Decision docs:
 
     C:\Users\equin\Documents\institutional-ea\docs\decisions\DR-001-m1-data-acquisition.md
     C:\Users\equin\Documents\institutional-ea\docs\decisions\DR-002-external-m1-data-source-evaluation.md
     C:\Users\equin\Documents\institutional-ea\docs\decisions\DR-003-histdata-duplicate-handling.md
+
+## Strategy / Validation Background
+
+The project uses strict hypothesis discipline because many prior strategies failed.
+
+Immutable strategy graveyard summary:
+
+- H001: Backtest without intrabar SL/TP simulation is fiction. Must use M1 inside H4 bars to resolve fills.
+- H002-H003: ATR-based per-symbol stops mandatory; reduce trade frequency to amortize costs.
+- H004a: Single-seed models unreliable; use multi-seed ensembles.
+- H005: Stacked multi-symbol models fail on heterogeneous instruments; use per-symbol models.
+- H006-H007: Confidence filters are not risk management. ML chooses entries; deterministic rules manage risk.
+- H008-H010: High Sharpe with kurtosis 38 is unsafe. ML on basic technicals cannot be risk manager.
+- H011-H013: Deterministic ATR stops + chandelier exits + vol-targeted sizing showed edge on USDJPY, but single-asset tail risk ceiling remained.
+- H014-H016: Two-asset USDJPY + XAUUSD reduced kurtosis and improved Sortino, but 1 percent per-trade risk was not 1 percent portfolio risk when trades overlapped. Drawdown breach was -19.43 percent.
+- H015: Diversification into negative-edge instruments destroys the portfolio.
+- H017: H016 plus portfolio heat governor. Alive but not promotable.
+
+Do not broaden to more symbols yet.
+Do not add machine learning yet.
+Do not tune H017 to vendor quirks or short-window results.
+
+## Core Strategy Conventions
+
+ATR:
+
+- Wilder RMA, not SMA.
+- First true range is high - low.
+- Seed at index window - 1 with simple mean of first window true ranges.
+- Recurrence:
+
+    ATR[t] = (ATR[t-1] * (n - 1) + TR[t]) / n
+
+Chandelier Exit:
+
+- Long:
+
+    highest_high(lookback) - multiplier * ATR
+
+- Short:
+
+    lowest_low(lookback) + multiplier * ATR
+
+Defaults:
+
+    multiplier = 3.0
+    lookback = 22
+
+Vol Target:
+
+- Realized vol at bar t uses returns through t-1 only:
+
+    returns.shift(1).rolling(lookback)
+
+- No lookahead.
+- For H4 bars:
+
+    periods_per_year = 1512
+
+Signals:
+
+- Donchian breakout.
+- Long:
+
+    close[t] > max(high[t-N ... t-1])
+
+- Short:
+
+    close[t] < min(low[t-N ... t-1])
+
+- Channel uses prior N bars:
+
+    shift(1).rolling(N)
+
+H017:
+
+- Inner-joins USDJPY and XAUUSD timestamps.
+- Computes close-to-close returns.
+- Uses same returns for vol targeting and heat governor.
+- Position is signed risk exposure:
+
+    signal * per_trade_risk * vol_mult * heat_mult
+
+Heat governor:
+
+- Combined heat:
+
+    sqrt(w' (r^2 * C) w)
+
+- Defaults:
+
+    cap = 0.015
+    per_trade_risk = 0.01
+    correlation_window = 120
+    correlation_floor = 0.0
+
+## Phase 3 Event-Driven Backtest Conventions
+
+Phase 3.1 fill rule:
+
+If stop and take-profit are both touched in the same M1 bar, stop wins.
+
+Reason:
+
+M1 OHLC does not reveal tick order inside the minute, so stop-first is conservative.
+
+Phase 3.2 cost model defaults:
+
+USDJPY:
+
+    spread_price = 0.01
+    commission_usd_per_lot_per_fill = 7.0
+    stop_slippage_atr_fraction = 0.05
+
+XAUUSD:
+
+    spread_price = 0.30
+    commission_usd_per_lot_per_fill = 10.0
+    stop_slippage_atr_fraction = 0.05
+
+Commission is per fill. A round trip charges entry and exit.
+
+Portfolio P&L:
+
+- XAUUSD P&L is already USD.
+- USDJPY P&L is JPY and must be divided by USDJPY conversion price to become USD.
+
+Event bridge timing:
+
+1. H017 decides at H4 timestamp t.
+2. Trade opens on next H4 bar open t+1.
+3. M1 bars inside [t+1, t+2) resolve stops.
+4. If no stop is hit, exposure closes at t+2 open as signal_flip.
+5. This is a bridge-layer simplification.
 
 ## H017 Current Status
 
@@ -291,8 +442,8 @@ Interpretation:
 
 1. The event pipeline works.
 2. The previous short broker-native M1 history was too short.
-3. Do not trust the short-window +61.46% return as validated edge.
-4. The -33.65% drawdown is a serious risk signal.
+3. Do not trust the short-window +61.46 percent return as validated edge.
+4. The -33.65 percent drawdown is a serious risk signal.
 5. H017 is alive but not promotable.
 
 Do not run H017 until source acceptance explicitly allows it.
@@ -314,6 +465,12 @@ Server reported by user:
 Broker timezone used by loader:
 
     Europe/Athens
+
+Meaning:
+
+- Winter UTC+2
+- Summer UTC+3
+- DST-aware
 
 MT5 loader:
 
@@ -351,6 +508,15 @@ Document:
 Commit:
 
     3d1c67f Document broker-native expanded raw inventory
+
+Status:
+
+- Read-only.
+- Broker-native only.
+- No HistData used.
+- No H017 run.
+- No derived data written.
+- No raw files committed.
 
 Inventory:
 
@@ -400,6 +566,19 @@ Commit:
 
     66d7100 Document expanded broker-native loader timestamp diagnostic
 
+Status:
+
+- Read-only.
+- Broker-native only.
+- No HistData used.
+- No H017 run.
+- No derived data written.
+- No raw files committed.
+
+API inspection:
+
+    load_mt5_csv_signature: (path: 'str | Path', broker_tz: 'str' = 'Europe/Athens') -> 'MT5LoadResult'
+
 Key results:
 
 USDJPY M1:
@@ -409,6 +588,7 @@ USDJPY M1:
     earliest_utc: 2018-07-02 21:00:00+00:00
     latest_utc: 2026-04-30 07:00:00+00:00
     duplicate_timestamps_after_load: 0
+    expected_delta: 1 minute
     expected_delta_pct: 99.316086
     classification: expected_timeframe_spaced
 
@@ -419,6 +599,7 @@ USDJPY H4:
     earliest_utc: 2018-07-02 21:00:00+00:00
     latest_utc: 2026-04-30 05:00:00+00:00
     duplicate_timestamps_after_load: 0
+    expected_delta: 4 hours
     expected_delta_pct: 86.260331
     classification: expected_timeframe_spaced
 
@@ -429,6 +610,7 @@ XAUUSD M1:
     earliest_utc: 2018-06-27 21:00:00+00:00
     latest_utc: 2026-04-30 07:00:00+00:00
     duplicate_timestamps_after_load: 0
+    expected_delta: 1 minute
     expected_delta_pct: 99.861517
     classification: expected_timeframe_spaced
 
@@ -439,6 +621,7 @@ XAUUSD H4:
     earliest_utc: 2018-06-27 21:00:00+00:00
     latest_utc: 2026-04-30 05:00:00+00:00
     duplicate_timestamps_after_load: 0
+    expected_delta: 4 hours
     expected_delta_pct: 86.173039
     classification: expected_timeframe_spaced
 
@@ -460,13 +643,32 @@ Commit:
 
     66faeb3 Document expanded broker-native M1 coverage density diagnostic
 
+Status:
+
+- Read-only.
+- Broker-native only.
+- No HistData used.
+- No H017 run.
+- No derived data written.
+- No raw files committed.
+
 Key result:
 
 The expanded files have a sparse daily-like prefix from 2018 through 2021-06, then become dense M1 candidates starting in 2021-07.
 
 USDJPY M1:
 
+    n_input_rows: 1785312
+    n_bars: 1785312
+    earliest_utc: 2018-07-02 21:00:00+00:00
+    latest_utc: 2026-04-30 07:00:00+00:00
+    duplicate_timestamps_after_load: 0
+    monotonic_increasing: True
+    one_minute_delta_pct: 99.316086
     first_month_observed_pct_ge_50: 2021-07
+    first_month_observed_pct_ge_40: 2021-07
+    first_month_observed_pct_ge_25: 2021-07
+    n_months_total: 94
     n_months_very_sparse_lt_10_pct: 36
     n_months_dense_ge_50_pct: 58
     classification: has_dense_m1_candidate_region
@@ -486,7 +688,17 @@ USDJPY yearly calendar density:
 
 XAUUSD M1:
 
+    n_input_rows: 1704907
+    n_bars: 1704907
+    earliest_utc: 2018-06-27 21:00:00+00:00
+    latest_utc: 2026-04-30 07:00:00+00:00
+    duplicate_timestamps_after_load: 0
+    monotonic_increasing: True
+    one_minute_delta_pct: 99.861517
     first_month_observed_pct_ge_50: 2021-07
+    first_month_observed_pct_ge_40: 2021-07
+    first_month_observed_pct_ge_25: 2021-07
+    n_months_total: 95
     n_months_very_sparse_lt_10_pct: 37
     n_months_dense_ge_50_pct: 58
     classification: has_dense_m1_candidate_region
@@ -525,6 +737,15 @@ Commit:
 
     61b822e Document expanded broker-native H4 M1 aggregation diagnostic
 
+Status:
+
+- Read-only.
+- Broker-native only.
+- No HistData used.
+- No H017 run.
+- No derived data written.
+- No raw files committed.
+
 Method:
 
 1. Load broker-native H4 and M1 files with `load_mt5_csv(..., broker_tz="Europe/Athens")`.
@@ -552,7 +773,18 @@ USDJPY result:
     mismatched_bars: 0
     first_full_m1_window_utc: 2021-07-02 13:00:00+00:00
     last_full_m1_window_utc: 2026-04-30 01:00:00+00:00
+    first_matched_window_utc: 2021-07-02 13:00:00+00:00
+    last_matched_window_utc: 2026-04-30 01:00:00+00:00
     classification: aligned_on_all_full_m1_windows
+
+USDJPY yearly full windows matched:
+
+    2021: 326
+    2022: 1035
+    2023: 1170
+    2024: 1366
+    2025: 1377
+    2026: 427
 
 XAUUSD result:
 
@@ -566,7 +798,18 @@ XAUUSD result:
     mismatched_bars: 0
     first_full_m1_window_utc: 2021-07-02 13:00:00+00:00
     last_full_m1_window_utc: 2026-04-30 01:00:00+00:00
+    first_matched_window_utc: 2021-07-02 13:00:00+00:00
+    last_matched_window_utc: 2026-04-30 01:00:00+00:00
     classification: aligned_on_all_full_m1_windows
+
+XAUUSD yearly full windows matched:
+
+    2021: 640
+    2022: 1271
+    2023: 1271
+    2024: 1281
+    2025: 1271
+    2026: 415
 
 Interpretation:
 
@@ -593,6 +836,17 @@ Current statuses:
 6. H017 validation on HistData: not authorized.
 7. Long-history H017 validation source: none accepted yet.
 8. H017 status: alive but not promotable.
+
+Reason for HistData rejection:
+
+1. Duplicate timestamp handling required special documented policy.
+2. March-July 2023 was materially abnormal for both symbols.
+3. Source-session reconciliation remained unresolved.
+4. Broker mismatch assessment was adverse.
+5. Broker-native H4 became the accepted H4 reference for broker-aligned diagnostics.
+6. HistData-built H4 remained unaccepted.
+7. Broker H4 plus HistData M1 hybrid remained unaccepted.
+8. Using HistData for H017 would risk validating against a source whose session structure and execution bars may not represent the broker.
 
 Allowed HistData uses:
 
@@ -655,7 +909,11 @@ Live trading status:
 
     Not authorized.
 
-## Recommended Next Sub-Phase
+## Practical Next Paths
+
+The expanded broker-native data materially improves the situation.
+
+The next logical work is still source-acceptance diagnostics, not strategy validation.
 
 Recommended next sub-phase:
 
@@ -734,6 +992,25 @@ Do not:
 34. Do not skip session and common-window diagnostics.
 35. Do not skip full pytest.
 36. Do not allow test count to drop below 514 without an explicit test-removal phase.
+
+## Known Repo Hygiene Lessons
+
+Do not repeat these mistakes:
+
+1. `.gitignore` once had unrooted `data/`, which risked excluding `quantcore/data/`.
+2. Some older commits missed files because `git add` was incomplete.
+3. An empty `HANDOFF_16.md` was accidentally committed once; verify handoff file size and preview before committing.
+4. Markdown code fences have been damaged by paste before; avoid nested markdown fences in command blocks.
+5. PowerShell does not support Linux heredocs.
+6. VS Code can keep unsaved buffers that overwrite edits.
+7. If terminal output shows command echo ambiguity, verify with `Select-String` or file previews before proceeding.
+8. Always run tests.
+9. Always inspect git status.
+10. Always push commits.
+11. Always verify `git ls-files` after commits.
+12. Treat test-count drops as regressions.
+13. If terminal output is too large to paste, rerun a compact read-only diagnostic rather than continuing blindly.
+14. If `git commit` says nothing to commit, immediately run recovery status/log/ls-files checks before continuing.
 
 ## Exact First Response The Next AI Should Give
 
