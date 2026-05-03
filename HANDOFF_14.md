@@ -1,3 +1,57 @@
+# HANDOFF_14 CURRENT STATUS UPDATE
+
+## CURRENT STATUS OVERRIDE - PUSH PROBLEM RESOLVED
+
+This section supersedes any older text in this handoff that says Phase 3.7 or HANDOFF_14 still needs to be pushed.
+
+The GitHub push problem has been fixed.
+
+Current verified repo state after the fix:
+
+On branch main
+Your branch is up to date with 'origin/main'.
+
+nothing to commit, working tree clean
+
+Current latest commits, newest first:
+
+d6bc1a5 Add handoff document #14 after Phase 3.7 coverage guard promotion
+850a915 Phase 3.7: promote M1 coverage guard to tested library code
+34cf34b Phase 3.6: add M1 coverage guard to event smoke
+bf5dc22 Phase 3.5: add real-data H017 event smoke script
+bb09cce Add handoff document #13 after Phase 3.4 event backtest bridge
+
+Important correction:
+
+- Phase 3.7 is no longer only local.
+- HANDOFF_14.md is committed and pushed.
+- main is synced with origin/main.
+- The old DNS failure was resolved.
+- Do not retry or repair the old failed push.
+- Continue from the clean synced state above.
+
+Current test anchor for the next AI remains:
+
+476 passed
+
+The next AI should begin with hygiene verification only:
+
+cd C:\Users\equin\Documents\institutional-ea
+.\.venv\Scripts\Activate.ps1
+git status
+git log --oneline -5
+pytest -q
+
+Expected:
+
+nothing to commit, working tree clean
+
+and:
+
+476 passed
+
+---
+
 # Project Handoff — Institutional-Grade MT5 EA on Retail Stack (Continuation #14)
 
 You are continuing an existing project that has gone through many AI handoffs. Read this entire document before responding. Do not invent context that is not here. When in doubt, ask the user before writing code.
