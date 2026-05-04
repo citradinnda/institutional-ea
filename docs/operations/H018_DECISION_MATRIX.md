@@ -41,8 +41,8 @@ H018 planning exists because several possible changes would alter trade eligibil
 | Equality stop validity | Invalid |
 | Invalid stop policy | Fail closed with `H017EventInvalidStopError` |
 | Positive near-zero stop distance | Still an open execution-semantics/account-risk issue |
-| Minimum stop-distance threshold | None selected |
-| Maximum notional/leverage threshold | None selected |
+| Minimum stop-distance threshold | Accepted and implemented: raw_stop_distance must be at least one modeled spread; USDJPY 0.01, XAUUSD 0.30 |
+| Maximum notional/leverage threshold | Accepted and implemented: per-trade USD gross leverage must be at or below 10.0x equity |
 | Executable-entry sizing | Not adopted |
 | Trade skipping/clipping | Not authorized as a silent patch |
 

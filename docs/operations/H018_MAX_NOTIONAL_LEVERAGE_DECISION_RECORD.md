@@ -1,6 +1,6 @@
 ﻿# H018 Maximum Notional / Leverage Decision Record
 
-Status: Accepted for implementation
+Status: Accepted and implemented
 
 ## Decision Summary
 
@@ -282,7 +282,7 @@ This decision only authorizes implementation of a fail-closed maximum per-trade 
 
 ## Current Verdict
 
-Accepted for implementation.
+Accepted and implemented.
 
 The accepted rule is:
 
@@ -300,7 +300,7 @@ The accepted violation policy is:
 
 fail closed
 
-Implementation is authorized only for this narrow guard and its focused synthetic tests.
+Implementation was authorized only for this narrow guard and its focused synthetic tests, and that implementation has been completed.
 
 Real-data validation is not authorized by this decision.
 
