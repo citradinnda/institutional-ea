@@ -46,6 +46,7 @@ Current strict expanded validation reference:
 Current H018 boundary reference:
 
 - docs/operations/H018_BOUNDARY_DECISION_PLAN.md
+- docs/operations/H018_MINIMUM_STOP_DISTANCE_DECISION_PLAN.md
 
 ## Graveyard Summary Before H017
 

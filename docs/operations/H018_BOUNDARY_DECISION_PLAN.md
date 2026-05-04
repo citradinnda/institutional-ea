@@ -139,6 +139,14 @@ Before implementing minimum stop-distance, maximum notional/leverage, or executa
 7. Commit and push.
 8. Only then consider diagnostic or validation real-data runs.
 
+## Subordinate Decision Plans
+
+Opened subordinate H018 decision plans:
+
+- `docs/operations/H018_MINIMUM_STOP_DISTANCE_DECISION_PLAN.md`
+
+The minimum stop-distance plan does not choose a threshold, implement a guard, authorize a real-data rerun, or promote H017/H018.
+
 ## Real-Data Run Restriction
 
 No broad strict real-data validation rerun is authorized by this document.

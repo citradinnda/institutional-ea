@@ -31,6 +31,7 @@ The operational run log is documented here:
 The H018 boundary decision plan is documented here:
 
 - `docs/operations/H018_BOUNDARY_DECISION_PLAN.md`
+- `docs/operations/H018_MINIMUM_STOP_DISTANCE_DECISION_PLAN.md`
 
 ## Guardrails
 

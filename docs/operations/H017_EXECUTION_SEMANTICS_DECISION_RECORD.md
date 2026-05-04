@@ -225,6 +225,10 @@ A read-only sizing diagnostic is recorded here:
 
     docs/operations/H017_NEAR_ZERO_STOP_DISTANCE_DIAGNOSTIC.md
 
+The H018 minimum stop-distance decision plan is recorded here:
+
+    docs/operations/H018_MINIMUM_STOP_DISTANCE_DECISION_PLAN.md
+
 The diagnostic confirms that the current sizing API rejects zero and negative stop distances, but accepts any positive stop distance.
 
 Positive near-zero stop distances can still create extreme broker lots and extreme notional exposure.
