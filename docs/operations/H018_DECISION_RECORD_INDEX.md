@@ -25,6 +25,7 @@ The reusable decision-record template is documented in docs/operations/H018_DECI
 | Trade violation policy | Accepted for implementation | Yes | H018 validation-mode guard violations fail closed. Skip and clipping are rejected for first validation-mode implementation. Diagnostic-only continuation is deferred to a separate explicitly labeled diagnostic mode. |
 | Real-data rerun classification | Pending | Yes | Must decide whether reruns after execution-semantics changes are diagnostic-only or eligible H018 validation. |
 | H018 claim gate | Pending | Yes | Must decide the minimum evidence required before any future H018 claim can be considered. |
+| Portfolio-wide gross leverage rule | Accepted for implementation | Yes | Maximum interval-level portfolio USD gross leverage is capped at 10.0x equity. Gross notionals are summed across candidate non-zero-lot trades without netting. Validation-mode violations fail closed. |
 
 ## Current non-decisions
 
@@ -58,7 +59,7 @@ H018 minimum stop-distance rule is accepted for future implementation:
 8. This rule is implemented.
 9. This rule does not authorize real-data validation.
 
-These accepted policies do not choose any validation claim, promotion rule, live-trading rule, Phase 4 execution approval, portfolio-wide leverage cap, broker margin model, or friction-burden cap.
+These accepted policies do not choose any validation claim, promotion rule, live-trading rule, Phase 4 execution approval, broker margin model or friction-burden cap.
 
 ## Audit rule
 
@@ -77,6 +78,7 @@ H017 remains failed and not promotable. This index does not alter that verdict.
 | docs/operations/H018_MINIMUM_STOP_DISTANCE_DECISION_RECORD.md | Accepted and implemented | Yes | Yes | No | Raw-entry stop distance must be greater than or equal to one modeled spread for the symbol. USDJPY threshold is 0.01. XAUUSD threshold is 0.30. Validation-mode violations fail closed. No real-data validation is authorized. |
 | docs/operations/H018_MAX_NOTIONAL_LEVERAGE_DECISION_RECORD.md | Accepted and implemented | Yes | Yes | No | Maximum per-trade USD gross leverage is capped at 10.0x equity. XAUUSD notional_quote is treated as USD. USDJPY notional_quote is converted to USD by dividing by entry_raw_price. Violations fail closed. No real-data validation is authorized. |
 | docs/operations/H018_TRADE_VIOLATION_POLICY_DECISION_RECORD.md | Accepted for implementation | Yes | Yes | No | H018 validation-mode guard violations fail closed. Skip and clipping are rejected for first validation-mode implementation. Diagnostic-only continuation is deferred to a separate explicitly labeled diagnostic mode. |
+| docs/operations/H018_PORTFOLIO_GROSS_LEVERAGE_DECISION_RECORD.md | Accepted for implementation | Yes | Yes | No | Maximum interval-level portfolio USD gross leverage is capped at 10.0x equity. USD-converted gross notionals are summed across candidate non-zero-lot trades without netting. Violations fail closed. No real-data validation is authorized. |
 
 <!-- H018_MAX_NOTIONAL_LEVERAGE_ACCEPTED_START -->
 ## H018 Maximum Notional / Leverage Decision Record

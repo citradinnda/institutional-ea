@@ -45,6 +45,7 @@ H018 planning exists because several possible changes would alter trade eligibil
 | Maximum notional/leverage threshold | Accepted and implemented: per-trade USD gross leverage must be at or below 10.0x equity |
 | Executable-entry sizing | Not adopted |
 | Trade skipping/clipping | Not authorized as a silent patch |
+| Portfolio-wide gross leverage threshold | Accepted for implementation: interval-level portfolio USD gross leverage must be at or below 10.0x equity, summed gross across candidate non-zero-lot trades without netting |
 
 ## Consolidated Decision Matrix
 
