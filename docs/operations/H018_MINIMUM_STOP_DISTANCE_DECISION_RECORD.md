@@ -2,7 +2,7 @@
 
 Decision title: H018 minimum stop-distance rule.
 Decision identifier: H018-MSDR-001.
-Decision status: Draft.
+Decision status: Accepted for implementation.
 Date: 2026-05-04.
 Related hypothesis: H018 candidate successor hypothesis.
 Related documents:
@@ -15,6 +15,7 @@ Related documents:
 - docs/operations/H018_SIZING_REFERENCE_DECISION_RECORD.md
 - docs/operations/H018_MINIMUM_STOP_DISTANCE_DECISION_PLAN.md
 - docs/operations/H018_MAX_NOTIONAL_LEVERAGE_DECISION_PLAN.md
+- docs/operations/H018_TRADE_VIOLATION_POLICY_DECISION_RECORD.md
 - docs/operations/H018_DECISION_MATRIX.md
 - docs/operations/H018_CLAIM_SKELETON.md
 - docs/operations/H018_DECISION_RECORD_TEMPLATE.md
@@ -28,253 +29,127 @@ Phase 4 execution status: not approved.
 
 ## Purpose
 
-This draft decision record defines the unresolved H018 minimum stop-distance question.
+This decision record accepts the first H018 minimum stop-distance policy.
 
-It exists to prevent positive near-zero stop-distance handling from becoming a silent repair to failed H017 evidence.
+The purpose is to prevent positive near-zero stop-distance denominators from creating unrealistic or account-destructive position sizes during validation-mode event backtesting.
 
-This draft does not choose a minimum stop-distance rule.
-
-This draft does not choose a numeric threshold.
-
-This draft does not choose spread, ATR, tick size, broker point, all-in friction, or a combined maximum as the reference.
-
-This draft does not choose fail-closed, skip, clip, or diagnostic-continuation behavior.
-
-This draft does not authorize implementation.
-
-This draft does not authorize a real-data rerun.
-
-This draft does not approve live trading.
-
-This draft does not approve Phase 4 execution work.
-
-## Scope
-
-This decision record affects the following open decision areas:
-
-1. Minimum stop-distance rule.
-2. Minimum stop-distance threshold reference.
-3. Minimum stop-distance violation policy.
-4. Real-data validation classification after any future minimum-distance rule.
-5. H017 non-promotion language.
-6. H018 claim relationship.
-
-This decision record does not choose a policy for:
-
-1. Entry sizing reference.
-2. Stop-validity reference.
-3. Maximum notional or leverage rule.
-4. Maximum exposure violation policy.
-5. Trade skipping.
-6. Trade clipping.
-7. Portfolio-level exposure caps.
-8. Margin approximation.
-9. Live deployment.
-
-Those subjects require separate H018 decision records before implementation.
-
-## Current Behavior
+This is not an H017 repair.
 
 H017 remains failed and not promotable.
 
-H017 failed strict expanded broker-native event validation by insolvency on a complete strict bridge window.
+This decision creates an H018 execution-semantics requirement for future implementation.
 
-The historically important failure included a pathological USDJPY trade caused by a near-zero raw-entry stop-distance denominator before the invalid-stop guard existed.
+This decision does not authorize a real-data rerun.
 
-Current H017 event sizing uses the raw H4 entry open before spread.
+This decision does not validate H018.
 
-Current H017 raw-entry invalid-stop behavior fails closed for invalid directional geometry:
+This decision does not approve live trading.
 
-1. A long or buy stop must be below the raw H4 entry open.
-2. A short or sell stop must be above the raw H4 entry open.
-3. Equality is invalid.
+This decision does not approve Phase 4 execution work.
 
-Invalid directional stops are not skipped silently.
+## Accepted Minimum Stop-Distance Policy
 
-Invalid directional stops are not clipped.
+For first H018 validation-mode implementation, a candidate trade must have a raw-entry stop distance greater than or equal to one modeled spread for that symbol.
 
-The current sizing API rejects zero and negative stop distances.
+The selected rule is:
 
-The current sizing API does not reject positive near-zero stop distances solely because they are near zero.
+1. Compute raw_stop_distance as the absolute difference between the raw H4 entry open and the selected stop price.
+2. Compute minimum_stop_distance as the modeled spread price for the symbol.
+3. If raw_stop_distance is less than minimum_stop_distance, fail closed.
+4. If raw_stop_distance is equal to minimum_stop_distance, pass this guard.
+5. If raw_stop_distance is greater than minimum_stop_distance, pass this guard.
 
-Positive near-zero stop distance remains an open execution-semantics and account-risk issue.
+Formula:
 
-No minimum stop-distance threshold has been selected.
+    raw_stop_distance = abs(raw_h4_entry_open - stop_price)
+    minimum_stop_distance = modeled_spread_price_for_symbol
 
-No minimum stop-distance violation policy has been selected.
+    raw_stop_distance < minimum_stop_distance  -> fail closed
+    raw_stop_distance >= minimum_stop_distance -> pass this guard
 
-No maximum notional threshold has been selected.
+## Selected Thresholds
 
-No maximum leverage threshold has been selected.
+The selected minimum stop-distance threshold is one modeled spread.
 
-No executable-entry sizing has been adopted.
+Current modeled spreads:
 
-No H018 implementation exists.
+| Symbol | Modeled spread price | Minimum raw-entry stop distance |
+|---|---:|---:|
+| USDJPY | 0.01 | 0.01 JPY price distance |
+| XAUUSD | 0.30 | 0.30 USD price distance |
 
-No H018 validation exists.
+These values come from the current cost-model assumptions already used by the event engine.
 
-No H018 claim has been accepted.
+This decision does not choose floating historical spreads.
 
-## Draft Minimum Stop-Distance Question
+This decision does not choose ATR-based minimum distance.
 
-The unresolved minimum stop-distance question is:
+This decision does not choose tick-size-only minimum distance.
 
-Should future H018 require a positive stop distance to also be large enough relative to one or more market, broker, or risk references?
+This decision does not choose all-in friction conversion.
 
-If yes, a future accepted decision record must define:
+This decision does not choose a combined maximum rule.
 
-1. The stop-distance reference.
-2. The threshold formula.
-3. The threshold units.
-4. The instruments affected.
-5. Whether USDJPY and XAUUSD are handled differently.
-6. The selected violation policy.
-7. Whether the rule changes trade eligibility.
-8. Whether the rule changes realized exposure.
-9. Whether the rule changes the PnL path.
-10. Whether the rule creates H018 rather than repairing H017.
+Those alternatives remain deferred unless later accepted by a separate decision record.
 
-No option is selected by this draft.
+## Reference Basis
 
-## Candidate Minimum-Distance References
+The accepted minimum-distance reference is the raw H4 entry open.
 
-### 1. Spread Multiple
+For this first H018 minimum-distance policy:
 
-Under this candidate, stop distance would need to exceed a multiple of spread.
+1. The entry reference is raw_h4_entry_open.
+2. The stop reference is the strategy-emitted stop price for the same decision.
+3. The stop distance is measured before spread-adjusted executable entry is applied.
+4. The rule is applied after directional stop geometry is checked.
+5. The rule is applied before position sizing.
 
-Potential advantage:
+This matches the current event-engine sizing denominator basis and directly guards the denominator used by size_position_from_risk.
 
-1. Links minimum distance to entry friction.
-2. Prevents sizing from being dominated by a distance smaller than the quoted spread.
-3. Is simple to explain.
+This decision does not choose executable-entry sizing.
 
-Potential risk:
+This decision does not choose executable-entry stop-validity reference.
 
-1. Fixed historical spread assumptions may understate real spread variation.
-2. Spread-based filtering can change trade eligibility.
-3. Symbol-specific spread conventions are required.
-4. It may not be sufficient to prevent extreme notional exposure.
+Executable-entry sizing and stop-validity reference remain separate unresolved H018 decisions.
 
-### 2. ATR Fraction
+## Violation Policy
 
-Under this candidate, stop distance would need to exceed a fraction of ATR.
+The accepted violation policy is fail closed in validation mode.
 
-Potential advantage:
+If the minimum stop-distance rule is violated:
 
-1. Links minimum distance to recent volatility.
-2. Adapts to instrument regime changes.
-3. Can prevent stops that are tiny relative to normal price movement.
+1. The validation run must stop.
+2. The violation must not be silently ignored.
+3. The trade must not be skipped as if no signal occurred.
+4. The position must not be clipped or resized.
+5. The run must not continue as a valid validation run.
+6. The error or invalid-run output must identify the violated rule and raw values that caused the violation.
 
-Potential risk:
+This follows the accepted H018 trade violation policy in:
 
-1. ATR thresholds can become strategy logic rather than pure execution realism.
-2. ATR calculation choices can affect eligibility.
-3. Changing ATR-based eligibility can materially alter the hypothesis.
-4. It likely requires H018 if adopted.
+- docs/operations/H018_TRADE_VIOLATION_POLICY_DECISION_RECORD.md
 
-### 3. Tick Size Or Broker Point Multiple
+## Boundary Behavior
 
-Under this candidate, stop distance would need to exceed a number of ticks or broker points.
+Boundary behavior is explicit:
 
-Potential advantage:
+1. raw_stop_distance less than minimum_stop_distance fails closed.
+2. raw_stop_distance equal to minimum_stop_distance passes this guard.
+3. raw_stop_distance greater than minimum_stop_distance passes this guard.
 
-1. Prevents mathematically positive but practically negligible stop distances.
-2. Aligns with broker precision.
-3. Can be tested deterministically.
+Equality passes the minimum-distance guard because the accepted rule is a floor of at least one modeled spread.
 
-Potential risk:
+This does not override directional stop validity.
 
-1. Tick or point rules alone may be too small to prevent extreme leverage.
-2. Symbol-specific point definitions are required.
-3. Broker metadata may differ across account types.
-4. It may need to be combined with another rule.
+Directional stop validity remains separate:
 
-### 4. All-In Friction Multiple
+1. A long or buy stop must be below the selected entry validity reference.
+2. A short or sell stop must be above the selected entry validity reference.
+3. Equality at the directional stop-validity reference remains invalid under the current H017 raw-entry guard unless a later H018 stop-validity decision changes that rule.
 
-Under this candidate, stop distance would need to exceed a multiple of expected all-in friction.
+## Instruments And Units
 
-Friction may include:
-
-1. Spread.
-2. Commission converted into price-distance equivalent.
-3. Stop slippage estimate.
-
-Potential advantage:
-
-1. Connects minimum distance to expected execution cost.
-2. Can prevent trades where friction dominates the intended risk.
-3. Makes cost burden visible.
-
-Potential risk:
-
-1. Commission-to-price-distance conversion is symbol-specific.
-2. The formula may depend on lot size, account equity, or conversion price.
-3. Circularity can occur if lot size is needed before the threshold can be computed.
-4. Complexity can hide tuning.
-
-### 5. Combined Maximum Rule
-
-Under this candidate, stop distance would need to exceed the maximum of several references, such as:
-
-1. Spread multiple.
-2. ATR fraction.
-3. Tick or point multiple.
-4. All-in friction multiple.
-
-Potential advantage:
-
-1. Avoids relying on one fragile threshold.
-2. Can be conservative across different market regimes.
-3. Can handle both broker precision and volatility scale.
-
-Potential risk:
-
-1. More complex than a single-reference rule.
-2. Requires careful audit output.
-3. Can reject more trades.
-4. Can become hidden strategy filtering if not governed explicitly.
-
-## Candidate Violation Policies
-
-If a future minimum stop-distance rule is violated, the project must choose one explicit violation policy.
-
-No violation policy is chosen here.
-
-Candidate policies include:
-
-1. Fail closed with an explicit error.
-2. Skip the trade and continue.
-3. Clip or resize the position and continue.
-4. Mark the run invalid but continue diagnostics only.
-
-Skipping and clipping can materially change the realized strategy and must not be introduced without an accepted H018 decision record.
-
-## Draft Non-Decision
-
-This draft makes the following non-decision:
-
-1. No minimum stop-distance rule is selected.
-2. No minimum stop-distance threshold is selected.
-3. No spread multiple is selected.
-4. No ATR fraction is selected.
-5. No tick-size multiple is selected.
-6. No broker-point multiple is selected.
-7. No all-in friction multiple is selected.
-8. No combined maximum rule is selected.
-9. No minimum-distance violation policy is selected.
-10. No fail-closed policy is selected for a new H018 minimum-distance rule.
-11. No trade-skip policy is selected.
-12. No clipping policy is selected.
-13. No diagnostic-continuation policy is selected.
-14. No implementation is authorized.
-15. No real-data run is authorized.
-16. No H018 validation is authorized.
-17. No live trading is approved.
-18. No Phase 4 execution work is approved.
-
-## Units And Instruments
-
-This draft applies to the current candidate research scope:
+This accepted policy applies to the current H018 candidate scope only:
 
 1. USDJPY.
 2. XAUUSD.
@@ -282,121 +157,163 @@ This draft applies to the current candidate research scope:
 4. Broker-native M1 bridge-window execution.
 5. Exness demo MT5 exports conditionally accepted only under strict complete-window rules.
 
-Potential stop-distance units are instrument price units:
+Units:
 
-1. USDJPY price distance is measured in JPY per USD.
-2. XAUUSD price distance is measured in USD per troy ounce.
+1. USDJPY stop distance is measured in JPY price units.
+2. XAUUSD stop distance is measured in USD price units.
+3. The threshold is symbol-specific because modeled spread price is symbol-specific.
 
-Potential threshold references may use:
+## Rationale
 
-1. Spread price distance.
-2. ATR price distance.
-3. Tick size.
-4. Broker point.
-5. Commission converted into price distance.
-6. Slippage converted into price distance.
-7. A maximum of multiple references.
+The original strict expanded broker-native H017 validation failed by insolvency.
 
-This draft does not select any numeric value in those units.
+The historically important failure included a pathological USDJPY size caused by a near-zero raw-entry stop-distance denominator.
 
-This draft does not define notional, leverage, margin, or friction-burden caps.
+The fatal diagnostic raw distance was approximately:
+
+    0.000240804
+
+The current modeled USDJPY spread is:
+
+    0.01
+
+A stop-distance denominator smaller than the modeled spread is not credible for validation-mode position sizing because the intended risk denominator is smaller than the modeled transaction-cost uncertainty.
+
+This rule directly blocks that known near-zero denominator class without tuning Donchian parameters, ATR parameters, heat-governor parameters, symbol universe, or machine-learning logic.
+
+The rule is intentionally simple and auditable.
+
+It is not claimed to be sufficient by itself.
+
+A separate maximum notional or leverage guard is still required before any real-data validation attempt.
 
 ## Effect On Trade Eligibility
 
-This draft does not change trade eligibility.
+This decision changes future H018 trade eligibility.
 
-No trade is accepted, rejected, skipped, clipped, or failed closed by this draft alone.
+A trade that is directionally valid but has raw_stop_distance less than one modeled spread will be invalid in H018 validation mode.
 
-Any future accepted decision that adds a minimum stop-distance rule can change trade eligibility and must be treated as an H018 semantics change unless separately proven otherwise.
+This must be treated as H018 implementation work.
+
+It must not be described as H017 promotion.
 
 ## Effect On Realized Exposure
 
-This draft does not change realized exposure.
+This decision does not clip or resize exposure.
 
-No lot size, notional amount, leverage amount, margin amount, or risk fraction is changed by this draft alone.
+It only defines a future fail-closed invalid-trade condition.
 
-Any future accepted decision that clips or resizes trades after a minimum-distance violation can change realized exposure and must be treated as an H018 semantics change unless separately proven otherwise.
+If implemented, trades that violate the rule stop the validation run rather than being resized, skipped, or allowed.
+
+This decision does not define maximum notional exposure.
+
+This decision does not define maximum leverage.
+
+This decision does not define margin requirements.
 
 ## Effect On PnL Path
 
-This draft does not change the PnL path.
+This decision can affect the future H018 validation path because a rule violation stops the run.
 
-Any future implementation that changes stop-distance eligibility, sizing, skips, clips, guard behavior, fills, or costs can change the PnL path and must be classified as H018 implementation work or diagnostics, not H017 promotion.
+It does not create a new PnL path by skipping or clipping trades.
 
-## Rejected Alternatives
+A validation-mode fail-closed result is an invalid-run or failed-validation state, not an alternate equity curve.
 
-The following alternatives are rejected at the draft level:
+## Required Audit Fields
 
-1. Silently accepting all positive near-zero stop distances as solved.
+A future implementation must expose enough information to audit a minimum-distance violation.
 
-   Rejected because positive near-zero stop distance remains an open account-risk issue.
+At minimum, the error or invalid-run output must include:
 
-2. Silently adding a minimum stop-distance guard as an H017 repair.
-
-   Rejected because H017 already failed strict expanded broker-native event validation by insolvency.
-
-3. Choosing a threshold without a decision record.
-
-   Rejected because threshold choice can change trade eligibility and validation outcome.
-
-4. Treating skip or clip behavior as a harmless implementation detail.
-
-   Rejected because skipping changes trade eligibility and clipping changes realized exposure.
-
-5. Treating a future rerun after a minimum-distance rule as H017 promotion.
-
-   Rejected because altered semantics would not be the original H017 evidence path.
-
-## Deferred Alternatives
-
-The following alternatives are deferred to future decision records:
-
-1. Use a spread multiple.
-2. Use an ATR fraction.
-3. Use a tick-size multiple.
-4. Use a broker-point multiple.
-5. Use an all-in friction multiple.
-6. Use a combined maximum rule.
-7. Fail closed on minimum-distance violations.
-8. Skip trades on minimum-distance violations.
-9. Clip or resize trades on minimum-distance violations.
-10. Mark the run invalid but continue diagnostics.
-11. Define symbol-specific thresholds for USDJPY and XAUUSD.
-12. Define one shared threshold formula for both symbols.
-13. Require audit output for minimum-distance classification.
-
-No deferred alternative is chosen here.
+1. Rule name.
+2. Symbol.
+3. Side.
+4. Decision time.
+5. Entry time.
+6. Raw H4 entry open.
+7. Stop price.
+8. Raw stop distance.
+9. Minimum stop-distance threshold.
+10. Threshold basis, which is one modeled spread.
+11. Modeled spread price.
+12. Boundary comparison result.
+13. Validation-mode action, which is fail closed.
 
 ## Synthetic Test Requirements
 
-No code implementation is authorized by this draft, so no synthetic tests are required before committing this documentation-only record.
+Before implementation is accepted, focused synthetic tests must cover at least:
 
-If a later decision record is accepted for implementation, it must define focused synthetic tests before code changes.
+1. Directionally valid long stop with raw distance below one spread fails closed.
+2. Directionally valid short stop with raw distance below one spread fails closed.
+3. Directionally valid long stop with raw distance exactly equal to one spread passes the minimum-distance guard.
+4. Directionally valid short stop with raw distance exactly equal to one spread passes the minimum-distance guard.
+5. Directionally valid long stop with raw distance above one spread passes the minimum-distance guard.
+6. Directionally valid short stop with raw distance above one spread passes the minimum-distance guard.
+7. USDJPY uses 0.01 as the minimum raw-entry stop distance.
+8. XAUUSD uses 0.30 as the minimum raw-entry stop distance.
+9. Minimum-distance violation error includes raw H4 entry open, stop price, raw stop distance, threshold, symbol, side, decision time, and entry time.
+10. Existing invalid directional stop tests remain valid.
+11. Existing equality invalid-stop tests remain valid for directional stop geometry.
+12. No skip behavior is introduced for minimum-distance violations.
+13. No clipping behavior is introduced for minimum-distance violations.
+14. Full pytest count must not drop below the current anchor unless an explicit test-removal phase exists.
 
-At minimum, future minimum stop-distance implementation records must cover:
+## Rejected Alternatives
 
-1. Directionally valid long stop with normal distance.
-2. Directionally valid short stop with normal distance.
-3. Directionally valid long stop with positive near-zero distance.
-4. Directionally valid short stop with positive near-zero distance.
-5. Stop distance below the selected threshold.
-6. Stop distance exactly at the selected threshold.
-7. Stop distance above the selected threshold.
-8. Long-side behavior.
-9. Short-side behavior.
-10. USDJPY symbol-specific behavior if point, spread, commission, ATR, or conversion is used.
-11. XAUUSD symbol-specific behavior if point, spread, commission, ATR, or conversion is used.
-12. Equality remains invalid under the selected stop-validity semantics.
-13. Directionally invalid stops still fail closed if the existing H017 invalid-stop behavior is unchanged.
-14. The selected violation policy.
-15. Audit output for accepted, failed, skipped, clipped, or diagnostic-only trades.
-16. Test count preservation against the current full-test anchor unless an explicit test-removal phase exists.
+The following alternatives are rejected for first H018 validation-mode implementation:
+
+1. Silently accepting all positive near-zero stop distances.
+
+   Rejected because positive near-zero stop distance remains an account-risk issue.
+
+2. Skipping trades that violate the minimum-distance rule.
+
+   Rejected because skipping changes trade eligibility and can create a different strategy path.
+
+3. Clipping or resizing trades that violate the minimum-distance rule.
+
+   Rejected because clipping changes realized exposure and can hide invalid sizing.
+
+4. Warn-and-continue.
+
+   Rejected because validation mode must not continue as valid after a guard violation.
+
+5. Log-only continuation.
+
+   Rejected because validation mode must fail closed.
+
+6. ATR-based threshold as the first implementation.
+
+   Deferred because ATR thresholding can become strategy filtering and requires additional governance.
+
+7. Combined maximum rule as the first implementation.
+
+   Deferred because it is more complex and should not be introduced before the simpler spread-floor guard and maximum exposure guard are separately governed.
+
+8. Treating this rule as H017 repair.
+
+   Rejected because H017 already failed strict expanded broker-native event validation by insolvency.
+
+## Deferred Decisions
+
+The following decisions remain unresolved:
+
+1. Maximum notional threshold.
+2. Maximum leverage threshold.
+3. Exposure measurement basis.
+4. Sizing reference.
+5. Stop-validity reference.
+6. Executable-entry sizing.
+7. Real-data rerun classification.
+8. H018 claim gate.
+9. Diagnostic-only continuation mode.
+10. Live deployment criteria.
 
 ## Real-Data Run Classification
 
-No real-data run is authorized by this draft.
+No real-data run is authorized by this decision.
 
-This draft does not authorize:
+This decision does not authorize:
 
 1. H017 promotion rerun.
 2. H018 diagnostic rerun.
@@ -404,9 +321,9 @@ This draft does not authorize:
 4. Phase 4 execution dry run.
 5. Live trading.
 
-Any future real-data run after minimum stop-distance changes must be authorized by a separate accepted decision record or claim document.
+Any future real-data run after implementation of this rule must be separately authorized and classified.
 
-A real-data run after changed minimum-distance semantics must never be described as H017 promotion.
+A real-data run after this rule is implemented must never be described as H017 promotion.
 
 ## Non-Promotion Language
 
@@ -414,72 +331,49 @@ H017 remains failed.
 
 H017 is not promotable.
 
-This draft does not repair H017.
+This decision does not repair H017.
 
-This draft does not validate H018.
+This decision does not validate H018.
 
-This draft does not approve live trading.
+This decision does not approve live trading.
 
-This draft does not approve Phase 4 execution.
+This decision does not approve Phase 4 execution.
 
-Passing tests after any future implementation would not automatically approve live trading.
+Passing tests after future implementation will not approve live trading.
 
 Any future H018 validation must be judged under an explicit H018 claim.
 
-## Audit Requirements
-
-This draft does not impose implementation audit output because it does not implement a minimum stop-distance rule.
-
-Future decision records that affect minimum stop distance must require audit output showing:
-
-1. Which minimum-distance rule was applied.
-2. Which threshold reference was used.
-3. Raw H4 entry open.
-4. Executable entry after spread if applicable.
-5. Stop price.
-6. Selected stop-distance denominator.
-7. Spread distance if used.
-8. ATR distance if used.
-9. Tick or point distance if used.
-10. Friction distance if used.
-11. Combined threshold if used.
-12. Whether the trade was accepted.
-13. Whether the trade failed closed.
-14. Whether the trade was skipped, if skipping is selected.
-15. Whether the trade was clipped, if clipping is selected.
-16. Whether the trade continued as diagnostic-only, if diagnostic continuation is selected.
-17. Final accepted or rejected lot size if sizing is affected.
-
 ## Implementation Gate
 
-No code implementation should begin from this draft.
+This decision is accepted for future implementation, but implementation must not begin until the next implementation phase explicitly defines the exact code changes and tests.
 
-Before implementing any H018 minimum stop-distance behavior:
+Before code changes:
 
-1. The relevant decision record must be accepted for implementation.
-2. The selected threshold reference must be explicit.
-3. The selected threshold formula must be explicit.
-4. The selected units must be explicit.
-5. USDJPY and XAUUSD handling must be explicit.
-6. The selected violation policy must be explicit.
-7. Required synthetic tests must be listed.
-8. Real-data run classification must be explicit.
-9. Non-promotion language must be present.
-10. H018 claim relationship must be clear.
+1. Inspect the relevant APIs again if needed.
+2. Define the new error type or invalid-run representation.
+3. Define exact synthetic tests.
+4. Confirm modeled spread constants are imported from the existing cost model or otherwise referenced without duplication.
+5. Preserve existing H017 invalid-stop tests.
+6. Run focused tests.
+7. Run full pytest.
+8. Preserve the current full-test anchor unless a deliberate test-removal phase exists.
+9. Commit and push.
 
 ## Current Verdict
 
-This is a draft minimum stop-distance decision record only.
+The H018 minimum stop-distance policy is accepted for future implementation.
 
-No H018 minimum stop-distance rule is chosen here.
+The accepted rule is:
 
-No H018 minimum stop-distance threshold is chosen here.
+    raw_stop_distance must be greater than or equal to one modeled spread for the symbol.
 
-No H018 minimum-distance violation policy is chosen here.
+The accepted violation policy is validation-mode fail closed.
 
-No H018 guard is implemented here.
+No code is implemented by this decision record.
 
-No H018 real-data run is authorized here.
+No H018 validation is authorized by this decision record.
+
+No real-data run is authorized by this decision record.
 
 H018 remains unimplemented.
 

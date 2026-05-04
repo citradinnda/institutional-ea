@@ -20,15 +20,13 @@ The reusable decision-record template is documented in docs/operations/H018_DECI
 | H018 hypothesis boundary | Draft | Yes | Must preserve the original H017 failure and define whether H018 is a new hypothesis or a semantics-only successor. |
 | Sizing reference | Draft | Yes | Must decide whether sizing uses raw H4 entry, executable entry after spread, both, or another explicitly named reference. |
 | Directional stop validity reference | Draft | Yes | Must decide whether long and short stop geometry is checked against raw entry, executable entry, both, or another explicit reference. |
-| Minimum stop-distance rule | Draft | Yes | Must decide whether positive near-zero stop distances fail closed and what reference defines the minimum allowed distance. |
+| Minimum stop-distance rule | Accepted for implementation | Yes | Raw-entry stop distance must be greater than or equal to one modeled spread for the symbol. Validation-mode violations fail closed. |
 | Maximum notional/leverage rule | Draft | Yes | Must decide whether exposure caps are enforced and how exposure is measured. |
 | Trade violation policy | Accepted for implementation | Yes | H018 validation-mode guard violations fail closed. Skip and clipping are rejected for first validation-mode implementation. Diagnostic-only continuation is deferred to a separate explicitly labeled diagnostic mode. |
 | Real-data rerun classification | Pending | Yes | Must decide whether reruns after execution-semantics changes are diagnostic-only or eligible H018 validation. |
 | H018 claim gate | Pending | Yes | Must decide the minimum evidence required before any future H018 claim can be considered. |
 
 ## Current non-decisions
-
-No minimum stop-distance threshold has been chosen.
 
 No maximum notional threshold has been chosen.
 
@@ -56,7 +54,19 @@ Log-only continuation is rejected for validation mode.
 
 Diagnostic-only continuation is deferred to a separate explicitly labeled diagnostic mode.
 
-This accepted violation policy does not choose any minimum stop-distance threshold, maximum notional threshold, maximum leverage threshold, sizing reference, stop-validity reference, validation claim, promotion rule, live-trading rule, or Phase 4 execution approval.
+H018 minimum stop-distance rule is accepted for future implementation:
+
+1. raw_stop_distance is abs(raw_h4_entry_open - stop_price).
+2. minimum_stop_distance is one modeled spread for the symbol.
+3. USDJPY minimum raw-entry stop distance is 0.01.
+4. XAUUSD minimum raw-entry stop distance is 0.30.
+5. raw_stop_distance less than minimum_stop_distance fails closed.
+6. raw_stop_distance equal to minimum_stop_distance passes this guard.
+7. raw_stop_distance greater than minimum_stop_distance passes this guard.
+8. This rule is not implemented yet.
+9. This rule does not authorize real-data validation.
+
+These accepted policies do not choose any maximum notional threshold, maximum leverage threshold, sizing reference, stop-validity reference, validation claim, promotion rule, live-trading rule, or Phase 4 execution approval.
 
 ## Audit rule
 
@@ -72,6 +82,6 @@ H017 remains failed and not promotable. This index does not alter that verdict.
 |---|---|---:|---:|---:|---|
 | docs/operations/H018_BOUNDARY_DECISION_RECORD.md | Draft | No | No | No | Draft boundary record only. Preserves H017 failure visibility and states that H018, if pursued, is a successor hypothesis rather than a silent H017 repair. |
 | docs/operations/H018_SIZING_REFERENCE_DECISION_RECORD.md | Draft | No | No | No | Draft sizing-reference and stop-validity-reference record only. Does not choose raw entry, executable entry, both-reference, conservative, skip, clip, or rerun policy. |
-| docs/operations/H018_MINIMUM_STOP_DISTANCE_DECISION_RECORD.md | Draft | No | No | No | Draft minimum stop-distance record only. Does not choose spread, ATR, tick, point, friction, combined rule, threshold, fail-closed, skip, clip, diagnostic, or rerun policy. |
+| docs/operations/H018_MINIMUM_STOP_DISTANCE_DECISION_RECORD.md | Accepted for implementation | Yes | Yes | No | Raw-entry stop distance must be greater than or equal to one modeled spread for the symbol. USDJPY threshold is 0.01. XAUUSD threshold is 0.30. Validation-mode violations fail closed. No real-data validation is authorized. |
 | docs/operations/H018_MAX_NOTIONAL_LEVERAGE_DECISION_RECORD.md | Draft | No | No | No | Draft maximum notional / leverage record only. Does not choose lots, notional, notional/equity, leverage, margin, friction, threshold, fail-closed, skip, clip, diagnostic, or rerun policy. |
 | docs/operations/H018_TRADE_VIOLATION_POLICY_DECISION_RECORD.md | Accepted for implementation | Yes | Yes | No | H018 validation-mode guard violations fail closed. Skip and clipping are rejected for first validation-mode implementation. Diagnostic-only continuation is deferred to a separate explicitly labeled diagnostic mode. |
