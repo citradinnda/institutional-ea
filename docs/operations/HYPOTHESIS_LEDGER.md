@@ -269,5 +269,6 @@ The open H018 boundary, minimum stop-distance, maximum notional/leverage, and ex
 
 ## H018 claim skeleton
 
-The minimum structure for any future H018 claim is documented in docs/operations/H018_CLAIM_SKELETON.md. The reusable template for future H018 decision records is documented in docs/operations/H018_DECISION_RECORD_TEMPLATE.md. H018 remains unimplemented, unvalidated, not promotable, and not live-approved. H017 remains failed and not promotable.
+The minimum structure for any future H018 claim is documented in docs/operations/H018_CLAIM_SKELETON.md. The reusable template for future H018 decision records is documented in docs/operations/H018_DECISION_RECORD_TEMPLATE.md. The pending H018 decision inventory is documented in docs/operations/H018_DECISION_RECORD_INDEX.md. H018 remains unimplemented, unvalidated, not promotable, and not live-approved. H017 remains failed and not promotable.
+
 

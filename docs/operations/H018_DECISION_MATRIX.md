@@ -65,7 +65,7 @@ H018 planning exists because several possible changes would alter trade eligibil
 
 Before implementing any H018 execution/account-risk behavior, at least one explicit decision record should choose the intended policy for:
 
-The reusable decision-record structure is documented in docs/operations/H018_DECISION_RECORD_TEMPLATE.md. The template is governance-only and does not choose a policy by itself.
+The reusable decision-record structure is documented in docs/operations/H018_DECISION_RECORD_TEMPLATE.md. The pending decision inventory is documented in docs/operations/H018_DECISION_RECORD_INDEX.md. The template and index are governance-only and do not choose a policy by themselves.
 
 1. H018 hypothesis boundary.
 2. Sizing reference.
@@ -124,4 +124,5 @@ Phase 4 execution remains not approved.
 ## H018 claim skeleton reference
 
 The validation-gate structure for any future H018 claim is documented in docs/operations/H018_CLAIM_SKELETON.md. The claim skeleton must be resolved before any H018 validation run is treated as more than diagnostic-only.
+
 

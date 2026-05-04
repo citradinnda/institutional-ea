@@ -72,5 +72,6 @@ H018 execution-semantics and account-risk planning is consolidated in docs/opera
 
 ## H018 claim skeleton
 
-A governance skeleton for any future H018 claim is documented in docs/operations/H018_CLAIM_SKELETON.md. It defines required claim fields, synthetic-test gates, source gates, event-validation gates, and non-promotion language. The reusable template for future H018 execution/account-risk policy decisions is documented in docs/operations/H018_DECISION_RECORD_TEMPLATE.md. These documents do not implement H018, validate H018, promote H017, approve live trading, or approve Phase 4 execution.
+A governance skeleton for any future H018 claim is documented in docs/operations/H018_CLAIM_SKELETON.md. It defines required claim fields, synthetic-test gates, source gates, event-validation gates, and non-promotion language. The reusable template for future H018 execution/account-risk policy decisions is documented in docs/operations/H018_DECISION_RECORD_TEMPLATE.md. The pending H018 decision inventory is documented in docs/operations/H018_DECISION_RECORD_INDEX.md. These documents do not implement H018, validate H018, promote H017, approve live trading, or approve Phase 4 execution.
+
 
