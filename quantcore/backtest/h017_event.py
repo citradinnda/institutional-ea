@@ -40,6 +40,46 @@ class H017EventBacktestResult:
     symbols: tuple[str, ...]
 
 
+class H017EventInsolvencyError(RuntimeError):
+    """Raised when an H017 event interval drives account equity non-positive.
+
+    This is a fail-closed validation state. The backtest should identify the
+    interval that caused ruin instead of continuing until a later, less
+    informative positive-equity validation fails during position sizing.
+    """
+
+    def __init__(
+        self,
+        *,
+        decision_time: pd.Timestamp,
+        entry_time: pd.Timestamp,
+        forced_exit_time: pd.Timestamp,
+        interval_start_equity_usd: float,
+        interval_pnl_usd: float,
+        ending_equity_usd: float,
+        interval_fills: Sequence[Fill],
+    ) -> None:
+        self.decision_time = pd.Timestamp(decision_time)
+        self.entry_time = pd.Timestamp(entry_time)
+        self.forced_exit_time = pd.Timestamp(forced_exit_time)
+        self.interval_start_equity_usd = float(interval_start_equity_usd)
+        self.interval_pnl_usd = float(interval_pnl_usd)
+        self.ending_equity_usd = float(ending_equity_usd)
+        self.interval_fills = tuple(interval_fills)
+
+        symbols = ", ".join(fill.symbol for fill in self.interval_fills) or "none"
+        super().__init__(
+            "H017 event backtest insolvency: "
+            f"decision_time={self.decision_time}, "
+            f"entry_time={self.entry_time}, "
+            f"forced_exit_time={self.forced_exit_time}, "
+            f"interval_start_equity_usd={self.interval_start_equity_usd:.2f}, "
+            f"interval_pnl_usd={self.interval_pnl_usd:.2f}, "
+            f"ending_equity_usd={self.ending_equity_usd:.2f}, "
+            f"interval_fills={len(self.interval_fills)} [{symbols}]"
+        )
+
+
 def backtest_h017_event_driven(
     *,
     usdjpy_h4: pd.DataFrame,
@@ -139,6 +179,7 @@ def backtest_h017_event_from_result(
         forced_exit_time = pd.Timestamp(index[i + 1])
         interval_start_equity = current_equity
         interval_pnl_usd = 0.0
+        interval_fills: list[Fill] = []
 
         for symbol in _SYMBOLS:
             maybe_fill = _build_symbol_interval_fill(
@@ -157,9 +198,21 @@ def backtest_h017_event_from_result(
                 continue
 
             fills.append(maybe_fill)
+            interval_fills.append(maybe_fill)
             interval_pnl_usd += fill_pnl_usd(fill=maybe_fill)
 
         current_equity += interval_pnl_usd
+
+        if current_equity <= 0.0:
+            raise H017EventInsolvencyError(
+                decision_time=decision_time,
+                entry_time=entry_time,
+                forced_exit_time=forced_exit_time,
+                interval_start_equity_usd=interval_start_equity,
+                interval_pnl_usd=interval_pnl_usd,
+                ending_equity_usd=current_equity,
+                interval_fills=interval_fills,
+            )
 
     sorted_fills = tuple(sorted(fills, key=lambda fill: fill.exit_time_utc))
     portfolio = build_portfolio_result(

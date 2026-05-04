@@ -7,6 +7,7 @@ import pytest
 
 from quantcore.backtest.h017_event import (
     H017EventBacktestResult,
+    H017EventInsolvencyError,
     backtest_h017_event_from_result,
 )
 from quantcore.strategy.h017 import H017Result
@@ -243,6 +244,47 @@ def test_short_xauusd_intrabar_stop_uses_short_stop_panel() -> None:
     assert fill.exit_price == pytest.approx(2010.35)
     assert fill.pnl_quote == pytest.approx(-105.0)
     assert result.portfolio.ending_equity_usd == pytest.approx(9_893.0)
+
+
+def test_interval_ruin_raises_clear_insolvency_error() -> None:
+    with pytest.raises(
+        H017EventInsolvencyError,
+        match="H017 event backtest insolvency",
+    ) as exc_info:
+        backtest_h017_event_from_result(
+            h017_result=_h017_result(
+                xauusd_positions=[2.0, 0.0, 0.0],
+                xauusd_stop_long=[1990.0, 1990.0, 1990.0],
+            ),
+            usdjpy_h4=_h4([150.0, 150.0, 150.0]),
+            xauusd_h4=_h4([2000.0, 2000.0, 2000.0]),
+            usdjpy_m1=_m1(
+                [
+                    ("2024-01-02 04:00", 150.0, 150.1, 149.9, 150.0),
+                ]
+            ),
+            xauusd_m1=_m1(
+                [
+                    ("2024-01-02 04:00", 2000.0, 2001.0, 1989.0, 1990.0),
+                ]
+            ),
+        )
+
+    error = exc_info.value
+
+    assert error.decision_time == _utc("2024-01-02 00:00")
+    assert error.entry_time == _utc("2024-01-02 04:00")
+    assert error.forced_exit_time == _utc("2024-01-02 08:00")
+    assert error.interval_start_equity_usd == pytest.approx(10_000.0)
+    assert error.interval_pnl_usd < -10_000.0
+    assert error.ending_equity_usd <= 0.0
+    assert len(error.interval_fills) == 1
+
+    fill = error.interval_fills[0]
+    assert fill.symbol == "XAUUSD"
+    assert fill.side == "buy"
+    assert fill.exit_reason == "stop"
+    assert fill.lots == pytest.approx(20.0)
 
 
 def test_flat_positions_create_no_fills_and_flat_equity() -> None:
