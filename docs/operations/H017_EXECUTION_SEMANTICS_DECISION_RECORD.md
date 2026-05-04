@@ -2,11 +2,13 @@
 
 ## Status
 
-Draft decision record.
+Implemented partial decision record.
 
-This document records the proposed execution-semantics policy after inspecting the current H017 event backtest API.
+This document records the execution-semantics policy after inspecting the current H017 event backtest API.
 
-It does not implement code.
+The raw-entry directional stop-validity guard has been implemented and tested.
+
+Executable-entry sizing, minimum stop distance, and maximum notional/leverage guards remain undecided.
 
 It does not repair H017.
 
@@ -98,9 +100,9 @@ If a new rule skips invalid stops, clips position size, changes the sizing refer
 
 H017 should remain failed unless a separate governance decision explicitly says otherwise.
 
-## Proposed Policy For Future Implementation
+## Implemented Partial Policy
 
-This is the proposed policy to test, not implemented behavior.
+This section records the implemented raw-entry directional stop-validity policy and the remaining open decisions.
 
 ### 1. Entry reference policy
 
@@ -115,37 +117,43 @@ However, any future implementation must name the chosen reference explicitly in 
 
 ### 2. Directional stop-validity policy
 
-The event bridge should not use absolute stop distance without first validating stop direction.
+Implemented for current raw-entry sizing semantics.
 
-Candidate strict policy:
+The event bridge no longer uses absolute stop distance before validating stop direction against the raw H4 entry open.
+
+Implemented strict policy:
 
 - Long trade:
-  - stop must be below the selected entry reference.
+  - stop must be below the raw H4 entry open.
 - Short trade:
-  - stop must be above the selected entry reference.
+  - stop must be above the raw H4 entry open.
+
+If the stop geometry is invalid, the event bridge raises:
+
+    H017EventInvalidStopError
+
+This is fail-closed behavior. It does not skip the trade silently and does not clip size.
 
 Open decision:
 
-- whether the selected entry reference is raw H4 open, executable entry price, or both.
+- whether a future H018 should use executable-entry sizing, raw-entry sizing, or a separate declared sizing reference.
 
 ### 3. Invalid-stop behavior policy
 
-Invalid execution geometry should not be silently converted into a trade.
+Implemented for raw-entry directional invalid stops.
 
-Candidate behaviors:
+Invalid directional stop geometry is not silently converted into a trade.
 
-1. Fail closed with a clear validation error.
-2. Skip the trade and record a skipped-trade reason.
-3. Treat it as a new strategy rule requiring H018.
+Current behavior:
 
-Recommended default for research validation:
-
-- fail closed first,
-- then decide separately whether a future H018 strategy may skip such trades by rule.
+- fail closed with a clear validation error,
+- do not skip the trade,
+- do not clip the size,
+- do not treat the resulting code change as H017 promotion.
 
 Reason:
 
-Skipping invalid trades can accidentally become hidden optimization.
+Skipping invalid trades can accidentally become hidden optimization. A future strategy that skips invalid stops should be opened under a new hypothesis boundary unless explicitly justified otherwise.
 
 ### 4. Minimum stop-distance policy
 
@@ -176,31 +184,38 @@ Recommended default:
 - test the behavior synthetically,
 - treat any trade-clipping or trade-skipping version as H018 unless explicitly justified otherwise.
 
-## Proposed Immediate Test Plan
+## Implemented Tests
 
-Before implementation, inspect existing test helpers and then add focused synthetic tests.
+Focused synthetic tests were added before any real-data rerun.
 
-Recommended first synthetic tests:
+Implemented tests:
 
-1. Long stop above raw entry is not silently sized.
-2. Short stop below raw entry is not silently sized.
-3. Long stop above raw entry but below executable entry is explicitly governed.
-4. Near-zero positive stop distance is explicitly governed.
-5. Existing valid long and short cases continue to behave as before unless a deliberate semantics change says otherwise.
+1. Long stop above raw entry fails closed.
+2. Short stop below raw entry fails closed.
+3. Existing valid long and short cases continue to pass under the full suite.
 
-Expected test location:
+Test location:
 
     tests/test_h017_event.py
 
-Expected implementation location, if later authorized:
+Implementation location:
 
     quantcore/backtest/h017_event.py
 
-Do not modify:
+The generic portfolio sizing API was not modified:
 
     quantcore/backtest/portfolio.py
 
-unless a later decision explicitly says the generic sizing API should change.
+Current full-test anchor after this implementation:
+
+    535 passed
+
+Remaining future tests, if authorized:
+
+1. Long stop above raw entry but below executable entry is explicitly governed under any future executable-entry policy.
+2. Near-zero positive stop distance is explicitly governed.
+3. Spread-adjusted sizing behavior is explicitly governed.
+4. Maximum notional/leverage guard behavior is explicitly governed.
 
 ## H017/H018 Boundary
 
@@ -213,15 +228,19 @@ H017 remains:
 A successor H018 should be opened if the project chooses any of these:
 
 1. executable-entry sizing,
-2. directional invalid-stop skipping,
+2. directional invalid-stop skipping instead of fail-closed validation,
 3. minimum stop-distance trade filtering,
 4. maximum notional/leverage clipping,
 5. any other rule that materially changes trade eligibility or realized exposure.
 
+The implemented raw-entry directional fail-closed guard is documented as an execution-validation guard. It does not revive H017 and does not authorize new real-data validation as a promotion attempt.
+
 ## Current Verdict
 
-The project should proceed with synthetic execution-semantics tests before any real-data rerun.
+The project has implemented and tested the first synthetic execution-semantics guard: fail closed on raw-entry directional invalid stops.
 
-No implementation change is authorized by this document alone.
+H017 remains failed.
+
+No real-data rerun is authorized by this document alone.
 
 No live trading is approved.

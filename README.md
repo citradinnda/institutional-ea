@@ -54,6 +54,6 @@ Typical setup:
     pip install -e .[dev]
     pytest -q
 
-Current full-test anchor after H017 strict expanded insolvency documentation:
+Current full-test anchor after H017 invalid-stop execution guard:
 
-    533 passed
+    535 passed
