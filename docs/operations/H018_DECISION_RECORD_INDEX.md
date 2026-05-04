@@ -57,3 +57,5 @@ H017 remains failed and not promotable. This index does not alter that verdict.
 | Decision record | Status | Policy chosen? | Implementation authorized? | Validation authorized? | Notes |
 |---|---|---:|---:|---:|---|
 | docs/operations/H018_BOUNDARY_DECISION_RECORD.md | Draft | No | No | No | Draft boundary record only. Preserves H017 failure visibility and states that H018, if pursued, is a successor hypothesis rather than a silent H017 repair. |
+
+| docs/operations/H018_SIZING_REFERENCE_DECISION_RECORD.md | Draft | No | No | No | Draft sizing-reference and stop-validity-reference record only. Does not choose raw entry, executable entry, both-reference, conservative, skip, clip, or rerun policy. |

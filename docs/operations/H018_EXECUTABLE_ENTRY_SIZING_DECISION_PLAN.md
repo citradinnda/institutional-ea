@@ -385,3 +385,13 @@ This plan does not validate H018.
 This plan does not repair H017.
 
 This plan only defines the executable-entry sizing governance questions that must be answered before implementation.
+
+## Sizing-reference decision-record draft
+
+A draft H018 sizing-reference decision record has been created at docs/operations/H018_SIZING_REFERENCE_DECISION_RECORD.md.
+
+The draft does not choose raw-entry sizing, executable-entry sizing, both-reference sizing, conservative worst-case sizing, or a separately named sizing reference.
+
+The draft does not choose raw-entry stop validity, executable-entry stop validity, both-reference stop validity, skip behavior, clipping behavior, fail-closed behavior for a new H018 rule, diagnostic-continuation behavior, implementation approval, validation approval, promotion approval, live-trading approval, or Phase 4 approval.
+
+The draft preserves the original H017 failure and keeps H018 as unimplemented, unvalidated, not promotable, not live-approved, and not Phase 4 approved.
