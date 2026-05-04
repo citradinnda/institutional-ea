@@ -2,7 +2,7 @@
 
 Decision title: H018 trade violation policy decision record.
 Decision identifier: H018-TRADE-VIOLATION-POLICY.
-Decision status: Draft.
+Decision status: Accepted for implementation.
 Date: 2026-05-04.
 Related hypothesis: H018.
 Related documents:
@@ -24,16 +24,17 @@ Related documents:
 
 Owner or reviewer: solo research owner.
 Implementation status: not implemented.
+Implementation authorization status: accepted for future implementation after focused synthetic tests.
 Validation status: not validated.
 Live-trading status: not approved.
 
 ## Purpose
 
-This draft decision record captures the H018 trade violation policy question.
+This decision record chooses the default H018 validation-mode policy for future trade-rule violations.
 
-A trade violation policy defines what the research engine should do when a future H018 rule rejects or challenges a trade.
+A trade-rule violation means a future H018 guard determines that a trade is outside the declared validation envelope.
 
-Examples include:
+Examples may include:
 
 1. Invalid stop geometry.
 2. Minimum stop-distance violation.
@@ -43,61 +44,58 @@ Examples include:
 6. Maximum friction-burden violation.
 7. Any future account-risk envelope violation.
 
-This record exists to prevent trade skipping, position clipping, fail-closed behavior, or diagnostic-only continuation from becoming silent repairs to the failed H017 validation.
+This decision prevents trade skipping, position clipping, or unmarked continuation from becoming silent repairs to the failed H017 validation.
 
-This record is Draft only.
+## Decision
 
-It does not choose fail closed.
+For H018 validation-mode runs, future guard violations must fail closed.
 
-It does not choose skip trade.
+Fail closed means:
 
-It does not choose clip position size.
+1. The run must stop with an explicit error or explicit invalid-run result.
+2. The violation must not be silently ignored.
+3. The violating trade must not be skipped as if no signal occurred.
+4. The violating position must not be clipped to a smaller size.
+5. The run must not continue as a valid validation run.
+6. The audit output or error message must identify the violated rule and the raw values that caused the violation.
 
-It does not choose diagnostic-only continuation.
+This policy applies to future H018 validation-mode guard violations.
 
-It does not choose any minimum stop-distance rule.
+This policy does not choose the guard thresholds themselves.
 
-It does not choose any maximum notional or leverage rule.
+This policy does not choose a minimum stop-distance threshold.
 
-It does not implement code.
+This policy does not choose a maximum notional threshold.
 
-It does not authorize a real-data rerun.
+This policy does not choose a maximum leverage threshold.
 
-It does not validate H018.
+This policy does not choose a sizing reference.
 
-It does not repair H017.
+This policy does not choose a stop-validity reference.
 
-It does not approve live trading.
+This policy does not implement code by itself.
 
-It does not approve Phase 4 execution work.
+This policy does not authorize a real-data rerun.
 
 ## Scope
 
-This draft decision record concerns possible H018 behavior after a trade violates a declared rule.
+This decision affects future H018 validation-mode behavior for:
 
-It may later affect:
+1. Trade eligibility violations.
+2. Minimum stop-distance violations if a minimum-distance rule is later accepted.
+3. Maximum exposure violations if an exposure rule is later accepted.
+4. Margin-usage violations if a margin rule is later accepted.
+5. Friction-burden violations if a friction rule is later accepted.
+6. Audit output for failed validation-mode guard violations.
 
-1. Trade eligibility.
-2. Trade rejection.
-3. Trade skipping.
-4. Position clipping.
-5. Diagnostic-only continuation.
-6. Audit output.
-7. Real-data validation classification.
-8. H018 hypothesis boundary.
-9. PnL path comparability.
+This decision does not affect:
 
-This draft record does not currently affect:
-
-1. Entry sizing reference.
-2. Stop-validity reference.
-3. Equality behavior.
-4. Minimum stop-distance threshold.
-5. Maximum notional threshold.
-6. Maximum leverage threshold.
-7. Existing H017 raw-entry invalid-stop behavior.
-
-Those topics remain governed by separate H018 decision records or plans.
+1. The current H017 failure verdict.
+2. The current H017 strict expanded broker-native insolvency result.
+3. The current H017 raw-entry invalid-stop guard implementation.
+4. Any H018 threshold selection.
+5. Any H018 real-data validation authorization.
+6. Any live-trading approval.
 
 ## Current Behavior
 
@@ -133,185 +131,131 @@ No maximum notional threshold has been selected.
 
 No maximum leverage threshold has been selected.
 
-No trade-skip policy has been selected.
+No executable-entry sizing rule has been adopted.
 
-No clipping policy has been selected.
+## Chosen Rule
 
-No diagnostic-only continuation policy has been selected.
+The chosen rule is:
 
-No future H018 violation policy has been selected.
+Future H018 validation-mode guard violations fail closed.
 
-## Draft Non-Decision
+The unit of the chosen rule is policy behavior, not price, lots, notional, or leverage.
 
-This draft does not select a violation policy.
+Affected instruments:
 
-No policy is chosen for:
+1. USDJPY.
+2. XAUUSD.
 
-1. Fail closed.
-2. Skip trade.
-3. Clip position size.
-4. Mark run invalid but continue diagnostics.
-5. Warn and continue.
-6. Log-only continuation.
-7. Mixed policy by violation type.
-8. Mixed policy by instrument.
-9. Mixed policy by validation mode.
+USDJPY and XAUUSD are handled the same way under this policy.
 
-No rule is chosen for whether different violation types should share one common policy or use separate policies.
+If a future accepted guard applies to only one instrument, that instrument-specific guard must still use fail-closed behavior in validation mode unless a later decision record supersedes this policy.
 
-No rule is chosen for whether USDJPY and XAUUSD should have the same violation policy.
+This rule affects trade eligibility because a violating trade makes the validation run invalid.
 
-No rule is chosen for whether a violation should stop the whole run, stop only the current symbol, reject only the trade, clip only the lots, or continue only for diagnostics.
+This rule does not clip realized exposure.
 
-No rule is chosen for whether a violation policy belongs to execution realism, account-risk governance, broker-margin approximation, strategy logic, or a combination.
+This rule does not create a replacement trade.
 
-## Candidate Decision Questions
+This rule does not skip a trade and continue as valid.
 
-A future accepted decision must answer at least these questions before implementation:
+This rule can change the validation result because the run may stop earlier than a skip-or-clip implementation would.
 
-1. What violation types are governed by the policy?
-2. Is the same policy used for invalid stop geometry, minimum-distance violations, maximum-exposure violations, and margin or friction violations?
-3. Should a violation fail closed?
-4. Should a violation skip the trade?
-5. Should a violation clip position size?
-6. Should a violation mark the run invalid but continue diagnostics?
-7. Should policy differ between research diagnostics and validation?
-8. Should policy differ between USDJPY and XAUUSD?
-9. Should policy differ between per-trade and portfolio-level violations?
-10. Should a violation change trade eligibility?
-11. Should a violation change realized exposure?
-12. Should a violation change the PnL path?
-13. What audit output is mandatory?
-14. What synthetic tests must pass before implementation?
-15. What real-data run classification is permitted after implementation?
-16. Does the selected policy create H018 rather than repairing H017?
-
-## Candidate Violation Policies Not Yet Chosen
-
-### Fail Closed
-
-A future rule could raise an explicit error when a violation occurs.
-
-This is not chosen.
-
-Interpretation if later selected:
-
-- The strategy produced a trade outside the declared validation envelope.
-
-Benefit:
-
-- It prevents silent trade-history mutation.
-- It keeps the invalid condition visible.
-- It avoids pretending that skipped or clipped trades are the original strategy.
-
-Risk:
-
-- It may stop validation early.
-- It may not summarize all later violations unless a separate diagnostic mode exists.
-
-### Skip Trade
-
-A future rule could skip the violating trade.
-
-This is not chosen.
-
-Interpretation if later selected:
-
-- The trade is considered untradeable under the declared H018 account-risk or execution model.
-
-Benefit:
-
-- It allows the backtest to continue.
-- It can represent a rule that certain trades are ineligible.
-
-Risk:
-
-- Skipping changes trade eligibility.
-- Skipping changes the trade history.
-- Skipping can become hidden optimization.
-- Skipping likely creates H018 rather than repairing H017.
-
-### Clip Position Size
-
-A future rule could reduce the position size to the maximum allowed value.
-
-This is not chosen.
-
-Interpretation if later selected:
-
-- Account-risk governance overrides raw strategy sizing.
-
-Benefit:
-
-- It can prevent pathological exposure while preserving partial participation.
-
-Risk:
-
-- Clipping changes realized exposure.
-- Clipping changes the PnL path.
-- Clipping may improve backtest outcomes by construction.
-- Clipping likely creates H018 rather than repairing H017.
-
-### Diagnostic-Only Continuation
-
-A future rule could mark the run invalid but continue only to count and audit violations.
-
-This is not chosen.
-
-Interpretation if later selected:
-
-- The run becomes evidence-gathering only and is not promotable validation.
-
-Benefit:
-
-- It can show how often violations occur before choosing a production-like policy.
-- It preserves visibility into the strategy's failure modes.
-
-Risk:
-
-- Diagnostic continuation must not be confused with validation.
-- Diagnostic output must not be used as live-trading evidence.
+This rule creates H018 governance behavior rather than repairing H017.
 
 ## Rejected Alternatives
 
-No alternative is rejected by this draft.
+### Skip Trade
 
-This is intentional.
+Rejected for first H018 validation-mode implementation.
 
-Because the record is Draft, it preserves the decision space instead of selecting or rejecting policies prematurely.
+Reason:
 
-A later Proposed or Accepted decision must explicitly list rejected alternatives and the reason each alternative was rejected.
+Skipping changes trade eligibility and trade history.
 
-## Required Synthetic Tests Before Any Implementation
+Skipping can hide the fact that the strategy produced an invalid trade.
 
-No implementation is authorized by this draft.
+Skipping can become hidden optimization.
 
-If a later decision becomes Accepted for implementation, it must define focused synthetic tests before code changes.
+Skipping may be useful later only if a separate H018 decision explicitly defines untradeable-signal semantics, audit output, and validation rules.
 
-Required cases should include at least:
+### Clip Position Size
 
-1. A normal trade with no violation is accepted.
-2. A long-side violation triggers the selected policy.
-3. A short-side violation triggers the selected policy.
-4. A USDJPY violation triggers the selected policy.
-5. An XAUUSD violation triggers the selected policy.
-6. An exact-boundary case triggers the documented exact-boundary behavior.
-7. A below-boundary case triggers the documented below-boundary behavior.
-8. An above-boundary case triggers the documented above-boundary behavior.
-9. If fail closed is selected, the error type and message are explicit.
-10. If skip is selected, skipped trades are counted and reported.
-11. If clipping is selected, clipped trades are counted and reported.
-12. If diagnostic-only continuation is selected, the run is clearly marked invalid for validation.
-13. If portfolio-level violations are governed, overlapping USDJPY and XAUUSD positions are tested.
-14. Audit output identifies the rule, raw values, derived threshold, violation type, and selected action.
-15. Regression protection confirms existing H017 raw-entry invalid-stop behavior remains unchanged unless explicitly superseded.
-16. Full test count remains at or above the current 537-test anchor unless an explicit test-removal phase exists.
+Rejected for first H018 validation-mode implementation.
+
+Reason:
+
+Clipping changes realized exposure and the PnL path.
+
+Clipping may improve results by construction.
+
+Clipping can turn an invalid strategy output into a synthetic safer trade.
+
+Clipping may be useful later only if a separate H018 decision explicitly defines account-risk override semantics, cap calculation, audit output, and validation rules.
+
+### Warn And Continue
+
+Rejected.
+
+Reason:
+
+Warning while continuing as valid validation allows invalid trades to contaminate validation results.
+
+### Log-Only Continuation
+
+Rejected for validation mode.
+
+Reason:
+
+A log-only violation is too easy to ignore in a validation result.
+
+### Diagnostic-Only Continuation
+
+Deferred, not accepted for validation mode.
+
+Reason:
+
+Diagnostic continuation can be useful for counting violations, but it must be a separately labeled diagnostic mode.
+
+If implemented later, diagnostic-only continuation must mark the run invalid for validation and must never be reported as H018 validation success.
+
+### Mixed Policy By Instrument Or Violation Type
+
+Rejected for first implementation.
+
+Reason:
+
+Mixed policies add complexity before the basic H018 guard semantics are proven.
+
+A later decision may supersede this if there is a strong reason for instrument-specific or violation-specific behavior.
+
+## Required Synthetic Tests Before Implementation
+
+Before implementing this policy in code, focused synthetic tests must cover at least:
+
+1. A normal trade with no violation proceeds normally.
+2. A long-side guard violation fails closed.
+3. A short-side guard violation fails closed.
+4. A USDJPY guard violation fails closed.
+5. An XAUUSD guard violation fails closed.
+6. A minimum-distance violation fails closed if a minimum-distance rule is later implemented.
+7. A maximum-exposure violation fails closed if an exposure rule is later implemented.
+8. Exact-boundary behavior is explicitly tested for each implemented guard.
+9. Below-boundary behavior is explicitly tested for each implemented guard.
+10. Above-boundary behavior is explicitly tested for each implemented guard.
+11. The error type or invalid-run result is explicit.
+12. The error message or audit output identifies the violated rule.
+13. The error message or audit output includes raw input values.
+14. No trade is silently skipped.
+15. No position size is clipped.
+16. No validation-mode run continues as valid after a guard violation.
+17. Existing H017 raw-entry invalid-stop behavior remains unchanged unless explicitly superseded.
+18. Full test count remains at or above the current 537-test anchor unless an explicit test-removal phase exists.
 
 ## Required Real-Data Run Classification
 
-No real-data run is authorized by this draft.
+No real-data run is authorized by this decision.
 
-A future real-data run after trade violation policy semantics are changed must be classified as one of:
+A future real-data run after implementing H018 fail-closed guard semantics must be classified as one of:
 
 1. Diagnostic-only run.
 2. H018 validation run after a formal H018 claim exists.
@@ -326,7 +270,7 @@ A passing real-data run after implementation would not approve Phase 4 execution
 
 ## Required Audit Output If Later Implemented
 
-If a future accepted decision affects trade eligibility or exposure, implementation must emit or preserve audit output showing:
+If this policy is implemented, a failed validation-mode guard violation must preserve or emit enough information to identify:
 
 1. Which violation policy was applied.
 2. Which rule produced the violation.
@@ -337,33 +281,25 @@ If a future accepted decision affects trade eligibility or exposure, implementat
 7. Which entry reference was used, if relevant.
 8. Which stop reference was used, if relevant.
 9. Which account equity value was used, if relevant.
-10. Which lots value was produced before the policy, if relevant.
-11. Which lots value was accepted after the policy, if relevant.
-12. Which notional or leverage value was produced before the policy, if relevant.
-13. Which trades were accepted.
-14. Which trades failed closed.
-15. Which trades were skipped, if skipping is selected.
-16. Which trades were clipped, if clipping is selected.
-17. Which trades continued as diagnostic-only, if diagnostic continuation is selected.
-18. Whether the run remains eligible for validation after the policy action.
-19. The final accepted, rejected, skipped, clipped, or diagnostic-only value.
+10. Which lots value was produced before the guard, if relevant.
+11. Which notional or leverage value was produced before the guard, if relevant.
+12. Why the run is invalid for validation.
+13. That no skip occurred.
+14. That no clipping occurred.
 
 ## Implementation Gate
 
-No code implementation should begin from this draft.
+This decision is accepted for implementation, but implementation must still be staged safely.
 
-Implementation remains blocked until a later decision record states:
+Before code changes begin, the implementation phase must:
 
-1. Decision status is Accepted for implementation.
-2. The exact violation types governed by the policy are selected.
-3. The exact violation policy is selected.
-4. Any instrument-specific differences are selected.
-5. Any validation-mode differences are selected.
-6. Required synthetic tests are listed.
-7. Required audit output is listed.
-8. Real-data run classification is explicit.
-9. Non-promotion language is present.
-10. The H018 claim relationship is clear.
+1. Inspect actual APIs before calling internal functions.
+2. Define focused synthetic tests first.
+3. Preserve existing H017 invalid-stop regression tests unless explicitly superseded.
+4. Avoid real-data reruns.
+5. Avoid H017 tuning.
+6. Avoid adding skip or clipping behavior.
+7. Preserve the 537-test full-suite anchor.
 
 ## Non-Promotion Statement
 
@@ -371,13 +307,13 @@ H017 remains failed.
 
 H017 is not promotable.
 
-This draft does not repair H017.
+This decision does not repair H017.
 
-This draft does not validate H018.
+This decision does not validate H018.
 
-This draft does not approve live trading.
+This decision does not approve live trading.
 
-This draft does not approve Phase 4 execution.
+This decision does not approve Phase 4 execution.
 
 Passing future tests after implementation would not automatically approve live trading.
 
@@ -385,19 +321,29 @@ Any future H018 validation must be judged under an explicit H018 claim.
 
 ## Current Verdict
 
-This is a Draft decision record only.
+The H018 validation-mode trade violation policy is accepted as fail closed.
 
-No fail-closed policy is chosen for future H018 violations.
+Skip trade is rejected for first H018 validation-mode implementation.
 
-No skip policy is chosen.
+Position clipping is rejected for first H018 validation-mode implementation.
 
-No clipping policy is chosen.
+Warn-and-continue is rejected.
 
-No diagnostic-only continuation policy is chosen.
+Log-only continuation is rejected for validation mode.
 
-No mixed violation policy is chosen.
+Diagnostic-only continuation is deferred to a separately labeled diagnostic mode.
 
-No implementation is authorized.
+No minimum stop-distance threshold is chosen.
+
+No maximum notional threshold is chosen.
+
+No maximum leverage threshold is chosen.
+
+No sizing reference is chosen.
+
+No stop-validity reference is chosen.
+
+No code has been implemented by this decision record.
 
 No validation rerun is authorized.
 
