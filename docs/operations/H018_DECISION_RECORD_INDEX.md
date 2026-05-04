@@ -85,3 +85,34 @@ H017 remains failed and not promotable. This index does not alter that verdict.
 | docs/operations/H018_MINIMUM_STOP_DISTANCE_DECISION_RECORD.md | Accepted for implementation | Yes | Yes | No | Raw-entry stop distance must be greater than or equal to one modeled spread for the symbol. USDJPY threshold is 0.01. XAUUSD threshold is 0.30. Validation-mode violations fail closed. No real-data validation is authorized. |
 | docs/operations/H018_MAX_NOTIONAL_LEVERAGE_DECISION_RECORD.md | Draft | No | No | No | Draft maximum notional / leverage record only. Does not choose lots, notional, notional/equity, leverage, margin, friction, threshold, fail-closed, skip, clip, diagnostic, or rerun policy. |
 | docs/operations/H018_TRADE_VIOLATION_POLICY_DECISION_RECORD.md | Accepted for implementation | Yes | Yes | No | H018 validation-mode guard violations fail closed. Skip and clipping are rejected for first validation-mode implementation. Diagnostic-only continuation is deferred to a separate explicitly labeled diagnostic mode. |
+
+<!-- H018_MAX_NOTIONAL_LEVERAGE_ACCEPTED_START -->
+## H018 Maximum Notional / Leverage Decision Record
+
+Status: Accepted for implementation
+
+Path:
+
+docs/operations/H018_MAX_NOTIONAL_LEVERAGE_DECISION_RECORD.md
+
+Accepted policy:
+
+1. Maximum per-trade USD gross leverage is capped at 10.0x equity.
+2. Exposure basis is per-trade USD gross notional divided by account equity.
+3. XAUUSD PositionSize.notional_quote is treated as USD notional.
+4. USDJPY PositionSize.notional_quote is converted from JPY to USD by dividing by entry_raw_price.
+5. gross_leverage < 10.0 passes.
+6. gross_leverage == 10.0 passes.
+7. gross_leverage > 10.0 fails closed.
+8. Violations are not skipped.
+9. Violations are not clipped.
+10. Violations are not warn-and-continue.
+11. Violations are not log-only continuation.
+12. Diagnostic-only continuation remains deferred to a separately labeled diagnostic mode.
+13. This decision does not authorize a real-data rerun.
+14. This decision does not promote H017.
+15. This decision does not validate H018.
+16. This decision does not approve live trading.
+17. This decision does not approve Phase 4 execution.
+<!-- H018_MAX_NOTIONAL_LEVERAGE_ACCEPTED_END -->
+
