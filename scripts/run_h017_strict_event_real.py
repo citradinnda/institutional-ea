@@ -5,6 +5,7 @@ from pathlib import Path
 
 import pandas as pd
 
+from quantcore.backtest.h017_event import H017EventInsolvencyError
 from quantcore.backtest.h017_strict_event import (
     StrictH017EventBacktestResult,
     backtest_h017_strict_event_driven,
@@ -161,14 +162,18 @@ def run_validation() -> StrictExpandedValidationResult:
     assessment = _assess_bridge_windows(loaded)
     _assert_expected_bridge_window_assessment(assessment)
 
-    strict_result = backtest_h017_strict_event_driven(
-        usdjpy_h4=loaded.usdjpy_h4.bars,
-        xauusd_h4=loaded.xauusd_h4.bars,
-        usdjpy_m1=loaded.usdjpy_m1.bars,
-        xauusd_m1=loaded.xauusd_m1.bars,
-        accepted_entry_times=assessment.accepted_timestamps,
-        expected_h4_delta=EXPECTED_H4_DELTA,
-    )
+    try:
+        strict_result = backtest_h017_strict_event_driven(
+            usdjpy_h4=loaded.usdjpy_h4.bars,
+            xauusd_h4=loaded.xauusd_h4.bars,
+            usdjpy_m1=loaded.usdjpy_m1.bars,
+            xauusd_m1=loaded.xauusd_m1.bars,
+            accepted_entry_times=assessment.accepted_timestamps,
+            expected_h4_delta=EXPECTED_H4_DELTA,
+        )
+    except H017EventInsolvencyError as exc:
+        _print_insolvency_failure(exc)
+        raise SystemExit(1) from None
 
     claim = build_h017_claim(
         strict_result.backtest.portfolio.returns,
@@ -275,6 +280,61 @@ def _print_backtest_summary(
     )
     print(f"max_drawdown_pct={portfolio.max_drawdown * 100.0:.2f}")
     print(f"annualized_sharpe={annualized_sharpe:.4f}")
+
+
+def _print_insolvency_failure(error: H017EventInsolvencyError) -> None:
+    """Print a fail-closed validation result for account ruin."""
+
+    print("Strict event-driven backtest")
+    print("-" * 40)
+    print("completed=False")
+    print("failure_reason=insolvency")
+    print(f"decision_time={error.decision_time}")
+    print(f"entry_time={error.entry_time}")
+    print(f"forced_exit_time={error.forced_exit_time}")
+    print(f"interval_start_equity_usd={error.interval_start_equity_usd:.2f}")
+    print(f"interval_pnl_usd={error.interval_pnl_usd:.2f}")
+    print(f"ending_equity_usd={error.ending_equity_usd:.2f}")
+    print(
+        "interval_return_pct="
+        f"{error.interval_pnl_usd / error.interval_start_equity_usd * 100.0:.2f}"
+    )
+    print(f"interval_fills={len(error.interval_fills)}")
+
+    for fill in error.interval_fills:
+        print(
+            "  fill: "
+            f"symbol={fill.symbol}, "
+            f"side={fill.side}, "
+            f"entry_time={fill.entry_time_utc}, "
+            f"exit_time={fill.exit_time_utc}, "
+            f"entry_price={fill.entry_price:.9f}, "
+            f"exit_price={fill.exit_price:.9f}, "
+            f"lots={fill.lots:.2f}, "
+            f"pnl_quote={fill.pnl_quote:.2f}, "
+            f"commission={fill.commission:.2f}, "
+            f"slippage={fill.slippage:.9f}, "
+            f"exit_reason={fill.exit_reason}"
+        )
+
+    print()
+    print("Research verdict")
+    print("-" * 40)
+    print("STRICT BRIDGE-WINDOW PREFLIGHT PASSED: True")
+    print("H017 STRICT EVENT BACKTEST COMPLETED: False")
+    print("H017 VALIDATION FAILED BY INSOLVENCY: True")
+    print("H017 PROMOTABLE BY CLAIM: False")
+    print("EXPANDED VALIDATION IS RESEARCH EVIDENCE ONLY: True")
+    print("LIVE TRADING APPROVED: False")
+    print()
+    print("Interpretation guardrails:")
+    print("- This is a fail-closed validation result, not a data preflight failure.")
+    print("- This script does not tune H017.")
+    print("- This script does not change the cost model.")
+    print("- This script does not use HistData.")
+    print("- This script does not write derived datasets.")
+    print("- Source acceptance is not strategy promotion.")
+    print("- Live trading is not approved.")
 
 
 def main() -> None:
