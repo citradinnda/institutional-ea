@@ -264,3 +264,13 @@ This plan does not validate H018.
 This plan does not repair H017.
 
 This plan only defines the minimum stop-distance governance questions that must be answered before implementation.
+
+## Minimum stop-distance decision-record draft
+
+A draft H018 minimum stop-distance decision record has been created at docs/operations/H018_MINIMUM_STOP_DISTANCE_DECISION_RECORD.md.
+
+The draft does not choose spread multiple, ATR fraction, tick-size multiple, broker-point multiple, all-in friction multiple, combined maximum rule, or any numeric threshold.
+
+The draft does not choose fail-closed behavior, skip behavior, clipping behavior, diagnostic-continuation behavior, implementation approval, validation approval, promotion approval, live-trading approval, or Phase 4 approval.
+
+The draft preserves the original H017 failure and keeps H018 as unimplemented, unvalidated, not promotable, not live-approved, and not Phase 4 approved.
