@@ -1,5 +1,9 @@
 ﻿# H018 Maximum Notional / Leverage Decision Plan
 
+Related draft decision record:
+
+- docs/operations/H018_MAX_NOTIONAL_LEVERAGE_DECISION_RECORD.md
+
 ## Purpose
 
 This document opens the H018 maximum notional / leverage decision plan.
