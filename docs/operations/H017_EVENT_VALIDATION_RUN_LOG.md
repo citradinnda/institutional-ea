@@ -259,3 +259,166 @@ Acquire longer broker-native M1 exports for USDJPY and XAUUSD, then rerun:
 Only consider the run research-grade if the output eventually reports:
 
     RESEARCH VALIDATION SUFFICIENT: True
+
+---
+
+### Run 2026-05-04 — Expanded broker-native strict validation failed by insolvency
+
+#### Operator context
+
+Run date: 2026-05-04
+
+Data source: Exness demo MT5 broker-native H4/M1 exports
+
+Broker/account environment: Exness MT5 demo, broker timezone Europe/Athens
+
+Validation script:
+
+    scripts/run_h017_strict_event_real.py
+
+Detailed result documents:
+
+    docs/operations/BROKER_NATIVE_EXPANDED_STRICT_H017_VALIDATION_RESULT.md
+    docs/operations/BROKER_NATIVE_EXPANDED_STRICT_H017_VALIDATION_RESULT_OUTPUT.txt
+
+#### Strict bridge-window preflight
+
+STRICT BRIDGE-WINDOW PREFLIGHT PASSED: True
+
+Accepted strict bridge-window start: 2021-07-02 13:00:00+00:00
+
+Accepted strict bridge-window end: 2026-04-30 01:00:00+00:00
+
+Accepted common complete H4/M1 bridge windows: 5476
+
+Expected M1 bars per H4 window: 240
+
+No M1 imputation, forward-fill, backfill, or synthetic bars were used.
+
+HistData was not used.
+
+Raw broker CSV files remained local and were not committed.
+
+#### Research sufficiency
+
+RESEARCH VALIDATION SUFFICIENT: True
+
+Important qualification:
+
+Research sufficiency means the expanded broker-native source and strict complete-window preflight were sufficient to run event-driven validation. It does not mean H017 passed validation.
+
+#### Event-driven backtest output
+
+H017 STRICT EVENT BACKTEST COMPLETED: False
+
+Failure reason: insolvency
+
+Fatal interval:
+
+    decision_time=2021-07-06 01:00:00+00:00
+    entry_time=2021-07-06 05:00:00+00:00
+    forced_exit_time=2021-07-06 09:00:00+00:00
+    interval_start_equity_usd=9847.56
+    interval_pnl_usd=-11835.26
+    ending_equity_usd=-1987.71
+    interval_return_pct=-120.18
+    interval_fills=2
+
+Fatal USDJPY fill summary:
+
+    side=buy
+    entry_price=110.775000000
+    exit_price=110.765228764
+    lots=518.77
+    pnl_quote=-506902.42
+    commission=7262.78
+    exit_reason=stop
+
+Fatal XAUUSD fill summary:
+
+    side=buy
+    entry_price=1807.480000000
+    exit_price=1809.622000000
+    lots=0.02
+    pnl_quote=4.28
+    commission=0.40
+    exit_reason=signal_flip
+
+#### H017 claim output
+
+H017 promotable: False
+
+Live trading approved: False
+
+PSR, DSR, and MinTRL were not reached because strict event validation failed closed by insolvency.
+
+#### Interpretation
+
+Pipeline smoke passed: True
+
+Research-grade validation passed: False
+
+Is this run promotable evidence? No.
+
+If not promotable, why not?
+
+The strict expanded broker-native source preflight passed, but H017 failed event-driven validation by account insolvency on a complete strict bridge window.
+
+This was not a missing-M1 problem.
+
+The immediate pathological event was a USDJPY long sized to 518.77 lots on an account with approximately 9847.56 USD of interval-start equity.
+
+Prior diagnostics localized the sizing pathology to a near-zero raw stop distance:
+
+    raw H4 entry open=110.770000000
+    H017 long stop=110.770240804
+
+The current event engine sizes from:
+
+    abs(raw H4 entry open - stop_price)
+
+before entry spread is applied.
+
+This run records H017 failure. It does not silently change sizing semantics, cost semantics, H017 parameters, or strategy logic.
+
+#### Research verdict
+
+STRICT BRIDGE-WINDOW PREFLIGHT PASSED: True
+
+H017 STRICT EVENT BACKTEST COMPLETED: False
+
+H017 VALIDATION FAILED BY INSOLVENCY: True
+
+H017 PROMOTABLE BY CLAIM: False
+
+EXPANDED VALIDATION IS RESEARCH EVIDENCE ONLY: True
+
+LIVE TRADING APPROVED: False
+
+#### Notes
+
+Additional observations:
+
+- H017 is now classified as failed / not promotable under strict expanded broker-native event validation.
+- Broker-native source acceptance remains conditional and restricted to complete bridge windows.
+- Source acceptance is not strategy promotion.
+- The strict expanded result supersedes the earlier short-window baseline interpretation where H017 was alive but not promotable.
+- The raw-entry versus executable-entry sizing question remains an explicit future execution-model semantics question, not a silent fix.
+
+Operational issues:
+
+- The strict runner reported insolvency cleanly without a Python traceback.
+- The script exit code was 1, as expected for fail-closed validation failure.
+- Raw data files remained local and were not committed.
+- HistData was not used.
+- No derived datasets were written.
+
+Follow-up action:
+
+Do not tune H017.
+
+Do not rerun broad real-data validation as if H017 is alive or promotable.
+
+Do not change raw-entry versus executable-entry sizing semantics without explicit tests and documentation.
+
+Next recommended work is to decide the epistemic response to this failed hypothesis.
