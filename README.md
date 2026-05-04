@@ -65,3 +65,7 @@ Typical setup:
 Current full-test anchor after H017 equality invalid-stop tests:
 
     537 passed
+
+## H018 decision matrix
+
+H018 execution-semantics and account-risk planning is consolidated in docs/operations/H018_DECISION_MATRIX.md. This matrix is governance-only: it does not choose thresholds, implement guards, validate H018, promote H017, approve live trading, or approve Phase 4 execution work.

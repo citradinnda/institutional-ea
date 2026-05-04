@@ -173,3 +173,7 @@ This document does not approve Phase 4 execution work.
 This document does not approve H017 promotion.
 
 This document only opens the boundary-governance plan for deciding whether the next hypothesis should be H018.
+
+## Consolidated H018 decision matrix
+
+The cross-cutting H018 choices are summarized in docs/operations/H018_DECISION_MATRIX.md. The matrix is intended to prevent execution-semantics changes, stop-distance guards, exposure caps, skipping, or clipping from being introduced as silent H017 repairs.

@@ -262,3 +262,7 @@ Implemented follow-up execution-validation guard:
 - This guard does not authorize a broad real-data rerun.
 
 Any successor strategy should be opened as a new hypothesis, such as H018, rather than treating H017 as repaired without a new hypothesis boundary.
+
+## H018 consolidated decision matrix
+
+The open H018 boundary, minimum stop-distance, maximum notional/leverage, and executable-entry sizing questions are consolidated in docs/operations/H018_DECISION_MATRIX.md. H018 remains unimplemented, unvalidated, not promotable, and not live-approved.

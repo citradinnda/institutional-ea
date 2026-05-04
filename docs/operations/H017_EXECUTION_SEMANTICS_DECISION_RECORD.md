@@ -278,3 +278,7 @@ H017 remains failed.
 No real-data rerun is authorized by this document alone.
 
 No live trading is approved.
+
+## H018 decision matrix reference
+
+Future changes to raw-entry versus executable-entry sizing, stop-validity reference, minimum stop distance, or maximum exposure policy are tracked as H018 governance in docs/operations/H018_DECISION_MATRIX.md. Such changes must not be interpreted as H017 promotion.
