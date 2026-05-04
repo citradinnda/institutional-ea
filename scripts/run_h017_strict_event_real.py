@@ -162,18 +162,14 @@ def run_validation() -> StrictExpandedValidationResult:
     assessment = _assess_bridge_windows(loaded)
     _assert_expected_bridge_window_assessment(assessment)
 
-    try:
-        strict_result = backtest_h017_strict_event_driven(
-            usdjpy_h4=loaded.usdjpy_h4.bars,
-            xauusd_h4=loaded.xauusd_h4.bars,
-            usdjpy_m1=loaded.usdjpy_m1.bars,
-            xauusd_m1=loaded.xauusd_m1.bars,
-            accepted_entry_times=assessment.accepted_timestamps,
-            expected_h4_delta=EXPECTED_H4_DELTA,
-        )
-    except H017EventInsolvencyError as exc:
-        _print_insolvency_failure(exc)
-        raise SystemExit(1) from None
+    strict_result = backtest_h017_strict_event_driven(
+        usdjpy_h4=loaded.usdjpy_h4.bars,
+        xauusd_h4=loaded.xauusd_h4.bars,
+        usdjpy_m1=loaded.usdjpy_m1.bars,
+        xauusd_m1=loaded.xauusd_m1.bars,
+        accepted_entry_times=assessment.accepted_timestamps,
+        expected_h4_delta=EXPECTED_H4_DELTA,
+    )
 
     claim = build_h017_claim(
         strict_result.backtest.portfolio.returns,
@@ -362,14 +358,18 @@ def main() -> None:
     _print_bridge_window_assessment(assessment)
     print()
 
-    strict_result = backtest_h017_strict_event_driven(
-        usdjpy_h4=loaded.usdjpy_h4.bars,
-        xauusd_h4=loaded.xauusd_h4.bars,
-        usdjpy_m1=loaded.usdjpy_m1.bars,
-        xauusd_m1=loaded.xauusd_m1.bars,
-        accepted_entry_times=assessment.accepted_timestamps,
-        expected_h4_delta=EXPECTED_H4_DELTA,
-    )
+    try:
+        strict_result = backtest_h017_strict_event_driven(
+            usdjpy_h4=loaded.usdjpy_h4.bars,
+            xauusd_h4=loaded.xauusd_h4.bars,
+            usdjpy_m1=loaded.usdjpy_m1.bars,
+            xauusd_m1=loaded.xauusd_m1.bars,
+            accepted_entry_times=assessment.accepted_timestamps,
+            expected_h4_delta=EXPECTED_H4_DELTA,
+        )
+    except H017EventInsolvencyError as exc:
+        _print_insolvency_failure(exc)
+        raise SystemExit(1) from None
 
     claim = build_h017_claim(
         strict_result.backtest.portfolio.returns,
