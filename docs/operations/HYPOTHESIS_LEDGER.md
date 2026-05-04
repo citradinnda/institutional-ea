@@ -21,6 +21,13 @@ Current candidate status:
 
 - H017: Failed / not promotable.
 
+Current boundary-planning status:
+
+- H018 boundary planning is opened for governance only.
+- H018 is not validated.
+- H018 is not promotable.
+- H018 does not approve live trading or Phase 4 execution work.
+
 Current live-trading status:
 
 - Live trading approved: False.
@@ -35,6 +42,10 @@ Current strict expanded validation reference:
 - docs/operations/BROKER_NATIVE_EXPANDED_STRICT_H017_VALIDATION_RESULT.md
 - docs/operations/BROKER_NATIVE_EXPANDED_STRICT_H017_VALIDATION_RESULT_OUTPUT.txt
 - docs/operations/H017_EVENT_VALIDATION_RUN_LOG.md
+
+Current H018 boundary reference:
+
+- docs/operations/H018_BOUNDARY_DECISION_PLAN.md
 
 ## Graveyard Summary Before H017
 

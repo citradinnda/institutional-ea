@@ -9,6 +9,7 @@ This repository is infrastructure-first research. It is not a live-trading syste
 - Current hypothesis: H017.
 - H017 status: failed / not promotable.
 - Failure mode: strict expanded broker-native event-driven validation failed by account insolvency.
+- H018 boundary planning: opened as governance only; no H018 validation is authorized yet.
 - Live trading approved: False.
 - Phase 4 execution work: not approved.
 
@@ -26,6 +27,10 @@ The formal hypothesis status is documented here:
 The operational run log is documented here:
 
 - `docs/operations/H017_EVENT_VALIDATION_RUN_LOG.md`
+
+The H018 boundary decision plan is documented here:
+
+- `docs/operations/H018_BOUNDARY_DECISION_PLAN.md`
 
 ## Guardrails
 
