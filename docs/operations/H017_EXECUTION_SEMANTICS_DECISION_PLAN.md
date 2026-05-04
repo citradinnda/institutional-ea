@@ -285,9 +285,9 @@ Before any future real-data validation under altered semantics, the repository s
 5. Documentation stating whether the altered behavior is H017-compatible or requires H018.
 6. Full test suite passing without a count regression.
 
-Current full-test anchor:
+Current full-test anchor after H017 invalid-stop execution guard:
 
-    533 passed
+    535 passed
 
 ## Current Verdict
 
@@ -298,3 +298,15 @@ H017 remains failed.
 No live trading is approved.
 
 No implementation change is authorized by this document alone.
+
+## Post-Plan Implementation Note
+
+After this plan was written, the project implemented the first partial execution-semantics guard:
+
+- `H017EventInvalidStopError` in `quantcore/backtest/h017_event.py`.
+- Raw-entry directional stop validation under current raw-entry sizing semantics.
+- Long/buy stops must be below raw H4 entry open.
+- Short/sell stops must be above raw H4 entry open.
+- Invalid directional stops fail closed and are not skipped or clipped.
+
+This implementation does not promote H017, does not approve live trading, and does not authorize a broad real-data rerun.

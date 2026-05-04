@@ -235,4 +235,15 @@ Do not add machine learning.
 
 Any future raw-entry versus executable-entry sizing change must be explicit, tested, documented, and treated as an execution-model semantics decision.
 
+Implemented follow-up execution-validation guard:
+
+- Raw-entry directional invalid-stop guard is implemented in `quantcore/backtest/h017_event.py`.
+- Error class: `H017EventInvalidStopError`.
+- Under current raw-entry sizing semantics, long/buy stops must be below raw H4 entry open and short/sell stops must be above raw H4 entry open.
+- Invalid directional stops fail closed.
+- Invalid directional stops are not skipped silently and are not clipped.
+- This guard does not promote H017.
+- This guard does not approve live trading.
+- This guard does not authorize a broad real-data rerun.
+
 Any successor strategy should be opened as a new hypothesis, such as H018, rather than treating H017 as repaired without a new hypothesis boundary.
