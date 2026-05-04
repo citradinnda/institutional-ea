@@ -166,6 +166,76 @@ class H018MinimumStopDistanceError(RuntimeError):
             f"validation_action={self.validation_action}"
         )
 
+
+class H018MaximumPerTradeLeverageError(RuntimeError):
+    """Raised when H018 maximum per-trade USD gross leverage policy is violated.
+
+    H018 validation mode caps each trade's USD-converted gross notional exposure
+    at 10.0 times account equity. Violations fail closed; they are not skipped,
+    clipped, or treated as valid continuation.
+    """
+
+    def __init__(
+        self,
+        *,
+        symbol: str,
+        side: str,
+        decision_time: pd.Timestamp,
+        entry_time: pd.Timestamp,
+        entry_raw_price: float,
+        stop_price: float,
+        raw_stop_distance: float,
+        equity_usd: float,
+        lots: float,
+        contract_size: float,
+        quote_currency: str,
+        notional_quote: float,
+        notional_usd: float,
+        gross_leverage: float,
+        maximum_gross_leverage: float,
+    ) -> None:
+        self.rule_name = "per_trade_usd_gross_leverage_at_or_below_10x_equity"
+        self.symbol = symbol
+        self.side = side
+        self.decision_time = pd.Timestamp(decision_time)
+        self.entry_time = pd.Timestamp(entry_time)
+        self.entry_raw_price = float(entry_raw_price)
+        self.stop_price = float(stop_price)
+        self.raw_stop_distance = float(raw_stop_distance)
+        self.equity_usd = float(equity_usd)
+        self.lots = float(lots)
+        self.contract_size = float(contract_size)
+        self.quote_currency = quote_currency
+        self.notional_quote = float(notional_quote)
+        self.notional_usd = float(notional_usd)
+        self.gross_leverage = float(gross_leverage)
+        self.maximum_gross_leverage = float(maximum_gross_leverage)
+        self.threshold_basis = "per_trade_usd_gross_notional_divided_by_equity"
+        self.validation_action = "fail_closed"
+
+        super().__init__(
+            "H018 maximum per-trade leverage violation: "
+            f"rule_name={self.rule_name}, "
+            f"symbol={self.symbol}, "
+            f"side={self.side}, "
+            f"decision_time={self.decision_time}, "
+            f"entry_time={self.entry_time}, "
+            f"entry_raw_price={self.entry_raw_price:.9f}, "
+            f"stop_price={self.stop_price:.9f}, "
+            f"raw_stop_distance={self.raw_stop_distance:.9f}, "
+            f"equity_usd={self.equity_usd:.2f}, "
+            f"lots={self.lots:.2f}, "
+            f"contract_size={self.contract_size:.9f}, "
+            f"quote_currency={self.quote_currency}, "
+            f"notional_quote={self.notional_quote:.9f}, "
+            f"notional_usd={self.notional_usd:.9f}, "
+            f"gross_leverage={self.gross_leverage:.9f}, "
+            f"maximum_gross_leverage={self.maximum_gross_leverage:.9f}, "
+            f"threshold_basis={self.threshold_basis}, "
+            f"validation_action={self.validation_action}"
+        )
+
+
 def backtest_h017_event_driven(
     *,
     usdjpy_h4: pd.DataFrame,
@@ -376,6 +446,19 @@ def _build_symbol_interval_fill(
     if position_size.lots == 0.0:
         return None
 
+    _validate_maximum_per_trade_usd_gross_leverage(
+        symbol=symbol,
+        side=side,
+        decision_time=decision_time,
+        entry_time=entry_time,
+        entry_raw_price=entry_raw_price,
+        stop_price=stop_price,
+        raw_stop_distance=stop_distance_price,
+        equity_usd=equity_usd,
+        position_size=position_size,
+        instrument_spec=instrument_spec,
+    )
+
     entry_cost = price_with_execution_costs(
         symbol=symbol,
         side=side,
@@ -512,6 +595,84 @@ def _validate_minimum_stop_distance(
             stop_price=stop_price,
             raw_stop_distance=raw_stop_distance,
             minimum_stop_distance=minimum_stop_distance,
+        )
+
+
+_MAXIMUM_PER_TRADE_USD_GROSS_LEVERAGE = 10.0
+
+
+def _position_notional_usd(
+    *,
+    symbol: str,
+    entry_raw_price: float,
+    position_size: PositionSize,
+    instrument_spec: InstrumentSpec,
+) -> float:
+    if position_size.symbol.upper() != symbol.upper():
+        raise ValueError("position_size symbol must match symbol")
+
+    if instrument_spec.symbol.upper() != symbol.upper():
+        raise ValueError("instrument_spec symbol must match symbol")
+
+    quote_currency = instrument_spec.quote_currency.upper()
+
+    if quote_currency == "USD":
+        return float(position_size.notional_quote)
+
+    if quote_currency == "JPY":
+        if entry_raw_price <= 0.0:
+            raise ValueError("entry_raw_price must be positive for JPY notional conversion")
+        return float(position_size.notional_quote) / float(entry_raw_price)
+
+    raise ValueError(f"unsupported quote currency {instrument_spec.quote_currency!r}")
+
+
+def _validate_maximum_per_trade_usd_gross_leverage(
+    *,
+    symbol: str,
+    side: str,
+    decision_time: pd.Timestamp,
+    entry_time: pd.Timestamp,
+    entry_raw_price: float,
+    stop_price: float,
+    raw_stop_distance: float,
+    equity_usd: float,
+    position_size: PositionSize,
+    instrument_spec: InstrumentSpec,
+) -> None:
+    if equity_usd <= 0.0:
+        raise ValueError("equity_usd must be positive")
+
+    notional_usd = _position_notional_usd(
+        symbol=symbol,
+        entry_raw_price=entry_raw_price,
+        position_size=position_size,
+        instrument_spec=instrument_spec,
+    )
+    gross_leverage = notional_usd / float(equity_usd)
+
+    if gross_leverage > _MAXIMUM_PER_TRADE_USD_GROSS_LEVERAGE and not math.isclose(
+        gross_leverage,
+        _MAXIMUM_PER_TRADE_USD_GROSS_LEVERAGE,
+        rel_tol=1e-12,
+        abs_tol=1e-12,
+    ):
+        raise H018MaximumPerTradeLeverageError(
+            symbol=symbol,
+            side=side,
+            decision_time=decision_time,
+            entry_time=entry_time,
+            entry_raw_price=entry_raw_price,
+            stop_price=stop_price,
+            raw_stop_distance=raw_stop_distance,
+            equity_usd=equity_usd,
+            lots=position_size.lots,
+            contract_size=instrument_spec.contract_size,
+            quote_currency=instrument_spec.quote_currency,
+            notional_quote=position_size.notional_quote,
+            notional_usd=notional_usd,
+            gross_leverage=gross_leverage,
+            maximum_gross_leverage=_MAXIMUM_PER_TRADE_USD_GROSS_LEVERAGE,
         )
 
 def _validate_h4_frame(symbol: str, bars: pd.DataFrame) -> pd.DataFrame:

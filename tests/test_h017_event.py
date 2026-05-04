@@ -9,6 +9,7 @@ from quantcore.backtest.h017_event import (
     H017EventBacktestResult,
     H017EventInsolvencyError,
     H017EventInvalidStopError,
+    H018MaximumPerTradeLeverageError,
     H018MinimumStopDistanceError,
     backtest_h017_event_from_result,
 )
@@ -255,8 +256,8 @@ def test_interval_ruin_raises_clear_insolvency_error() -> None:
     ) as exc_info:
         backtest_h017_event_from_result(
             h017_result=_h017_result(
-                xauusd_positions=[2.0, 0.0, 0.0],
-                xauusd_stop_long=[1990.0, 1990.0, 1990.0],
+                xauusd_positions=[-2.0, 0.0, 0.0],
+                xauusd_stop_short=[4000.0, 2010.0, 2010.0],
             ),
             usdjpy_h4=_h4([150.0, 150.0, 150.0]),
             xauusd_h4=_h4([2000.0, 2000.0, 2000.0]),
@@ -267,7 +268,7 @@ def test_interval_ruin_raises_clear_insolvency_error() -> None:
             ),
             xauusd_m1=_m1(
                 [
-                    ("2024-01-02 04:00", 2000.0, 2001.0, 1989.0, 1990.0),
+                    ("2024-01-02 04:00", 2000.0, 4001.0, 1999.0, 4000.0),
                 ]
             ),
         )
@@ -284,9 +285,9 @@ def test_interval_ruin_raises_clear_insolvency_error() -> None:
 
     fill = error.interval_fills[0]
     assert fill.symbol == "XAUUSD"
-    assert fill.side == "buy"
+    assert fill.side == "sell"
     assert fill.exit_reason == "stop"
-    assert fill.lots == pytest.approx(20.0)
+    assert fill.lots == pytest.approx(0.1)
 
 
 def test_flat_positions_create_no_fills_and_flat_equity() -> None:
@@ -678,7 +679,7 @@ def test_h018_minimum_stop_distance_at_or_above_one_spread_passes_guard(
     if symbol == "XAUUSD":
         result = backtest_h017_event_from_result(
             h017_result=_h017_result(
-                xauusd_positions=[0.01 if side == "buy" else -0.01, 0.0, 0.0],
+                xauusd_positions=[0.0001 if side == "buy" else -0.0001, 0.0, 0.0],
                 xauusd_stop_long=[stop_price, 1990.0, 1990.0],
                 xauusd_stop_short=[stop_price, 2010.0, 2010.0],
             ),
@@ -698,7 +699,7 @@ def test_h018_minimum_stop_distance_at_or_above_one_spread_passes_guard(
     else:
         result = backtest_h017_event_from_result(
             h017_result=_h017_result(
-                usdjpy_positions=[0.01 if side == "buy" else -0.01, 0.0, 0.0],
+                usdjpy_positions=[0.0001 if side == "buy" else -0.0001, 0.0, 0.0],
                 usdjpy_stop_long=[stop_price, 149.0, 149.0],
                 usdjpy_stop_short=[stop_price, 151.0, 151.0],
             ),
@@ -719,4 +720,174 @@ def test_h018_minimum_stop_distance_at_or_above_one_spread_passes_guard(
     assert len(result.fills) == 1
     assert result.fills[0].symbol == symbol
     assert result.fills[0].side == side
+
+@pytest.mark.parametrize(
+    ("symbol", "stop_price", "expected_lots", "expected_gross_leverage"),
+    [
+        ("USDJPY", 149.80, 0.75, 7.5),
+        ("USDJPY", 149.85, 1.00, 10.0),
+        ("XAUUSD", 1997.00, 0.33, 6.6),
+        ("XAUUSD", 1998.00, 0.50, 10.0),
+    ],
+)
+def test_h018_maximum_per_trade_leverage_at_or_below_10x_passes_guard(
+    symbol: str,
+    stop_price: float,
+    expected_lots: float,
+    expected_gross_leverage: float,
+) -> None:
+    if symbol == "USDJPY":
+        result = backtest_h017_event_from_result(
+            h017_result=_h017_result(
+                usdjpy_positions=[0.01, 0.0, 0.0],
+                usdjpy_stop_long=[stop_price, 149.0, 149.0],
+            ),
+            usdjpy_h4=_h4([150.0, 150.0, 151.0]),
+            xauusd_h4=_h4([2000.0, 2000.0, 2000.0]),
+            usdjpy_m1=_m1(
+                [
+                    ("2024-01-02 04:00", 150.0, 150.1, 149.9, 150.0),
+                ]
+            ),
+            xauusd_m1=_m1(
+                [
+                    ("2024-01-02 04:00", 2000.0, 2000.5, 1999.5, 2000.0),
+                ]
+            ),
+        )
+    else:
+        result = backtest_h017_event_from_result(
+            h017_result=_h017_result(
+                xauusd_positions=[0.01, 0.0, 0.0],
+                xauusd_stop_long=[stop_price, 1990.0, 1990.0],
+            ),
+            usdjpy_h4=_h4([150.0, 150.0, 150.0]),
+            xauusd_h4=_h4([2000.0, 2000.0, 2010.0]),
+            usdjpy_m1=_m1(
+                [
+                    ("2024-01-02 04:00", 150.0, 150.1, 149.9, 150.0),
+                ]
+            ),
+            xauusd_m1=_m1(
+                [
+                    ("2024-01-02 04:00", 2000.0, 2000.5, 1999.5, 2000.0),
+                ]
+            ),
+        )
+
+    assert len(result.fills) == 1
+    fill = result.fills[0]
+    assert fill.symbol == symbol
+    assert fill.side == "buy"
+    assert fill.lots == pytest.approx(expected_lots)
+
+    if symbol == "USDJPY":
+        notional_usd = fill.lots * 100_000.0
+    else:
+        notional_usd = fill.lots * 100.0 * 2000.0
+
+    assert notional_usd / 10_000.0 == pytest.approx(expected_gross_leverage)
+
+
+@pytest.mark.parametrize(
+    ("symbol", "stop_price"),
+    [
+        ("USDJPY", 149.90),
+        ("XAUUSD", 1999.00),
+    ],
+)
+def test_h018_maximum_per_trade_leverage_above_10x_fails_closed(
+    symbol: str,
+    stop_price: float,
+) -> None:
+    if symbol == "USDJPY":
+        kwargs = {
+            "h017_result": _h017_result(
+                usdjpy_positions=[0.01, 0.0, 0.0],
+                usdjpy_stop_long=[stop_price, 149.0, 149.0],
+            ),
+            "usdjpy_h4": _h4([150.0, 150.0, 151.0]),
+            "xauusd_h4": _h4([2000.0, 2000.0, 2000.0]),
+            "usdjpy_m1": _m1(
+                [
+                    ("2024-01-02 04:00", 150.0, 150.1, 149.9, 150.0),
+                ]
+            ),
+            "xauusd_m1": _m1(
+                [
+                    ("2024-01-02 04:00", 2000.0, 2000.5, 1999.5, 2000.0),
+                ]
+            ),
+        }
+    else:
+        kwargs = {
+            "h017_result": _h017_result(
+                xauusd_positions=[0.01, 0.0, 0.0],
+                xauusd_stop_long=[stop_price, 1990.0, 1990.0],
+            ),
+            "usdjpy_h4": _h4([150.0, 150.0, 150.0]),
+            "xauusd_h4": _h4([2000.0, 2000.0, 2010.0]),
+            "usdjpy_m1": _m1(
+                [
+                    ("2024-01-02 04:00", 150.0, 150.1, 149.9, 150.0),
+                ]
+            ),
+            "xauusd_m1": _m1(
+                [
+                    ("2024-01-02 04:00", 2000.0, 2000.5, 1999.5, 2000.0),
+                ]
+            ),
+        }
+
+    with pytest.raises(
+        H018MaximumPerTradeLeverageError,
+        match="H018 maximum per-trade leverage violation",
+    ):
+        backtest_h017_event_from_result(**kwargs)
+
+
+def test_h018_maximum_per_trade_leverage_error_preserves_audit_fields() -> None:
+    with pytest.raises(
+        H018MaximumPerTradeLeverageError,
+        match="H018 maximum per-trade leverage violation",
+    ) as exc_info:
+        backtest_h017_event_from_result(
+            h017_result=_h017_result(
+                usdjpy_positions=[0.01, 0.0, 0.0],
+                usdjpy_stop_long=[149.90, 149.0, 149.0],
+            ),
+            usdjpy_h4=_h4([150.0, 150.0, 151.0]),
+            xauusd_h4=_h4([2000.0, 2000.0, 2000.0]),
+            usdjpy_m1=_m1(
+                [
+                    ("2024-01-02 04:00", 150.0, 150.1, 149.9, 150.0),
+                ]
+            ),
+            xauusd_m1=_m1(
+                [
+                    ("2024-01-02 04:00", 2000.0, 2000.5, 1999.5, 2000.0),
+                ]
+            ),
+        )
+
+    error = exc_info.value
+
+    assert error.rule_name == "per_trade_usd_gross_leverage_at_or_below_10x_equity"
+    assert error.symbol == "USDJPY"
+    assert error.side == "buy"
+    assert error.decision_time == _utc("2024-01-02 00:00")
+    assert error.entry_time == _utc("2024-01-02 04:00")
+    assert error.entry_raw_price == pytest.approx(150.0)
+    assert error.stop_price == pytest.approx(149.90)
+    assert error.raw_stop_distance == pytest.approx(0.10)
+    assert error.equity_usd == pytest.approx(10_000.0)
+    assert error.lots == pytest.approx(1.50)
+    assert error.contract_size == pytest.approx(100_000.0)
+    assert error.quote_currency == "JPY"
+    assert error.notional_quote == pytest.approx(22_500_000.0)
+    assert error.notional_usd == pytest.approx(150_000.0)
+    assert error.gross_leverage == pytest.approx(15.0)
+    assert error.maximum_gross_leverage == pytest.approx(10.0)
+    assert error.threshold_basis == "per_trade_usd_gross_notional_divided_by_equity"
+    assert error.validation_action == "fail_closed"
 
