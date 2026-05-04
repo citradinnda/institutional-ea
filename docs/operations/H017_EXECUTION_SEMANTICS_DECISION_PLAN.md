@@ -285,9 +285,9 @@ Before any future real-data validation under altered semantics, the repository s
 5. Documentation stating whether the altered behavior is H017-compatible or requires H018.
 6. Full test suite passing without a count regression.
 
-Current full-test anchor after H017 invalid-stop execution guard:
+Current full-test anchor after H017 equality invalid-stop tests:
 
-    535 passed
+    537 passed
 
 ## Current Verdict
 

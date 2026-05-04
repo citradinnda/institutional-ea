@@ -54,6 +54,6 @@ Typical setup:
     pip install -e .[dev]
     pytest -q
 
-Current full-test anchor after H017 invalid-stop execution guard:
+Current full-test anchor after H017 equality invalid-stop tests:
 
-    535 passed
+    537 passed

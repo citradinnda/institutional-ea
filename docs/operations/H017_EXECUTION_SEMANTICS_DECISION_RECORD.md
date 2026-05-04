@@ -192,7 +192,9 @@ Implemented tests:
 
 1. Long stop above raw entry fails closed.
 2. Short stop below raw entry fails closed.
-3. Existing valid long and short cases continue to pass under the full suite.
+3. Long stop equal to raw entry fails closed.
+4. Short stop equal to raw entry fails closed.
+5. Existing valid long and short cases continue to pass under the full suite.
 
 Test location:
 
@@ -206,9 +208,9 @@ The generic portfolio sizing API was not modified:
 
     quantcore/backtest/portfolio.py
 
-Current full-test anchor after this implementation:
+Current full-test anchor after equality invalid-stop tests:
 
-    535 passed
+    537 passed
 
 Remaining future tests, if authorized:
 

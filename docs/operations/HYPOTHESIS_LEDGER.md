@@ -241,6 +241,7 @@ Implemented follow-up execution-validation guard:
 - Error class: `H017EventInvalidStopError`.
 - Under current raw-entry sizing semantics, long/buy stops must be below raw H4 entry open and short/sell stops must be above raw H4 entry open.
 - Invalid directional stops fail closed.
+- Equality is invalid: long/buy stops equal to raw H4 entry open and short/sell stops equal to raw H4 entry open fail closed.
 - Invalid directional stops are not skipped silently and are not clipped.
 - This guard does not promote H017.
 - This guard does not approve live trading.
