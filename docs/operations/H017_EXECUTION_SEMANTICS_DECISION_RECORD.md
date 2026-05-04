@@ -219,6 +219,26 @@ Remaining future tests, if authorized:
 3. Spread-adjusted sizing behavior is explicitly governed.
 4. Maximum notional/leverage guard behavior is explicitly governed.
 
+## Near-Zero Stop-Distance Diagnostic
+
+A read-only sizing diagnostic is recorded here:
+
+    docs/operations/H017_NEAR_ZERO_STOP_DISTANCE_DIAGNOSTIC.md
+
+The diagnostic confirms that the current sizing API rejects zero and negative stop distances, but accepts any positive stop distance.
+
+Positive near-zero stop distances can still create extreme broker lots and extreme notional exposure.
+
+This is documented as an open execution-semantics and account-risk governance issue.
+
+No minimum stop-distance guard has been chosen.
+
+No maximum notional or leverage guard has been chosen.
+
+No H017 promotion is implied.
+
+No real-data rerun is authorized by this diagnostic.
+
 ## H017/H018 Boundary
 
 H017 remains:
