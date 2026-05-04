@@ -69,3 +69,7 @@ Current full-test anchor after H017 equality invalid-stop tests:
 ## H018 decision matrix
 
 H018 execution-semantics and account-risk planning is consolidated in docs/operations/H018_DECISION_MATRIX.md. This matrix is governance-only: it does not choose thresholds, implement guards, validate H018, promote H017, approve live trading, or approve Phase 4 execution work.
+
+## H018 claim skeleton
+
+A governance skeleton for any future H018 claim is documented in docs/operations/H018_CLAIM_SKELETON.md. It defines required claim fields, synthetic-test gates, source gates, event-validation gates, and non-promotion language. It does not implement H018, validate H018, promote H017, approve live trading, or approve Phase 4 execution.

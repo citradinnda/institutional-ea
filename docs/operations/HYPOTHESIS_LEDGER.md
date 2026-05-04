@@ -266,3 +266,7 @@ Any successor strategy should be opened as a new hypothesis, such as H018, rathe
 ## H018 consolidated decision matrix
 
 The open H018 boundary, minimum stop-distance, maximum notional/leverage, and executable-entry sizing questions are consolidated in docs/operations/H018_DECISION_MATRIX.md. H018 remains unimplemented, unvalidated, not promotable, and not live-approved.
+
+## H018 claim skeleton
+
+The minimum structure for any future H018 claim is documented in docs/operations/H018_CLAIM_SKELETON.md. H018 remains unimplemented, unvalidated, not promotable, and not live-approved. H017 remains failed and not promotable.

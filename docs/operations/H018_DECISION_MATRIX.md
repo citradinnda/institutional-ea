@@ -118,3 +118,7 @@ H018 is not promotable.
 Live trading remains not approved.
 
 Phase 4 execution remains not approved.
+
+## H018 claim skeleton reference
+
+The validation-gate structure for any future H018 claim is documented in docs/operations/H018_CLAIM_SKELETON.md. The claim skeleton must be resolved before any H018 validation run is treated as more than diagnostic-only.

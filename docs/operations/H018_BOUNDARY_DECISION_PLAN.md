@@ -177,3 +177,7 @@ This document only opens the boundary-governance plan for deciding whether the n
 ## Consolidated H018 decision matrix
 
 The cross-cutting H018 choices are summarized in docs/operations/H018_DECISION_MATRIX.md. The matrix is intended to prevent execution-semantics changes, stop-distance guards, exposure caps, skipping, or clipping from being introduced as silent H017 repairs.
+
+## H018 claim skeleton reference
+
+The minimum required structure for any future H018 claim is documented in docs/operations/H018_CLAIM_SKELETON.md. This reinforces that H018 must be governed as a new hypothesis and not as a silent repair of failed H017 evidence.
