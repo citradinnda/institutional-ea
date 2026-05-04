@@ -181,3 +181,11 @@ The cross-cutting H018 choices are summarized in docs/operations/H018_DECISION_M
 ## H018 claim skeleton reference
 
 The minimum required structure for any future H018 claim is documented in docs/operations/H018_CLAIM_SKELETON.md. This reinforces that H018 must be governed as a new hypothesis and not as a silent repair of failed H017 evidence.
+
+## Boundary decision-record draft
+
+A draft H018 boundary decision record has been created at docs/operations/H018_BOUNDARY_DECISION_RECORD.md.
+
+The draft does not choose a sizing reference, stop-validity reference, minimum stop-distance threshold, maximum notional threshold, maximum leverage threshold, skip rule, clipping rule, implementation rule, validation rule, promotion rule, or live-trading rule.
+
+The draft preserves the original H017 failure and keeps H018 as unimplemented, unvalidated, not promotable, not live-approved, and not Phase 4 approved.

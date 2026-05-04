@@ -51,3 +51,9 @@ Before any H018 code change, the relevant pending decision must have a completed
 Before any H018 validation claim, the claim must also satisfy docs/operations/H018_CLAIM_SKELETON.md.
 
 H017 remains failed and not promotable. This index does not alter that verdict.
+
+## Draft decision records
+
+| Decision record | Status | Policy chosen? | Implementation authorized? | Validation authorized? | Notes |
+|---|---|---:|---:|---:|---|
+| docs/operations/H018_BOUNDARY_DECISION_RECORD.md | Draft | No | No | No | Draft boundary record only. Preserves H017 failure visibility and states that H018, if pursued, is a successor hypothesis rather than a silent H017 repair. |
