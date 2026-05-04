@@ -2,7 +2,7 @@
 
 Decision title: H018 sizing reference and stop-validity reference.
 Decision identifier: H018-SRDR-001.
-Decision status: Draft.
+Decision status: Accepted and implemented.
 Date: 2026-05-04.
 Related hypothesis: H018 candidate successor hypothesis.
 Related documents:
@@ -20,10 +20,43 @@ Related documents:
 - docs/operations/H018_DECISION_RECORD_INDEX.md
 
 Owner or reviewer: solo retail trader with AI engineering review.
-Implementation status: not implemented.
+Implementation status: implemented by preserving current raw-entry event-engine semantics.
 Validation status: not validated.
 Live-trading status: not approved.
 Phase 4 execution status: not approved.
+
+## Accepted Decision Summary
+
+For the first H018 validation-mode implementation, the accepted sizing reference is the raw broker-native H4 entry open.
+
+For the first H018 validation-mode implementation, the accepted directional stop-validity reference is also the raw broker-native H4 entry open.
+
+This preserves the current event-engine behavior:
+
+1. entry_raw_price is read from the broker-native H4 open at entry_time.
+2. Long / buy stops must be strictly below entry_raw_price.
+3. Short / sell stops must be strictly above entry_raw_price.
+4. Equality against entry_raw_price is invalid.
+5. raw_stop_distance is abs(entry_raw_price - stop_price).
+6. size_position_from_risk receives entry_price=entry_raw_price.
+7. H018 minimum stop-distance validation uses raw_stop_distance.
+8. H018 maximum per-trade USD gross leverage validation uses the preliminary raw-entry-based PositionSize.
+9. USDJPY notional conversion for the maximum leverage guard uses entry_raw_price.
+10. Executable entry after spread remains used for simulated fill price and PnL.
+11. This decision does not adopt executable-entry sizing.
+12. This decision does not adopt executable-entry-only stop validity.
+13. This decision does not adopt both-reference stop validity.
+14. This decision does not adopt conservative worst-case sizing.
+15. This decision does not authorize trade skipping.
+16. This decision does not authorize position clipping.
+17. This decision does not authorize a real-data rerun.
+18. This decision does not validate H018.
+19. This decision does not promote H017.
+20. This decision does not approve live trading or Phase 4 execution work.
+
+Plain English:
+
+The first H018 validation-mode guard implementation keeps the existing raw-entry sizing and raw-entry stop-validity semantics explicit rather than silently changing to executable-entry semantics.
 
 ## Purpose
 
@@ -350,24 +383,32 @@ Candidate policies include:
 
 Skipping and clipping can materially change the realized strategy and must not be introduced without an accepted H018 decision record.
 
-## Draft Non-Decision
+## Accepted Decision
 
-This draft makes the following non-decision:
+This record accepts the following narrow policy:
 
-1. No sizing reference is selected.
-2. No stop-validity reference is selected.
-3. No equality behavior is selected beyond the currently implemented H017 raw-entry guard.
-4. No minimum stop-distance threshold is selected.
-5. No maximum notional threshold is selected.
-6. No maximum leverage threshold is selected.
-7. No trade-skip policy is selected.
-8. No clipping policy is selected.
-9. No diagnostic-continuation policy is selected.
-10. No implementation is authorized.
-11. No real-data run is authorized.
-12. No H018 validation is authorized.
-13. No live trading is approved.
-14. No Phase 4 execution work is approved.
+1. The sizing reference is raw H4 entry open.
+2. The directional stop-validity reference is raw H4 entry open.
+3. Sizing and directional stop validity use the same raw-entry reference.
+4. Long / buy stops must be strictly below raw H4 entry open.
+5. Short / sell stops must be strictly above raw H4 entry open.
+6. Equality against raw H4 entry open is invalid.
+7. raw_stop_distance is abs(raw_h4_entry_open - stop_price).
+8. H018 minimum stop-distance validation remains based on raw_stop_distance.
+9. Position sizing remains based on raw_stop_distance and raw H4 entry open.
+10. H018 maximum per-trade USD gross leverage validation remains based on the preliminary raw-entry-based PositionSize.
+11. Executable entry after spread remains the simulated fill price for execution and PnL.
+12. Executable-entry sizing is rejected for this first H018 validation-mode implementation.
+13. Executable-entry-only stop validity is rejected for this first H018 validation-mode implementation.
+14. Both-reference stop validity is rejected for this first H018 validation-mode implementation.
+15. Conservative worst-case sizing is rejected for this first H018 validation-mode implementation.
+16. Trade skipping is rejected for this first H018 validation-mode implementation.
+17. Position clipping is rejected for this first H018 validation-mode implementation.
+18. Diagnostic-only continuation remains deferred to a separately labeled diagnostic mode.
+19. No real-data run is authorized.
+20. No H018 validation is authorized.
+21. No live trading is approved.
+22. No Phase 4 execution work is approved.
 
 ## Units And Instruments
 
@@ -552,19 +593,31 @@ Before implementing any H018 sizing-reference or stop-validity-reference behavio
 
 ## Current Verdict
 
-This is a draft sizing-reference decision record only.
+This sizing-reference and stop-validity-reference decision is accepted and implemented by preserving current raw-entry event-engine semantics.
 
-No H018 sizing reference is chosen here.
+The accepted H018 sizing reference is raw H4 entry open.
 
-No H018 stop-validity reference is chosen here.
+The accepted H018 directional stop-validity reference is raw H4 entry open.
 
-No H018 guard is implemented here.
+Executable-entry sizing is not adopted.
 
-No H018 threshold is chosen here.
+Executable-entry-only stop validity is not adopted.
 
-No H018 real-data run is authorized here.
+Both-reference stop validity is not adopted.
 
-H018 remains unimplemented.
+Conservative worst-case sizing is not adopted.
+
+Trade skipping is not adopted.
+
+Position clipping is not adopted.
+
+Diagnostic-only continuation remains deferred to a separately labeled diagnostic mode.
+
+This decision does not authorize a real-data run.
+
+This decision does not authorize H018 validation.
+
+This decision does not create an H018 claim.
 
 H018 remains unvalidated.
 

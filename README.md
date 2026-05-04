@@ -36,6 +36,7 @@ The H018 boundary decision plan is documented here:
 - `docs/operations/H018_MINIMUM_STOP_DISTANCE_DECISION_PLAN.md`
 - `docs/operations/H018_MAX_NOTIONAL_LEVERAGE_DECISION_PLAN.md`
 - `docs/operations/H018_EXECUTABLE_ENTRY_SIZING_DECISION_PLAN.md`
+- `docs/operations/H018_SIZING_REFERENCE_DECISION_RECORD.md`
 
 ## Guardrails
 
