@@ -63,3 +63,5 @@ H017 remains failed and not promotable. This index does not alter that verdict.
 | docs/operations/H018_MINIMUM_STOP_DISTANCE_DECISION_RECORD.md | Draft | No | No | No | Draft minimum stop-distance record only. Does not choose spread, ATR, tick, point, friction, combined rule, threshold, fail-closed, skip, clip, diagnostic, or rerun policy. |
 
 | docs/operations/H018_MAX_NOTIONAL_LEVERAGE_DECISION_RECORD.md | Draft | No | No | No | Draft maximum notional / leverage record only. Does not choose lots, notional, notional/equity, leverage, margin, friction, threshold, fail-closed, skip, clip, diagnostic, or rerun policy. |
+
+| docs/operations/H018_TRADE_VIOLATION_POLICY_DECISION_RECORD.md | Draft | No | No | No | Draft trade violation policy record only. Does not choose fail-closed, skip, clip, diagnostic-only continuation, mixed policy, implementation, validation, or rerun policy. |
