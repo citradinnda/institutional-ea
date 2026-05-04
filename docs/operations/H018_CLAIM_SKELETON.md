@@ -178,3 +178,9 @@ H017 remains failed and not promotable.
 Live trading remains not approved.
 
 Phase 4 execution remains not approved.
+## H018 decision-record template reference
+
+Future H018 execution/account-risk policy decisions should use docs/operations/H018_DECISION_RECORD_TEMPLATE.md before code implementation. The template is governance-only: it does not choose a minimum stop-distance threshold, maximum notional/leverage rule, sizing reference, trade-skip rule, clipping rule, validation rule, or promotion rule by itself.
+
+Using the template does not implement H018, validate H018, promote H017, approve live trading, or approve Phase 4 execution.
+
