@@ -229,6 +229,10 @@ The H018 minimum stop-distance decision plan is recorded here:
 
     docs/operations/H018_MINIMUM_STOP_DISTANCE_DECISION_PLAN.md
 
+The H018 maximum notional / leverage decision plan is recorded here:
+
+    docs/operations/H018_MAX_NOTIONAL_LEVERAGE_DECISION_PLAN.md
+
 The diagnostic confirms that the current sizing API rejects zero and negative stop distances, but accepts any positive stop distance.
 
 Positive near-zero stop distances can still create extreme broker lots and extreme notional exposure.

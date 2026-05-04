@@ -144,8 +144,11 @@ Before implementing minimum stop-distance, maximum notional/leverage, or executa
 Opened subordinate H018 decision plans:
 
 - `docs/operations/H018_MINIMUM_STOP_DISTANCE_DECISION_PLAN.md`
+- `docs/operations/H018_MAX_NOTIONAL_LEVERAGE_DECISION_PLAN.md`
 
 The minimum stop-distance plan does not choose a threshold, implement a guard, authorize a real-data rerun, or promote H017/H018.
+
+The maximum notional / leverage plan does not choose an exposure threshold, implement a guard, authorize a real-data rerun, or promote H017/H018.
 
 ## Real-Data Run Restriction
 
