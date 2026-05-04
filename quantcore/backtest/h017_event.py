@@ -80,6 +80,43 @@ class H017EventInsolvencyError(RuntimeError):
         )
 
 
+class H017EventInvalidStopError(RuntimeError):
+    """Raised when H017 emits a stop with invalid directional geometry.
+
+    The current H017 event bridge sizes from the raw H4 entry open. Under that
+    explicit semantics, a long stop must be below the raw entry and a short
+    stop must be above the raw entry. Failing closed here prevents absolute
+    stop-distance sizing from hiding invalid stop geometry.
+    """
+
+    def __init__(
+        self,
+        *,
+        symbol: str,
+        side: str,
+        decision_time: pd.Timestamp,
+        entry_time: pd.Timestamp,
+        entry_raw_price: float,
+        stop_price: float,
+    ) -> None:
+        self.symbol = symbol
+        self.side = side
+        self.decision_time = pd.Timestamp(decision_time)
+        self.entry_time = pd.Timestamp(entry_time)
+        self.entry_raw_price = float(entry_raw_price)
+        self.stop_price = float(stop_price)
+
+        super().__init__(
+            "H017 event invalid stop geometry: "
+            f"symbol={self.symbol}, "
+            f"side={self.side}, "
+            f"decision_time={self.decision_time}, "
+            f"entry_time={self.entry_time}, "
+            f"entry_raw_price={self.entry_raw_price:.9f}, "
+            f"stop_price={self.stop_price:.9f}"
+        )
+
+
 def backtest_h017_event_driven(
     *,
     usdjpy_h4: pd.DataFrame,
@@ -255,6 +292,14 @@ def _build_symbol_interval_fill(
 
     entry_raw_price = float(h4_bars.at[entry_time, "open"])
     forced_exit_raw_price = float(h4_bars.at[forced_exit_time, "open"])
+    _validate_directional_stop(
+        symbol=symbol,
+        side=side,
+        decision_time=decision_time,
+        entry_time=entry_time,
+        entry_raw_price=entry_raw_price,
+        stop_price=stop_price,
+    )
     stop_distance_price = abs(entry_raw_price - stop_price)
 
     if stop_distance_price <= 0.0:
@@ -349,6 +394,36 @@ def _validate_h017_panels(h017_result: H017Result) -> None:
         missing = [symbol for symbol in _SYMBOLS if symbol not in panel.columns]
         if missing:
             raise ValueError(f"{name} missing required symbols: {missing}")
+
+
+def _validate_directional_stop(
+    *,
+    symbol: str,
+    side: str,
+    decision_time: pd.Timestamp,
+    entry_time: pd.Timestamp,
+    entry_raw_price: float,
+    stop_price: float,
+) -> None:
+    if side == "buy" and stop_price >= entry_raw_price:
+        raise H017EventInvalidStopError(
+            symbol=symbol,
+            side=side,
+            decision_time=decision_time,
+            entry_time=entry_time,
+            entry_raw_price=entry_raw_price,
+            stop_price=stop_price,
+        )
+
+    if side == "sell" and stop_price <= entry_raw_price:
+        raise H017EventInvalidStopError(
+            symbol=symbol,
+            side=side,
+            decision_time=decision_time,
+            entry_time=entry_time,
+            entry_raw_price=entry_raw_price,
+            stop_price=stop_price,
+        )
 
 
 def _validate_h4_frame(symbol: str, bars: pd.DataFrame) -> pd.DataFrame:
