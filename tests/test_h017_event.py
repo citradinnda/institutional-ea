@@ -401,6 +401,74 @@ def test_short_stop_below_raw_entry_fails_closed() -> None:
     assert error.stop_price == pytest.approx(1999.0)
 
 
+def test_long_stop_equal_to_raw_entry_fails_closed() -> None:
+    with pytest.raises(
+        H017EventInvalidStopError,
+        match="H017 event invalid stop geometry",
+    ) as exc_info:
+        backtest_h017_event_from_result(
+            h017_result=_h017_result(
+                xauusd_positions=[0.01, 0.0, 0.0],
+                xauusd_stop_long=[2000.0, 1990.0, 1990.0],
+            ),
+            usdjpy_h4=_h4([150.0, 150.0, 150.0]),
+            xauusd_h4=_h4([2000.0, 2000.0, 2010.0]),
+            usdjpy_m1=_m1(
+                [
+                    ("2024-01-02 04:00", 150.0, 150.1, 149.9, 150.0),
+                ]
+            ),
+            xauusd_m1=_m1(
+                [
+                    ("2024-01-02 04:00", 2000.0, 2001.0, 1999.0, 2000.5),
+                ]
+            ),
+        )
+
+    error = exc_info.value
+
+    assert error.symbol == "XAUUSD"
+    assert error.side == "buy"
+    assert error.decision_time == _utc("2024-01-02 00:00")
+    assert error.entry_time == _utc("2024-01-02 04:00")
+    assert error.entry_raw_price == pytest.approx(2000.0)
+    assert error.stop_price == pytest.approx(2000.0)
+
+
+def test_short_stop_equal_to_raw_entry_fails_closed() -> None:
+    with pytest.raises(
+        H017EventInvalidStopError,
+        match="H017 event invalid stop geometry",
+    ) as exc_info:
+        backtest_h017_event_from_result(
+            h017_result=_h017_result(
+                xauusd_positions=[-0.01, 0.0, 0.0],
+                xauusd_stop_short=[2000.0, 2010.0, 2010.0],
+            ),
+            usdjpy_h4=_h4([150.0, 150.0, 150.0]),
+            xauusd_h4=_h4([2000.0, 2000.0, 1990.0]),
+            usdjpy_m1=_m1(
+                [
+                    ("2024-01-02 04:00", 150.0, 150.1, 149.9, 150.0),
+                ]
+            ),
+            xauusd_m1=_m1(
+                [
+                    ("2024-01-02 04:00", 2000.0, 2001.0, 1999.0, 2000.5),
+                ]
+            ),
+        )
+
+    error = exc_info.value
+
+    assert error.symbol == "XAUUSD"
+    assert error.side == "sell"
+    assert error.decision_time == _utc("2024-01-02 00:00")
+    assert error.entry_time == _utc("2024-01-02 04:00")
+    assert error.entry_raw_price == pytest.approx(2000.0)
+    assert error.stop_price == pytest.approx(2000.0)
+
+
 def test_usdjpy_jpy_pnl_is_converted_to_usd_in_portfolio() -> None:
     result = backtest_h017_event_from_result(
         h017_result=_h017_result(usdjpy_positions=[0.01, 0.0, 0.0]),
