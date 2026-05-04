@@ -9,6 +9,7 @@ from quantcore.backtest.h017_event import (
     H017EventBacktestResult,
     H017EventInsolvencyError,
     H017EventInvalidStopError,
+    H018MinimumStopDistanceError,
     backtest_h017_event_from_result,
 )
 from quantcore.strategy.h017 import H017Result
@@ -579,3 +580,143 @@ def test_m1_stop_window_errors_are_not_silently_ignored() -> None:
                 ]
             ),
         )
+
+def test_h018_minimum_stop_distance_long_below_one_spread_fails_closed() -> None:
+    with pytest.raises(
+        H018MinimumStopDistanceError,
+        match="H018 minimum stop-distance violation",
+    ) as exc_info:
+        backtest_h017_event_from_result(
+            h017_result=_h017_result(
+                xauusd_positions=[0.01, 0.0, 0.0],
+                xauusd_stop_long=[1999.80, 1990.0, 1990.0],
+            ),
+            usdjpy_h4=_h4([150.0, 150.0, 150.0]),
+            xauusd_h4=_h4([2000.0, 2000.0, 2010.0]),
+            usdjpy_m1=_m1(
+                [
+                    ("2024-01-02 04:00", 150.0, 150.1, 149.9, 150.0),
+                ]
+            ),
+            xauusd_m1=_m1(
+                [
+                    ("2024-01-02 04:00", 2000.0, 2000.5, 1999.5, 2000.0),
+                ]
+            ),
+        )
+
+    error = exc_info.value
+
+    assert error.rule_name == "raw_stop_distance_at_least_one_modeled_spread"
+    assert error.symbol == "XAUUSD"
+    assert error.side == "buy"
+    assert error.decision_time == _utc("2024-01-02 00:00")
+    assert error.entry_time == _utc("2024-01-02 04:00")
+    assert error.entry_raw_price == pytest.approx(2000.0)
+    assert error.stop_price == pytest.approx(1999.80)
+    assert error.raw_stop_distance == pytest.approx(0.20)
+    assert error.minimum_stop_distance == pytest.approx(0.30)
+    assert error.threshold_basis == "one_modeled_spread"
+    assert error.validation_action == "fail_closed"
+
+
+def test_h018_minimum_stop_distance_short_below_one_spread_fails_closed() -> None:
+    with pytest.raises(
+        H018MinimumStopDistanceError,
+        match="H018 minimum stop-distance violation",
+    ) as exc_info:
+        backtest_h017_event_from_result(
+            h017_result=_h017_result(
+                usdjpy_positions=[-0.01, 0.0, 0.0],
+                usdjpy_stop_short=[150.005, 151.0, 151.0],
+            ),
+            usdjpy_h4=_h4([150.0, 150.0, 149.0]),
+            xauusd_h4=_h4([2000.0, 2000.0, 2000.0]),
+            usdjpy_m1=_m1(
+                [
+                    ("2024-01-02 04:00", 150.0, 150.1, 149.9, 150.0),
+                ]
+            ),
+            xauusd_m1=_m1(
+                [
+                    ("2024-01-02 04:00", 2000.0, 2000.5, 1999.5, 2000.0),
+                ]
+            ),
+        )
+
+    error = exc_info.value
+
+    assert error.rule_name == "raw_stop_distance_at_least_one_modeled_spread"
+    assert error.symbol == "USDJPY"
+    assert error.side == "sell"
+    assert error.decision_time == _utc("2024-01-02 00:00")
+    assert error.entry_time == _utc("2024-01-02 04:00")
+    assert error.entry_raw_price == pytest.approx(150.0)
+    assert error.stop_price == pytest.approx(150.005)
+    assert error.raw_stop_distance == pytest.approx(0.005)
+    assert error.minimum_stop_distance == pytest.approx(0.01)
+    assert error.threshold_basis == "one_modeled_spread"
+    assert error.validation_action == "fail_closed"
+
+
+@pytest.mark.parametrize(
+    ("symbol", "side", "stop_price"),
+    [
+        ("XAUUSD", "buy", 1999.70),
+        ("XAUUSD", "sell", 2000.30),
+        ("XAUUSD", "buy", 1999.60),
+        ("XAUUSD", "sell", 2000.40),
+        ("USDJPY", "buy", 149.99),
+        ("USDJPY", "sell", 150.01),
+    ],
+)
+def test_h018_minimum_stop_distance_at_or_above_one_spread_passes_guard(
+    symbol: str,
+    side: str,
+    stop_price: float,
+) -> None:
+    if symbol == "XAUUSD":
+        result = backtest_h017_event_from_result(
+            h017_result=_h017_result(
+                xauusd_positions=[0.01 if side == "buy" else -0.01, 0.0, 0.0],
+                xauusd_stop_long=[stop_price, 1990.0, 1990.0],
+                xauusd_stop_short=[stop_price, 2010.0, 2010.0],
+            ),
+            usdjpy_h4=_h4([150.0, 150.0, 150.0]),
+            xauusd_h4=_h4([2000.0, 2000.0, 2010.0 if side == "buy" else 1990.0]),
+            usdjpy_m1=_m1(
+                [
+                    ("2024-01-02 04:00", 150.0, 150.1, 149.9, 150.0),
+                ]
+            ),
+            xauusd_m1=_m1(
+                [
+                    ("2024-01-02 04:00", 2000.0, 2000.5, 1999.5, 2000.0),
+                ]
+            ),
+        )
+    else:
+        result = backtest_h017_event_from_result(
+            h017_result=_h017_result(
+                usdjpy_positions=[0.01 if side == "buy" else -0.01, 0.0, 0.0],
+                usdjpy_stop_long=[stop_price, 149.0, 149.0],
+                usdjpy_stop_short=[stop_price, 151.0, 151.0],
+            ),
+            usdjpy_h4=_h4([150.0, 150.0, 151.0 if side == "buy" else 149.0]),
+            xauusd_h4=_h4([2000.0, 2000.0, 2000.0]),
+            usdjpy_m1=_m1(
+                [
+                    ("2024-01-02 04:00", 150.0, 150.1, 149.9, 150.0),
+                ]
+            ),
+            xauusd_m1=_m1(
+                [
+                    ("2024-01-02 04:00", 2000.0, 2000.5, 1999.5, 2000.0),
+                ]
+            ),
+        )
+
+    assert len(result.fills) == 1
+    assert result.fills[0].symbol == symbol
+    assert result.fills[0].side == side
+

@@ -1,11 +1,12 @@
 ﻿from __future__ import annotations
 
+import math
 from dataclasses import dataclass
 from typing import Mapping, Sequence
 
 import pandas as pd
 
-from quantcore.backtest.cost_model import price_with_execution_costs
+from quantcore.backtest.cost_model import get_default_cost_spec, price_with_execution_costs
 from quantcore.backtest.fill_engine import Fill, simulate_bracket_trade
 from quantcore.backtest.portfolio import (
     PortfolioResult,
@@ -116,6 +117,54 @@ class H017EventInvalidStopError(RuntimeError):
             f"stop_price={self.stop_price:.9f}"
         )
 
+
+
+class H018MinimumStopDistanceError(RuntimeError):
+    """Raised when H018 minimum raw-entry stop-distance policy is violated.
+
+    H018 validation mode requires the raw-entry stop distance to be greater than
+    or equal to one modeled spread for the symbol. Violations fail closed; they
+    are not skipped, clipped, or treated as valid continuation.
+    """
+
+    def __init__(
+        self,
+        *,
+        symbol: str,
+        side: str,
+        decision_time: pd.Timestamp,
+        entry_time: pd.Timestamp,
+        entry_raw_price: float,
+        stop_price: float,
+        raw_stop_distance: float,
+        minimum_stop_distance: float,
+    ) -> None:
+        self.rule_name = "raw_stop_distance_at_least_one_modeled_spread"
+        self.symbol = symbol
+        self.side = side
+        self.decision_time = pd.Timestamp(decision_time)
+        self.entry_time = pd.Timestamp(entry_time)
+        self.entry_raw_price = float(entry_raw_price)
+        self.stop_price = float(stop_price)
+        self.raw_stop_distance = float(raw_stop_distance)
+        self.minimum_stop_distance = float(minimum_stop_distance)
+        self.threshold_basis = "one_modeled_spread"
+        self.validation_action = "fail_closed"
+
+        super().__init__(
+            "H018 minimum stop-distance violation: "
+            f"rule_name={self.rule_name}, "
+            f"symbol={self.symbol}, "
+            f"side={self.side}, "
+            f"decision_time={self.decision_time}, "
+            f"entry_time={self.entry_time}, "
+            f"entry_raw_price={self.entry_raw_price:.9f}, "
+            f"stop_price={self.stop_price:.9f}, "
+            f"raw_stop_distance={self.raw_stop_distance:.9f}, "
+            f"minimum_stop_distance={self.minimum_stop_distance:.9f}, "
+            f"threshold_basis={self.threshold_basis}, "
+            f"validation_action={self.validation_action}"
+        )
 
 def backtest_h017_event_driven(
     *,
@@ -301,6 +350,15 @@ def _build_symbol_interval_fill(
         stop_price=stop_price,
     )
     stop_distance_price = abs(entry_raw_price - stop_price)
+    _validate_minimum_stop_distance(
+        symbol=symbol,
+        side=side,
+        decision_time=decision_time,
+        entry_time=entry_time,
+        entry_raw_price=entry_raw_price,
+        stop_price=stop_price,
+        raw_stop_distance=stop_distance_price,
+    )
 
     if stop_distance_price <= 0.0:
         return None
@@ -425,6 +483,36 @@ def _validate_directional_stop(
             stop_price=stop_price,
         )
 
+
+
+def _validate_minimum_stop_distance(
+    *,
+    symbol: str,
+    side: str,
+    decision_time: pd.Timestamp,
+    entry_time: pd.Timestamp,
+    entry_raw_price: float,
+    stop_price: float,
+    raw_stop_distance: float,
+) -> None:
+    minimum_stop_distance = float(get_default_cost_spec(symbol).spread_price)
+
+    if raw_stop_distance < minimum_stop_distance and not math.isclose(
+        raw_stop_distance,
+        minimum_stop_distance,
+        rel_tol=1e-12,
+        abs_tol=1e-12,
+    ):
+        raise H018MinimumStopDistanceError(
+            symbol=symbol,
+            side=side,
+            decision_time=decision_time,
+            entry_time=entry_time,
+            entry_raw_price=entry_raw_price,
+            stop_price=stop_price,
+            raw_stop_distance=raw_stop_distance,
+            minimum_stop_distance=minimum_stop_distance,
+        )
 
 def _validate_h4_frame(symbol: str, bars: pd.DataFrame) -> pd.DataFrame:
     missing = [column for column in _REQUIRED_H4_COLUMNS if column not in bars.columns]
