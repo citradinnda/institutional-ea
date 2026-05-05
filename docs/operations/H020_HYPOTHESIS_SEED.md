@@ -1,4 +1,4 @@
-﻿# H020 Hypothesis Seed
+# H020 Hypothesis Seed
 
 ## Status
 
@@ -95,6 +95,70 @@ Instead, H020 should define strategy outputs that are already compatible with th
 
 A guard failure after H020 would still mean the implementation or assumptions are wrong.
 
+## H019/H020 Guard Diagnostic Result
+
+After the H019 strict broker-native validation failed at the first per-trade leverage violation, an H019/H020 guard diagnostic scanner was added:
+
+- `scripts/scan_h019_guard_violations_real.py`
+- `tests/test_h019_guard_scan_real_script.py`
+
+Diagnostic command run:
+
+- `python .\scripts\scan_h019_guard_violations_real.py`
+
+This was diagnostic-only:
+
+- not validation,
+- not strategy promotion,
+- not live-trading approval,
+- not H020 implementation,
+- not a guard weakening.
+
+Strict bridge-window preflight passed exactly:
+
+- `accepted_entry_count=5476`
+- `first_accepted_timestamp=2021-07-02 13:00:00+00:00`
+- `last_accepted_timestamp=2026-04-30 01:00:00+00:00`
+
+H019/H020 guard diagnostic summary:
+
+- `accepted_entry_count=5476`
+- `executed_entry_count=5476`
+- `skipped_entry_count=3176`
+- `event_interval_count=8652`
+- `trade_intent_count=5736`
+- `candidate_count=5052`
+- `skipped_intent_count=424`
+- `violation_count=302`
+
+Violation counts by guard:
+
+- `maximum_per_trade_usd_gross_leverage`: `239`
+- `maximum_portfolio_usd_gross_leverage`: `42`
+- `minimum_stop_distance`: `19`
+- `invalid_directional_stop`: `2`
+
+Violation counts by symbol:
+
+- `USDJPY`: `205`
+- `XAUUSD`: `55`
+- Portfolio-wide leverage violations are symbolless in the current scanner, so symbol totals do not include the `42` portfolio violations.
+
+Comparison to prior H018 diagnostic:
+
+- Prior H018 total guard violations: `2271`
+- H019 total guard violations: `302`
+- Prior H018 invalid directional stops: `1545`
+- H019 invalid directional stops: `2`
+
+Interpretation:
+
+- H019 materially fixed the stale-held-signal versus stop-lifecycle mismatch.
+- H019 did not become promotable.
+- The dominant remaining blocker is notional/leverage sizing, especially per-trade USD gross leverage.
+- H020 should focus on explicit notional-aware sizing rather than lifecycle repair.
+- H020 should also account for portfolio-wide gross exposure because `42` portfolio leverage violations remain.
+- The `19` minimum stop-distance violations and `2` invalid directional-stop violations still require explicit handling or explanation before any strict H020 validation can be considered meaningful.
 ## H020 Design Choices To Lock Before Code
 
 Before coding H020, decide these explicitly:
@@ -133,9 +197,10 @@ Before coding H020, decide these explicitly:
 
 Step 1:
 
-- Build an H019/H020 diagnostic scan first.
-- Confirm how many H019 guard violations remain across all accepted windows.
-- Do not rely only on the first failure.
+- Completed: build and run the H019/H020 diagnostic scan.
+- Result: H019 has `302` guard violations across the accepted broker-native windows.
+- Dominant blocker: `239` maximum per-trade USD gross leverage violations.
+- Secondary blocker: `42` maximum portfolio USD gross leverage violations.
 
 Step 2:
 
@@ -177,19 +242,16 @@ H020 must not:
 
 ## Current Recommendation
 
-Start H020 by creating an H019 guard diagnostic scanner first.
+Do not write H020 sizing code yet.
 
-Reason:
+Next, lock H020 sizing semantics from the diagnostic evidence:
 
-H019 failed at the first per-trade leverage violation, but we need the full distribution before choosing H020 sizing semantics.
+- Per-trade notional-aware sizing is mandatory because `239` per-trade leverage violations remain.
+- Portfolio gross exposure must be considered because `42` portfolio leverage violations remain.
+- Minimum stop-distance handling must be explicit because `19` violations remain.
+- Directional stop geometry is almost fixed but not perfectly eliminated because `2` invalid directional-stop violations remain.
 
-The diagnostic should answer:
+Recommended next engineering action:
 
-- Are invalid directional stops now near zero?
-- How many per-trade leverage violations remain?
-- How many portfolio leverage violations remain?
-- How many minimum stop-distance violations remain?
-- Which symbols and sides dominate the failures?
-- Are failures mostly tight-stop sizing, overlapping exposure, or both?
-
-Only then should H020 sizing semantics be locked.
+- Inspect whether the remaining H019 violations are caused mainly by tight stops, overlapping exposure, minimum-lot constraints, or lifecycle edge cases.
+- Then decide H020 sizing contract before code.
