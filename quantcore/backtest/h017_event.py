@@ -9,7 +9,9 @@ import pandas as pd
 from quantcore.backtest.cost_model import get_default_cost_spec, price_with_execution_costs
 from quantcore.backtest.fill_engine import Fill, simulate_bracket_trade
 from quantcore.backtest.portfolio import (
+    InstrumentSpec,
     PortfolioResult,
+    PositionSize,
     build_portfolio_result,
     fill_pnl_usd,
     get_default_instrument_spec,
@@ -236,6 +238,80 @@ class H018MaximumPerTradeLeverageError(RuntimeError):
         )
 
 
+
+class H018MaximumPortfolioGrossLeverageError(RuntimeError):
+    """Raised when H018 portfolio-wide USD gross leverage policy is violated.
+
+    H018 validation mode caps the sum of USD-converted gross notional exposure
+    opened by all non-zero-lot candidate trades in one event interval at 10.0
+    times interval-start account equity. Long and short notionals are summed
+    gross; they are not netted.
+    """
+
+    def __init__(
+        self,
+        *,
+        decision_time: pd.Timestamp,
+        entry_time: pd.Timestamp,
+        interval_start_equity_usd: float,
+        symbols: Sequence[str],
+        per_symbol_lots: Mapping[str, float],
+        per_symbol_entry_raw_price: Mapping[str, float],
+        per_symbol_notional_quote: Mapping[str, float],
+        per_symbol_notional_usd: Mapping[str, float],
+        portfolio_notional_usd: float,
+        portfolio_gross_leverage: float,
+        maximum_portfolio_gross_leverage: float,
+    ) -> None:
+        self.rule_name = "portfolio_usd_gross_leverage_at_or_below_10x_equity"
+        self.decision_time = pd.Timestamp(decision_time)
+        self.entry_time = pd.Timestamp(entry_time)
+        self.interval_start_equity_usd = float(interval_start_equity_usd)
+        self.symbols = tuple(symbols)
+        self.per_symbol_lots = dict(per_symbol_lots)
+        self.per_symbol_entry_raw_price = dict(per_symbol_entry_raw_price)
+        self.per_symbol_notional_quote = dict(per_symbol_notional_quote)
+        self.per_symbol_notional_usd = dict(per_symbol_notional_usd)
+        self.portfolio_notional_usd = float(portfolio_notional_usd)
+        self.portfolio_gross_leverage = float(portfolio_gross_leverage)
+        self.maximum_portfolio_gross_leverage = float(maximum_portfolio_gross_leverage)
+        self.threshold_basis = "portfolio_usd_gross_notional_divided_by_interval_start_equity"
+        self.validation_action = "fail_closed"
+
+        super().__init__(
+            "H018 maximum portfolio gross leverage violation: "
+            f"rule_name={self.rule_name}, "
+            f"decision_time={self.decision_time}, "
+            f"entry_time={self.entry_time}, "
+            f"interval_start_equity_usd={self.interval_start_equity_usd:.2f}, "
+            f"symbols={self.symbols}, "
+            f"per_symbol_lots={self.per_symbol_lots}, "
+            f"per_symbol_entry_raw_price={self.per_symbol_entry_raw_price}, "
+            f"per_symbol_notional_quote={self.per_symbol_notional_quote}, "
+            f"per_symbol_notional_usd={self.per_symbol_notional_usd}, "
+            f"portfolio_notional_usd={self.portfolio_notional_usd:.9f}, "
+            f"portfolio_gross_leverage={self.portfolio_gross_leverage:.9f}, "
+            f"maximum_portfolio_gross_leverage={self.maximum_portfolio_gross_leverage:.9f}, "
+            f"threshold_basis={self.threshold_basis}, "
+            f"validation_action={self.validation_action}"
+        )
+
+
+@dataclass(frozen=True)
+class _SymbolIntervalCandidate:
+    symbol: str
+    side: str
+    decision_time: pd.Timestamp
+    entry_time: pd.Timestamp
+    forced_exit_time: pd.Timestamp
+    entry_raw_price: float
+    forced_exit_raw_price: float
+    stop_price: float
+    raw_stop_distance: float
+    instrument_spec: InstrumentSpec
+    position_size: PositionSize
+    notional_usd: float
+
 def backtest_h017_event_driven(
     *,
     usdjpy_h4: pd.DataFrame,
@@ -337,25 +413,41 @@ def backtest_h017_event_from_result(
         interval_pnl_usd = 0.0
         interval_fills: list[Fill] = []
 
+        interval_candidates: list[_SymbolIntervalCandidate] = []
+
         for symbol in _SYMBOLS:
-            maybe_fill = _build_symbol_interval_fill(
+            maybe_candidate = _build_symbol_interval_candidate(
                 symbol=symbol,
                 h017_result=h017_result,
                 h4_bars=h4_by_symbol[symbol],
-                m1_bars=m1_by_symbol[symbol],
                 decision_time=decision_time,
                 entry_time=entry_time,
                 forced_exit_time=forced_exit_time,
                 equity_usd=interval_start_equity,
+            )
+
+            if maybe_candidate is None:
+                continue
+
+            interval_candidates.append(maybe_candidate)
+
+        _validate_maximum_portfolio_usd_gross_leverage(
+            decision_time=decision_time,
+            entry_time=entry_time,
+            interval_start_equity_usd=interval_start_equity,
+            candidates=interval_candidates,
+        )
+
+        for candidate in interval_candidates:
+            fill = _build_symbol_interval_fill(
+                candidate=candidate,
+                m1_bars=m1_by_symbol[candidate.symbol],
                 slippage_atr_by_symbol=slippage_atr_by_symbol,
             )
 
-            if maybe_fill is None:
-                continue
-
-            fills.append(maybe_fill)
-            interval_fills.append(maybe_fill)
-            interval_pnl_usd += fill_pnl_usd(fill=maybe_fill)
+            fills.append(fill)
+            interval_fills.append(fill)
+            interval_pnl_usd += fill_pnl_usd(fill=fill)
 
         current_equity += interval_pnl_usd
 
@@ -385,18 +477,16 @@ def backtest_h017_event_from_result(
     )
 
 
-def _build_symbol_interval_fill(
+def _build_symbol_interval_candidate(
     *,
     symbol: str,
     h017_result: H017Result,
     h4_bars: pd.DataFrame,
-    m1_bars: pd.DataFrame,
     decision_time: pd.Timestamp,
     entry_time: pd.Timestamp,
     forced_exit_time: pd.Timestamp,
     equity_usd: float,
-    slippage_atr_by_symbol: Mapping[str, pd.Series] | None,
-) -> Fill | None:
+) -> _SymbolIntervalCandidate | None:
     signed_risk_fraction = float(h017_result.positions.at[decision_time, symbol])
 
     if pd.isna(signed_risk_fraction) or signed_risk_fraction == 0.0:
@@ -459,25 +549,59 @@ def _build_symbol_interval_fill(
         instrument_spec=instrument_spec,
     )
 
+    notional_usd = _position_notional_usd(
+        symbol=symbol,
+        entry_raw_price=entry_raw_price,
+        position_size=position_size,
+        instrument_spec=instrument_spec,
+    )
+
+    return _SymbolIntervalCandidate(
+        symbol=symbol,
+        side=side,
+        decision_time=decision_time,
+        entry_time=entry_time,
+        forced_exit_time=forced_exit_time,
+        entry_raw_price=entry_raw_price,
+        forced_exit_raw_price=forced_exit_raw_price,
+        stop_price=stop_price,
+        raw_stop_distance=stop_distance_price,
+        instrument_spec=instrument_spec,
+        position_size=position_size,
+        notional_usd=notional_usd,
+    )
+
+
+def _build_symbol_interval_fill(
+    *,
+    candidate: _SymbolIntervalCandidate,
+    m1_bars: pd.DataFrame,
+    slippage_atr_by_symbol: Mapping[str, pd.Series] | None,
+) -> Fill:
+    symbol = candidate.symbol
+    side = candidate.side
+    position_size = candidate.position_size
+    instrument_spec = candidate.instrument_spec
+
     entry_cost = price_with_execution_costs(
         symbol=symbol,
         side=side,
         action="entry",
-        raw_price=entry_raw_price,
+        raw_price=candidate.entry_raw_price,
         lots=position_size.lots,
     )
 
     raw_fill = simulate_bracket_trade(
         symbol=symbol,
         side=side,
-        entry_time_utc=entry_time,
+        entry_time_utc=candidate.entry_time,
         entry_price=entry_cost.fill_price,
         lots=position_size.lots,
         m1_bars=m1_bars,
-        stop_price=stop_price,
+        stop_price=candidate.stop_price,
         take_profit_price=None,
-        forced_exit_time_utc=forced_exit_time,
-        forced_exit_price=forced_exit_raw_price,
+        forced_exit_time_utc=candidate.forced_exit_time,
+        forced_exit_price=candidate.forced_exit_raw_price,
         contract_size=instrument_spec.contract_size,
         commission=0.0,
         stop_slippage=0.0,
@@ -485,8 +609,8 @@ def _build_symbol_interval_fill(
 
     atr_for_slippage = _atr_for_slippage(
         symbol=symbol,
-        decision_time=decision_time,
-        stop_distance_price=stop_distance_price,
+        decision_time=candidate.decision_time,
+        stop_distance_price=candidate.raw_stop_distance,
         slippage_atr_by_symbol=slippage_atr_by_symbol,
     )
 
@@ -512,7 +636,7 @@ def _build_symbol_interval_fill(
     return Fill(
         symbol=symbol,
         side=side,
-        entry_time_utc=entry_time,
+        entry_time_utc=candidate.entry_time,
         entry_price=entry_cost.fill_price,
         exit_time_utc=raw_fill.exit_time_utc,
         exit_price=exit_cost.fill_price,
@@ -522,7 +646,6 @@ def _build_symbol_interval_fill(
         slippage=exit_cost.slippage_price,
         exit_reason=raw_fill.exit_reason,
     )
-
 
 def _validate_h017_panels(h017_result: H017Result) -> None:
     panels = {
@@ -599,6 +722,7 @@ def _validate_minimum_stop_distance(
 
 
 _MAXIMUM_PER_TRADE_USD_GROSS_LEVERAGE = 10.0
+_MAXIMUM_PORTFOLIO_USD_GROSS_LEVERAGE = 10.0
 
 
 def _position_notional_usd(
@@ -674,6 +798,53 @@ def _validate_maximum_per_trade_usd_gross_leverage(
             gross_leverage=gross_leverage,
             maximum_gross_leverage=_MAXIMUM_PER_TRADE_USD_GROSS_LEVERAGE,
         )
+
+
+def _validate_maximum_portfolio_usd_gross_leverage(
+    *,
+    decision_time: pd.Timestamp,
+    entry_time: pd.Timestamp,
+    interval_start_equity_usd: float,
+    candidates: Sequence[_SymbolIntervalCandidate],
+) -> None:
+    if interval_start_equity_usd <= 0.0:
+        raise ValueError("interval_start_equity_usd must be positive")
+
+    if not candidates:
+        return
+
+    portfolio_notional_usd = sum(candidate.notional_usd for candidate in candidates)
+    portfolio_gross_leverage = portfolio_notional_usd / float(interval_start_equity_usd)
+
+    if portfolio_gross_leverage > _MAXIMUM_PORTFOLIO_USD_GROSS_LEVERAGE and not math.isclose(
+        portfolio_gross_leverage,
+        _MAXIMUM_PORTFOLIO_USD_GROSS_LEVERAGE,
+        rel_tol=1e-12,
+        abs_tol=1e-12,
+    ):
+        raise H018MaximumPortfolioGrossLeverageError(
+            decision_time=decision_time,
+            entry_time=entry_time,
+            interval_start_equity_usd=interval_start_equity_usd,
+            symbols=tuple(candidate.symbol for candidate in candidates),
+            per_symbol_lots={
+                candidate.symbol: candidate.position_size.lots for candidate in candidates
+            },
+            per_symbol_entry_raw_price={
+                candidate.symbol: candidate.entry_raw_price for candidate in candidates
+            },
+            per_symbol_notional_quote={
+                candidate.symbol: candidate.position_size.notional_quote
+                for candidate in candidates
+            },
+            per_symbol_notional_usd={
+                candidate.symbol: candidate.notional_usd for candidate in candidates
+            },
+            portfolio_notional_usd=portfolio_notional_usd,
+            portfolio_gross_leverage=portfolio_gross_leverage,
+            maximum_portfolio_gross_leverage=_MAXIMUM_PORTFOLIO_USD_GROSS_LEVERAGE,
+        )
+
 
 def _validate_h4_frame(symbol: str, bars: pd.DataFrame) -> pd.DataFrame:
     missing = [column for column in _REQUIRED_H4_COLUMNS if column not in bars.columns]

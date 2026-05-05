@@ -10,6 +10,7 @@ from quantcore.backtest.h017_event import (
     H017EventInsolvencyError,
     H017EventInvalidStopError,
     H018MaximumPerTradeLeverageError,
+    H018MaximumPortfolioGrossLeverageError,
     H018MinimumStopDistanceError,
     backtest_h017_event_from_result,
 )
@@ -891,3 +892,190 @@ def test_h018_maximum_per_trade_leverage_error_preserves_audit_fields() -> None:
     assert error.threshold_basis == "per_trade_usd_gross_notional_divided_by_equity"
     assert error.validation_action == "fail_closed"
 
+
+def test_h018_portfolio_gross_leverage_single_symbol_at_or_below_10x_passes_guard() -> None:
+    result = backtest_h017_event_from_result(
+        h017_result=_h017_result(
+            usdjpy_positions=[0.01, 0.0, 0.0],
+            usdjpy_stop_long=[149.85, 149.0, 149.0],
+        ),
+        usdjpy_h4=_h4([150.0, 150.0, 151.0]),
+        xauusd_h4=_h4([2000.0, 2000.0, 2000.0]),
+        usdjpy_m1=_m1(
+            [
+                ("2024-01-02 04:00", 150.0, 150.1, 149.9, 150.0),
+            ]
+        ),
+        xauusd_m1=_m1(
+            [
+                ("2024-01-02 04:00", 2000.0, 2000.5, 1999.5, 2000.0),
+            ]
+        ),
+    )
+
+    assert len(result.fills) == 1
+    assert result.fills[0].symbol == "USDJPY"
+    assert result.fills[0].lots == pytest.approx(1.00)
+
+
+def test_h018_portfolio_gross_leverage_two_symbols_combined_below_10x_passes_guard() -> None:
+    result = backtest_h017_event_from_result(
+        h017_result=_h017_result(
+            usdjpy_positions=[0.01, 0.0, 0.0],
+            xauusd_positions=[0.01, 0.0, 0.0],
+            usdjpy_stop_long=[149.80, 149.0, 149.0],
+            xauusd_stop_long=[1991.90, 1990.0, 1990.0],
+        ),
+        usdjpy_h4=_h4([150.0, 150.0, 151.0]),
+        xauusd_h4=_h4([2000.0, 2000.0, 2010.0]),
+        usdjpy_m1=_m1(
+            [
+                ("2024-01-02 04:00", 150.0, 150.1, 149.9, 150.0),
+            ]
+        ),
+        xauusd_m1=_m1(
+            [
+                ("2024-01-02 04:00", 2000.0, 2000.5, 1999.5, 2000.0),
+            ]
+        ),
+    )
+
+    assert len(result.fills) == 2
+    lots_by_symbol = {fill.symbol: fill.lots for fill in result.fills}
+    assert lots_by_symbol["USDJPY"] == pytest.approx(0.75)
+    assert lots_by_symbol["XAUUSD"] == pytest.approx(0.12)
+
+
+def test_h018_portfolio_gross_leverage_two_symbols_combined_exactly_10x_passes_guard() -> None:
+    result = backtest_h017_event_from_result(
+        h017_result=_h017_result(
+            usdjpy_positions=[0.01, 0.0, 0.0],
+            xauusd_positions=[0.01, 0.0, 0.0],
+            usdjpy_stop_long=[149.798, 149.0, 149.0],
+            xauusd_stop_long=[1992.40, 1990.0, 1990.0],
+        ),
+        usdjpy_h4=_h4([150.0, 150.0, 151.0]),
+        xauusd_h4=_h4([2000.0, 2000.0, 2010.0]),
+        usdjpy_m1=_m1(
+            [
+                ("2024-01-02 04:00", 150.0, 150.1, 149.9, 150.0),
+            ]
+        ),
+        xauusd_m1=_m1(
+            [
+                ("2024-01-02 04:00", 2000.0, 2000.5, 1999.5, 2000.0),
+            ]
+        ),
+    )
+
+    assert len(result.fills) == 2
+    lots_by_symbol = {fill.symbol: fill.lots for fill in result.fills}
+    assert lots_by_symbol["USDJPY"] == pytest.approx(0.74)
+    assert lots_by_symbol["XAUUSD"] == pytest.approx(0.13)
+
+
+def test_h018_portfolio_gross_leverage_two_symbols_combined_above_10x_fails_closed() -> None:
+    with pytest.raises(
+        H018MaximumPortfolioGrossLeverageError,
+        match="H018 maximum portfolio gross leverage violation",
+    ):
+        backtest_h017_event_from_result(
+            h017_result=_h017_result(
+                usdjpy_positions=[0.01, 0.0, 0.0],
+                xauusd_positions=[0.01, 0.0, 0.0],
+                usdjpy_stop_long=[149.80, 149.0, 149.0],
+                xauusd_stop_long=[1993.40, 1990.0, 1990.0],
+            ),
+            usdjpy_h4=_h4([150.0, 150.0, 151.0]),
+            xauusd_h4=_h4([2000.0, 2000.0, 2010.0]),
+            usdjpy_m1=_m1(
+                [
+                    ("2024-01-02 04:00", 150.0, 150.1, 149.9, 150.0),
+                ]
+            ),
+            xauusd_m1=_m1(
+                [
+                    ("2024-01-02 04:00", 2000.0, 2000.5, 1999.5, 2000.0),
+                ]
+            ),
+        )
+
+
+def test_h018_portfolio_gross_leverage_error_preserves_audit_fields() -> None:
+    with pytest.raises(
+        H018MaximumPortfolioGrossLeverageError,
+        match="H018 maximum portfolio gross leverage violation",
+    ) as exc_info:
+        backtest_h017_event_from_result(
+            h017_result=_h017_result(
+                usdjpy_positions=[0.01, 0.0, 0.0],
+                xauusd_positions=[0.01, 0.0, 0.0],
+                usdjpy_stop_long=[149.80, 149.0, 149.0],
+                xauusd_stop_long=[1993.40, 1990.0, 1990.0],
+            ),
+            usdjpy_h4=_h4([150.0, 150.0, 151.0]),
+            xauusd_h4=_h4([2000.0, 2000.0, 2010.0]),
+            usdjpy_m1=_m1(
+                [
+                    ("2024-01-02 04:00", 150.0, 150.1, 149.9, 150.0),
+                ]
+            ),
+            xauusd_m1=_m1(
+                [
+                    ("2024-01-02 04:00", 2000.0, 2000.5, 1999.5, 2000.0),
+                ]
+            ),
+        )
+
+    error = exc_info.value
+
+    assert error.rule_name == "portfolio_usd_gross_leverage_at_or_below_10x_equity"
+    assert error.decision_time == _utc("2024-01-02 00:00")
+    assert error.entry_time == _utc("2024-01-02 04:00")
+    assert error.interval_start_equity_usd == pytest.approx(10_000.0)
+    assert error.symbols == ("USDJPY", "XAUUSD")
+    assert error.per_symbol_lots == pytest.approx({"USDJPY": 0.75, "XAUUSD": 0.15})
+    assert error.per_symbol_entry_raw_price == pytest.approx(
+        {"USDJPY": 150.0, "XAUUSD": 2000.0}
+    )
+    assert error.per_symbol_notional_quote == pytest.approx(
+        {"USDJPY": 11_250_000.0, "XAUUSD": 30_000.0}
+    )
+    assert error.per_symbol_notional_usd == pytest.approx(
+        {"USDJPY": 75_000.0, "XAUUSD": 30_000.0}
+    )
+    assert error.portfolio_notional_usd == pytest.approx(105_000.0)
+    assert error.portfolio_gross_leverage == pytest.approx(10.5)
+    assert error.maximum_portfolio_gross_leverage == pytest.approx(10.0)
+    assert (
+        error.threshold_basis
+        == "portfolio_usd_gross_notional_divided_by_interval_start_equity"
+    )
+    assert error.validation_action == "fail_closed"
+
+
+def test_h018_portfolio_gross_leverage_sums_long_and_short_gross_without_netting() -> None:
+    with pytest.raises(
+        H018MaximumPortfolioGrossLeverageError,
+        match="H018 maximum portfolio gross leverage violation",
+    ):
+        backtest_h017_event_from_result(
+            h017_result=_h017_result(
+                usdjpy_positions=[0.01, 0.0, 0.0],
+                xauusd_positions=[-0.01, 0.0, 0.0],
+                usdjpy_stop_long=[149.80, 149.0, 149.0],
+                xauusd_stop_short=[2006.60, 2010.0, 2010.0],
+            ),
+            usdjpy_h4=_h4([150.0, 150.0, 151.0]),
+            xauusd_h4=_h4([2000.0, 2000.0, 1990.0]),
+            usdjpy_m1=_m1(
+                [
+                    ("2024-01-02 04:00", 150.0, 150.1, 149.9, 150.0),
+                ]
+            ),
+            xauusd_m1=_m1(
+                [
+                    ("2024-01-02 04:00", 2000.0, 2000.5, 1999.5, 2000.0),
+                ]
+            ),
+        )
