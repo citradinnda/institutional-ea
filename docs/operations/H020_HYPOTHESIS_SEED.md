@@ -194,6 +194,7 @@ Interpretation:
 - Portfolio leverage violations are milder than per-trade violations but still real: median `11.205x`, max `16.939x`.
 - The `19` minimum stop-distance violations and `2` invalid directional-stop violations still require explicit handling or explanation before any strict H020 validation can be considered meaningful.
 - A simple per-trade cap alone is insufficient because portfolio-wide overlap can still breach the hard guard.
+
 ## H020 Sizing Contract Decision
 
 Decision locked after the H019/H020 guard diagnostic severity scan.
