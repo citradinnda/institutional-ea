@@ -10,7 +10,7 @@ This repository is infrastructure-first research. It is not a live-trading syste
 - H017 status: failed / not promotable.
 - Failure mode: strict expanded broker-native event-driven validation failed by account insolvency.
 - H018 status: not validated / not promotable / not live-approved.
-- Implemented H018 validation-mode guards: raw-entry invalid-stop fail-closed guard, minimum raw stop-distance fail-closed guard, and maximum per-trade USD gross leverage fail-closed guard.
+- Implemented H018 validation-mode guards: raw-entry invalid-stop fail-closed guard, minimum raw stop-distance fail-closed guard, maximum per-trade USD gross leverage fail-closed guard, and portfolio-wide USD gross leverage fail-closed guard.
 - H018 real-data validation authorized: False.
 - Live trading approved: False.
 - Phase 4 execution work: not approved.
@@ -66,9 +66,9 @@ Typical setup:
     pip install -e .[dev]
     pytest -q
 
-Current full-test anchor after H018 maximum per-trade leverage guard implementation:
+Current full-test anchor after H018 portfolio-wide gross leverage guard implementation:
 
-    552 passed
+    558 passed
 
 ## H018 decision matrix
 

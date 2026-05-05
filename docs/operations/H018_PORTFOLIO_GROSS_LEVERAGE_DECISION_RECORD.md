@@ -1,11 +1,11 @@
 ﻿# H018 Portfolio-Wide Gross Leverage Decision Record
 
 Decision identifier: H018-PGLDR-001.
-Decision status: Accepted for implementation.
+Decision status: Accepted and implemented.
 Date: 2026-05-04.
 Owner or reviewer: solo retail trader with AI engineering review.
 
-Implementation status: not implemented.
+Implementation status: implemented.
 Validation status: not validated.
 Live-trading status: not approved.
 Phase 4 execution status: not approved.
@@ -270,7 +270,7 @@ This decision only authorizes implementation of a fail-closed maximum portfolio-
 
 ## Current Verdict
 
-Accepted for implementation.
+Accepted and implemented.
 
 The accepted rule is:
 
