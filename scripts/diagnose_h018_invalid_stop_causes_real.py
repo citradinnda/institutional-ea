@@ -141,6 +141,10 @@ def main() -> None:
     print(f"cause_counts={diagnostic.cause_counts}")
     print(f"invalid_counts_by_symbol={diagnostic.invalid_counts_by_symbol}")
     print(f"invalid_counts_by_side={diagnostic.invalid_counts_by_side}")
+    print(
+        "stop_panel_diagnostic_counts="
+        f"{diagnostic.stop_panel_diagnostic_counts}"
+    )
     print()
 
     print("First invalid stop observations")
@@ -155,6 +159,14 @@ def main() -> None:
             f"decision_close={obs.decision_close}, "
             f"entry_open={obs.entry_open}, "
             f"stop_price={obs.stop_price}, "
+            f"selected_stop_panel={obs.selected_stop_panel}, "
+            f"long_stop_price={obs.long_stop_price}, "
+            f"short_stop_price={obs.short_stop_price}, "
+            "long_stop_valid_at_decision_close="
+            f"{obs.long_stop_valid_at_decision_close}, "
+            "short_stop_valid_at_decision_close="
+            f"{obs.short_stop_valid_at_decision_close}, "
+            f"stop_panel_diagnostic={obs.stop_panel_diagnostic}, "
             f"decision_margin={obs.decision_margin}, "
             f"entry_margin={obs.entry_margin}"
         )
@@ -165,8 +177,20 @@ def main() -> None:
     print("H018 VALIDATED: False")
     print("H018 PROMOTABLE: False")
     print("LIVE TRADING APPROVED: False")
-    print("- crossed_between_decision_close_and_entry_open means the stop was valid at decision close but invalid by next executable open.")
-    print("- already_invalid_at_decision_close means the selected stop was already on the wrong side when the signal was made.")
+    print(
+        "- crossed_between_decision_close_and_entry_open means the stop was "
+        "valid at decision close but invalid by next executable open."
+    )
+    print(
+        "- already_invalid_at_decision_close means the selected stop was "
+        "already on the wrong side when the signal was made."
+    )
+    print(
+        "- selected_panel_nonprotective_opposite_panel_protective means the "
+        "chosen stop panel was not protective, while the opposite panel was "
+        "protective at decision close. This is diagnostic only and does not "
+        "approve switching stop panels."
+    )
     print("- This diagnostic does not tune H017 or modify validation behavior.")
     print("- This diagnostic does not use HistData.")
 

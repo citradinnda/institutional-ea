@@ -82,6 +82,19 @@ def test_classifies_buy_stop_crossed_between_decision_and_entry() -> None:
     assert obs.valid_at_entry_open is False
     assert obs.decision_margin == 0.5
     assert obs.entry_margin == -0.5
+    assert obs.signed_risk_fraction == 0.01
+    assert obs.selected_stop_panel == "stops_long"
+    assert obs.long_stop_price == 99.5
+    assert obs.short_stop_price == 9999.0
+    assert obs.long_stop_valid_at_decision_close is True
+    assert obs.short_stop_valid_at_decision_close is True
+    assert (
+        obs.stop_panel_diagnostic
+        == "selected_panel_protective_at_decision_close"
+    )
+    assert result.stop_panel_diagnostic_counts == {
+        "selected_panel_protective_at_decision_close": 1
+    }
 
 
 def test_classifies_sell_stop_already_invalid_at_decision() -> None:
@@ -110,6 +123,19 @@ def test_classifies_sell_stop_already_invalid_at_decision() -> None:
     assert obs.valid_at_entry_open is False
     assert obs.decision_margin == -10.0
     assert obs.entry_margin == -11.0
+    assert obs.signed_risk_fraction == -0.01
+    assert obs.selected_stop_panel == "stops_short"
+    assert obs.long_stop_price == 1.0
+    assert obs.short_stop_price == 1790.0
+    assert obs.long_stop_valid_at_decision_close is True
+    assert obs.short_stop_valid_at_decision_close is False
+    assert (
+        obs.stop_panel_diagnostic
+        == "selected_panel_nonprotective_opposite_panel_protective"
+    )
+    assert result.stop_panel_diagnostic_counts == {
+        "selected_panel_nonprotective_opposite_panel_protective": 1
+    }
 
 
 def test_valid_at_entry_stop_is_not_reported() -> None:
@@ -132,6 +158,7 @@ def test_valid_at_entry_stop_is_not_reported() -> None:
     assert result.trade_intent_count == 1
     assert result.invalid_at_entry_count == 0
     assert result.cause_counts == {}
+    assert result.stop_panel_diagnostic_counts == {}
     assert result.observations == ()
 
 
@@ -154,3 +181,4 @@ def test_empty_short_index_returns_empty_diagnostic() -> None:
     assert result.event_interval_count == 0
     assert result.trade_intent_count == 0
     assert result.invalid_at_entry_count == 0
+    assert result.stop_panel_diagnostic_counts == {}

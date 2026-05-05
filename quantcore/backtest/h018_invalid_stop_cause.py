@@ -33,6 +33,14 @@ class InvalidStopCauseObservation:
     valid_at_decision_close: bool
     valid_at_entry_open: bool
     cause: str
+    signed_risk_fraction: float = 0.0
+    signal_value: float | None = None
+    selected_stop_panel: str = ""
+    long_stop_price: float | None = None
+    short_stop_price: float | None = None
+    long_stop_valid_at_decision_close: bool | None = None
+    short_stop_valid_at_decision_close: bool | None = None
+    stop_panel_diagnostic: str = ""
 
     @property
     def decision_margin(self) -> float:
@@ -72,6 +80,10 @@ class InvalidStopCauseDiagnostic:
     @property
     def invalid_counts_by_side(self) -> dict[str, int]:
         return dict(Counter(obs.side for obs in self.observations))
+
+    @property
+    def stop_panel_diagnostic_counts(self) -> dict[str, int]:
+        return dict(Counter(obs.stop_panel_diagnostic for obs in self.observations))
 
 
 def diagnose_invalid_stop_causes(
@@ -143,15 +155,51 @@ def diagnose_invalid_stop_causes_from_masked_result(
 
             trade_intent_count += 1
             side = "buy" if signed_risk_fraction > 0.0 else "sell"
-            stop_panel = h017_result.stops_long if side == "buy" else h017_result.stops_short
-            stop_price = float(stop_panel.at[decision_time, symbol])
+            selected_stop_panel = "stops_long" if side == "buy" else "stops_short"
 
-            if pd.isna(stop_price):
+            long_stop_price = _optional_stop_price(
+                h017_result.stops_long,
+                decision_time,
+                symbol,
+            )
+            short_stop_price = _optional_stop_price(
+                h017_result.stops_short,
+                decision_time,
+                symbol,
+            )
+            stop_price = long_stop_price if side == "buy" else short_stop_price
+
+            if stop_price is None:
                 continue
+
+            signal_value = _optional_signal_value(
+                h017_result=h017_result,
+                decision_time=decision_time,
+                symbol=symbol,
+            )
 
             h4_bars = h4_by_symbol[symbol]
             decision_close = float(h4_bars.at[decision_time, "close"])
             entry_open = float(h4_bars.at[entry_time, "open"])
+
+            long_stop_valid_at_decision_close = (
+                None
+                if long_stop_price is None
+                else _is_directionally_valid(
+                    side="buy",
+                    reference_price=decision_close,
+                    stop_price=long_stop_price,
+                )
+            )
+            short_stop_valid_at_decision_close = (
+                None
+                if short_stop_price is None
+                else _is_directionally_valid(
+                    side="sell",
+                    reference_price=decision_close,
+                    stop_price=short_stop_price,
+                )
+            )
 
             valid_at_decision_close = _is_directionally_valid(
                 side=side,
@@ -182,6 +230,27 @@ def diagnose_invalid_stop_causes_from_masked_result(
                         valid_at_decision_close=valid_at_decision_close,
                         valid_at_entry_open=valid_at_entry_open,
                     ),
+                    signed_risk_fraction=signed_risk_fraction,
+                    signal_value=signal_value,
+                    selected_stop_panel=selected_stop_panel,
+                    long_stop_price=long_stop_price,
+                    short_stop_price=short_stop_price,
+                    long_stop_valid_at_decision_close=(
+                        long_stop_valid_at_decision_close
+                    ),
+                    short_stop_valid_at_decision_close=(
+                        short_stop_valid_at_decision_close
+                    ),
+                    stop_panel_diagnostic=_classify_stop_panel_diagnostic(
+                        selected_stop_valid_at_decision_close=(
+                            valid_at_decision_close
+                        ),
+                        opposite_stop_valid_at_decision_close=(
+                            short_stop_valid_at_decision_close
+                            if side == "buy"
+                            else long_stop_valid_at_decision_close
+                        ),
+                    ),
                 )
             )
 
@@ -194,6 +263,35 @@ def diagnose_invalid_stop_causes_from_masked_result(
         skipped_entry_count=None,
         observations=tuple(observations),
     )
+
+
+def _optional_stop_price(
+    panel: pd.DataFrame,
+    decision_time: pd.Timestamp,
+    symbol: str,
+) -> float | None:
+    stop_price = float(panel.at[decision_time, symbol])
+    if pd.isna(stop_price):
+        return None
+    return stop_price
+
+
+def _optional_signal_value(
+    *,
+    h017_result: Any,
+    decision_time: pd.Timestamp,
+    symbol: str,
+) -> float | None:
+    signals = getattr(h017_result, "signals", None)
+    if signals is None:
+        return None
+    if symbol not in signals.columns:
+        return None
+
+    signal_value = float(signals.at[decision_time, symbol])
+    if pd.isna(signal_value):
+        return None
+    return signal_value
 
 
 def _is_directionally_valid(
@@ -219,3 +317,17 @@ def _classify_cause(
     if valid_at_decision_close:
         return "crossed_between_decision_close_and_entry_open"
     return "already_invalid_at_decision_close"
+
+
+def _classify_stop_panel_diagnostic(
+    *,
+    selected_stop_valid_at_decision_close: bool,
+    opposite_stop_valid_at_decision_close: bool | None,
+) -> str:
+    if selected_stop_valid_at_decision_close:
+        return "selected_panel_protective_at_decision_close"
+    if opposite_stop_valid_at_decision_close is True:
+        return "selected_panel_nonprotective_opposite_panel_protective"
+    if opposite_stop_valid_at_decision_close is False:
+        return "selected_panel_nonprotective_both_panels_nonprotective"
+    return "selected_panel_nonprotective_opposite_panel_unavailable"
