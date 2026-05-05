@@ -37,4 +37,10 @@ def run_h020_bridge_shim(
         positions=new_positions,
         stops_long=h019_result.stops_long,
         stops_short=h019_result.stops_short,
+        signals=h019_result.signals,
+        vol_multipliers=h019_result.vol_multipliers,
+        heat_multipliers=h019_result.heat_multipliers,
+        heat_pre=h019_result.heat_pre,
+        heat_post=h019_result.heat_post,
+        heat_binding=h019_result.heat_binding,
     )
