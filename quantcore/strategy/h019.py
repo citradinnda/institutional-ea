@@ -33,6 +33,8 @@ from dataclasses import dataclass
 
 import numpy as np
 import pandas as pd
+from quantcore.strategy.h017 import H017Config, H017Result, run_h017
+from quantcore.strategy.heat_governor import heat_governor
 
 
 @dataclass(frozen=True)
@@ -169,4 +171,99 @@ def apply_h019_chandelier_lifecycle(
         selected_stops=selected_stops,
         entries=entries,
         exits=exits,
+    )
+def run_h019(
+    usdjpy_ohlcv: pd.DataFrame,
+    xauusd_ohlcv: pd.DataFrame,
+    config: H017Config | None = None,
+) -> H017Result:
+    """Run H019 portfolio strategy using H017 indicators plus H019 lifecycle.
+
+    H019 intentionally reuses the H017 indicator stack at first:
+
+        - ATR
+        - raw same-side Chandelier stop panels
+        - Donchian held signals
+        - vol-target multipliers
+        - heat-governor configuration
+
+    Then it changes the strategy state semantics:
+
+        - H017 held Donchian signals are converted into H019 lifecycle
+          signals.
+        - Same-side Chandelier stop breaches flatten the active state.
+        - Stale held Donchian direction does not cause re-entry after
+          stop-out.
+        - Heat is recomputed from H019 lifecycle signals.
+        - Positions are recomputed from H019 lifecycle signals, existing
+          vol multipliers, and recomputed H019 heat multipliers.
+
+    The returned object is deliberately H017Result-shaped so the existing
+    strict event bridge can consume it later without weakening H018 guards.
+    """
+    if config is None:
+        config = H017Config.default()
+
+    base = run_h017(
+        usdjpy_ohlcv=usdjpy_ohlcv,
+        xauusd_ohlcv=xauusd_ohlcv,
+        config=config,
+    )
+
+    index = base.positions.index
+
+    closes = {
+        "USDJPY": usdjpy_ohlcv.loc[index, "close"],
+        "XAUUSD": xauusd_ohlcv.loc[index, "close"],
+    }
+
+    lifecycle_by_symbol = {
+        "USDJPY": apply_h019_chandelier_lifecycle(
+            held_signal=base.signals["USDJPY"],
+            close=closes["USDJPY"],
+            stops_long=base.stops_long["USDJPY"],
+            stops_short=base.stops_short["USDJPY"],
+        ),
+        "XAUUSD": apply_h019_chandelier_lifecycle(
+            held_signal=base.signals["XAUUSD"],
+            close=closes["XAUUSD"],
+            stops_long=base.stops_long["XAUUSD"],
+            stops_short=base.stops_short["XAUUSD"],
+        ),
+    }
+
+    h019_signals = pd.DataFrame(
+        {
+            "USDJPY": lifecycle_by_symbol["USDJPY"].signals,
+            "XAUUSD": lifecycle_by_symbol["XAUUSD"].signals,
+        },
+        index=index,
+    )
+
+    returns_panel = pd.DataFrame(
+        {
+            "USDJPY": closes["USDJPY"].pct_change(),
+            "XAUUSD": closes["XAUUSD"].pct_change(),
+        },
+        index=index,
+    ).fillna(0.0)
+
+    heat = heat_governor(h019_signals, returns_panel, config.heat)
+
+    sig_clean = h019_signals.fillna(0.0).astype(float)
+    vol_panel = base.vol_multipliers.reindex(index=index).fillna(0.0)
+
+    positions = sig_clean * config.heat.per_trade_risk * vol_panel * heat.multipliers
+    positions.columns = ["USDJPY", "XAUUSD"]
+
+    return H017Result(
+        positions=positions,
+        signals=h019_signals,
+        stops_long=base.stops_long,
+        stops_short=base.stops_short,
+        vol_multipliers=vol_panel,
+        heat_multipliers=heat.multipliers,
+        heat_pre=heat.portfolio_heat_pre,
+        heat_post=heat.portfolio_heat_post,
+        heat_binding=heat.binding,
     )
