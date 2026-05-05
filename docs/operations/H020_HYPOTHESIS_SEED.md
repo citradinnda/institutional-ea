@@ -194,39 +194,167 @@ Interpretation:
 - Portfolio leverage violations are milder than per-trade violations but still real: median `11.205x`, max `16.939x`.
 - The `19` minimum stop-distance violations and `2` invalid directional-stop violations still require explicit handling or explanation before any strict H020 validation can be considered meaningful.
 - A simple per-trade cap alone is insufficient because portfolio-wide overlap can still breach the hard guard.
+## H020 Sizing Contract Decision
+
+Decision locked after the H019/H020 guard diagnostic severity scan.
+
+H020 will be a sizing-contract hypothesis, not a lifecycle-repair hypothesis.
+
+H020 will keep:
+
+- H019 Donchian entry/flip plus stateful same-side Chandelier lifecycle semantics,
+- same-side Chandelier stops,
+- H018 hard validation guards,
+- strict broker-native complete-window validation requirements.
+
+H020 will not weaken event-engine guards.
+
+### H020 Pre-Trade Suppression Rules
+
+Before sizing a candidate trade, H020 must check intended raw-entry stop geometry.
+
+If the same-side stop is non-protective at intended raw entry:
+
+- long/buy stop is not below raw entry, or
+- short/sell stop is not above raw entry,
+
+then H020 emits flat/no lot intent for that symbol at that decision.
+
+If raw stop distance is below one modeled spread for the symbol, H020 emits flat/no lot intent.
+
+This is approved strategy-level intent suppression.
+
+It is not:
+
+- event-engine silent skipping,
+- event-engine lot clipping,
+- validation pass-through,
+- guard weakening.
+
+The event engine must still fail closed if an invalid stop, sub-minimum stop distance, per-trade leverage violation, or portfolio leverage violation reaches validation.
+
+### H020 Risk-Based Lots
+
+For each valid candidate trade, H020 first computes risk-based lots from:
+
+- equity,
+- signed risk fraction,
+- raw entry price,
+- same-side stop distance,
+- contract size,
+- quote currency conversion,
+- lot step,
+- minimum lot.
+
+The existing portfolio sizing conventions remain the starting reference.
+
+### H020 Per-Trade Notional Cap
+
+H020 then computes maximum per-trade lots from a strategy-level USD gross notional cap.
+
+Decision:
+
+- H020 strategy per-trade cap: below the H018 hard guard.
+- Initial proposed cap for implementation: `9.0x` equity.
+- H018 hard guard remains `10.0x` equity.
+
+For each candidate:
+
+- `candidate_lots = min(risk_based_lots, per_trade_notional_cap_lots)`
+
+Lots must be rounded down to broker lot step.
+
+If rounded lots fall below broker minimum lot, H020 emits flat/no lot intent for that symbol.
+
+### H020 Portfolio Gross Notional Cap
+
+H020 must also enforce a portfolio-wide strategy-level USD gross notional cap before event validation.
+
+Decision:
+
+- H020 strategy portfolio cap: below the H018 hard guard.
+- Initial proposed cap for implementation: `9.0x` equity.
+- H018 hard portfolio guard remains `10.0x` equity.
+
+If combined candidate USD gross notional exceeds the H020 portfolio cap:
+
+- scale all active candidate lots down proportionally,
+- round down to broker lot step,
+- recompute notionals after rounding,
+- emit flat/no lot intent for any symbol whose rounded lots fall below minimum lot.
+
+Long and short notionals are summed gross.
+
+They are not netted.
+
+### H020 Representation Decision
+
+H020 should not pretend that signed risk fraction alone is enough to express the strategy contract.
+
+Implementation should introduce explicit sizing diagnostics or explicit lot-intent objects.
+
+At minimum, H020 outputs must make visible:
+
+- raw risk-based lots,
+- per-trade-cap lots,
+- portfolio-scaled lots,
+- final emitted lots,
+- whether the symbol was suppressed,
+- suppression reason if flat,
+- raw stop distance,
+- per-trade gross leverage estimate,
+- portfolio gross leverage estimate.
+
+The strict event bridge may need to be extended to consume explicit lots safely.
+
+If the first implementation temporarily converts final lots back into a risk-fraction-shaped result for compatibility, that conversion must be tested and documented as a bridge shim, not as the H020 strategy truth.
+
+### H020 Validation Expectations
+
+Before any strict H020 broker-native validation attempt, run an H020 guard diagnostic scan across the accepted complete windows.
+
+Expected diagnostic goal before validation:
+
+- zero invalid directional-stop violations,
+- zero minimum stop-distance violations,
+- zero per-trade leverage violations,
+- zero portfolio leverage violations.
+
+Any nonzero hard-guard violation in H020 diagnostic means the H020 sizing contract or implementation is not ready for strict validation.
 ## H020 Design Choices To Lock Before Code
 
 Before coding H020, decide these explicitly:
 
 1. Per-trade notional cap:
-   - use the existing H018 10x equity cap,
-   - or choose a lower strategy cap below the hard guard?
+   - Decision: use a strategy cap below the H018 hard guard.
+   - Initial implementation target: `9.0x` equity.
+   - H018 hard guard remains `10.0x`.
 
 2. Portfolio notional cap:
-   - use the existing H018 10x portfolio gross cap,
-   - or choose a lower strategy cap below the hard guard?
+   - Decision: use a strategy cap below the H018 hard guard.
+   - Initial implementation target: `9.0x` total gross equity exposure.
+   - H018 hard guard remains `10.0x`.
 
 3. Lot clipping semantics:
-   - Is reducing risk-based lots to the notional cap an approved strategy behavior?
-   - This is not the same as the event engine silently clipping a violation.
-   - It must be visible in strategy output or diagnostics.
+   - Decision: reducing risk-based lots to the notional cap is approved H020 strategy behavior.
+   - This must happen before validation.
+   - It must be visible in H020 outputs or diagnostics.
+   - It is not event-engine silent clipping.
 
 4. Minimum-lot semantics:
-   - If capped lots fall below min lot, should H020 emit flat?
-   - This likely reduces trade frequency and may create missed signals.
+   - Decision: if final capped/scaled lots fall below broker minimum lot, H020 emits flat/no lot intent for that symbol.
 
 5. Risk accounting:
-   - Should H020 positions continue to be represented as signed risk fraction?
-   - Or should the strategy/event bridge move toward explicit lot-intent objects?
+   - Decision: H020 should move toward explicit lot-intent or sizing-diagnostic outputs.
+   - Signed risk fraction alone is insufficient as the strategy truth.
 
 6. Heat governor interaction:
-   - Should heat be applied before notional cap?
-   - after notional cap?
-   - or both through a portfolio allocation step?
+   - Decision: keep existing heat/risk-fraction logic as the starting risk budget, then apply per-trade and portfolio notional caps afterward.
+   - The portfolio cap is the final gross-notional constraint before emitting lots.
 
 7. Diagnostic requirement:
-   - Before strict validation, run an H020 guard scan across accepted windows.
-   - The scan should count invalid stops, minimum stop distance failures, per-trade leverage failures, and portfolio leverage failures.
+   - Decision: before strict validation, run an H020 guard scan across accepted windows.
+   - Required target before validation: zero invalid stops, zero minimum stop-distance failures, zero per-trade leverage failures, and zero portfolio leverage failures.
 
 ## Recommended H020 Development Path
 
