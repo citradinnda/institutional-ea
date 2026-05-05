@@ -37,6 +37,4 @@ def run_h020_bridge_shim(
         positions=new_positions,
         stops_long=h019_result.stops_long,
         stops_short=h019_result.stops_short,
-        atr_by_symbol=h019_result.atr_by_symbol,
-        close_by_symbol=h019_result.close_by_symbol,
     )
