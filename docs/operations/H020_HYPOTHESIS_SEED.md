@@ -144,6 +144,38 @@ Violation counts by symbol:
 - `XAUUSD`: `55`
 - Portfolio-wide leverage violations are symbolless in the current scanner, so symbol totals do not include the `42` portfolio violations.
 
+Violation counts by side:
+
+- `buy`: `155`
+- `sell`: `105`
+- Portfolio-wide leverage violations are symbolless and sideless.
+
+Enriched severity diagnostics:
+
+Per-trade gross leverage violations:
+
+- `count`: `239`
+- `min`: `10.090896`
+- `median`: `15.700000`
+- `p95`: `79.820000`
+- `max`: `429.700000`
+
+Portfolio gross leverage violations:
+
+- `count`: `42`
+- `min`: `10.062785`
+- `median`: `11.205005`
+- `p95`: `15.568125`
+- `max`: `16.938916`
+
+Minimum stop-distance ratio violations, measured as raw stop distance divided by minimum modeled spread:
+
+- `count`: `19`
+- `min`: `0.114372`
+- `median`: `0.571525`
+- `p95`: `0.951577`
+- `max`: `0.960424`
+
 Comparison to prior H018 diagnostic:
 
 - Prior H018 total guard violations: `2271`
@@ -157,8 +189,11 @@ Interpretation:
 - H019 did not become promotable.
 - The dominant remaining blocker is notional/leverage sizing, especially per-trade USD gross leverage.
 - H020 should focus on explicit notional-aware sizing rather than lifecycle repair.
+- Per-trade leverage violations are severe, not cosmetic: median `15.70x`, p95 `79.82x`, max `429.70x`.
 - H020 should also account for portfolio-wide gross exposure because `42` portfolio leverage violations remain.
+- Portfolio leverage violations are milder than per-trade violations but still real: median `11.205x`, max `16.939x`.
 - The `19` minimum stop-distance violations and `2` invalid directional-stop violations still require explicit handling or explanation before any strict H020 validation can be considered meaningful.
+- A simple per-trade cap alone is insufficient because portfolio-wide overlap can still breach the hard guard.
 ## H020 Design Choices To Lock Before Code
 
 Before coding H020, decide these explicitly:
@@ -246,9 +281,9 @@ Do not write H020 sizing code yet.
 
 Next, lock H020 sizing semantics from the diagnostic evidence:
 
-- Per-trade notional-aware sizing is mandatory because `239` per-trade leverage violations remain.
-- Portfolio gross exposure must be considered because `42` portfolio leverage violations remain.
-- Minimum stop-distance handling must be explicit because `19` violations remain.
+- Per-trade notional-aware sizing is mandatory because `239` per-trade leverage violations remain, with p95 `79.82x` and max `429.70x`.
+- Portfolio gross exposure must be considered because `42` portfolio leverage violations remain, with max `16.938916x`.
+- Minimum stop-distance handling must be explicit because `19` violations remain, with median raw-distance/spread ratio `0.571525`.
 - Directional stop geometry is almost fixed but not perfectly eliminated because `2` invalid directional-stop violations remain.
 
 Recommended next engineering action:
