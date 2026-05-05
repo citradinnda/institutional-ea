@@ -1,4 +1,4 @@
-﻿from types import SimpleNamespace
+from types import SimpleNamespace
 
 import pandas as pd
 import pytest
@@ -82,6 +82,7 @@ def test_scan_counts_invalid_directional_stop_and_continues() -> None:
     assert result.violation_count == 1
     assert result.violation_counts_by_guard == {"invalid_directional_stop": 1}
     assert result.violation_counts_by_symbol == {"XAUUSD": 1}
+    assert result.violation_counts_by_side == {"sell": 1}
 
     violation = result.violations[0]
     assert violation.symbol == "XAUUSD"
@@ -132,6 +133,10 @@ def test_scan_counts_minimum_stop_distance_violation() -> None:
     assert result.violation_count == 1
     assert result.violation_counts_by_guard == {"minimum_stop_distance": 1}
 
+    violation = result.violations[0]
+    assert violation.raw_stop_distance == pytest.approx(0.1)
+    assert violation.minimum_stop_distance == pytest.approx(0.3)
+
 
 def test_scan_rejects_non_positive_starting_equity() -> None:
     times = _times()
@@ -163,3 +168,65 @@ def test_empty_scan_result_properties() -> None:
     assert result.violation_count == 0
     assert result.violation_counts_by_guard == {}
     assert result.violation_counts_by_symbol == {}
+def test_scan_records_per_trade_leverage_violation_severity() -> None:
+    times = _times()
+    h017_result = _h017_like_result(
+        times=times,
+        usdjpy_position=0.01,
+        usdjpy_long_stop=149.99,
+    )
+
+    result = scan_h018_guard_violations_from_masked_result(
+        h017_result=h017_result,
+        h4_by_symbol={
+            "USDJPY": _h4_panel(times, 150.0),
+            "XAUUSD": _h4_panel(times, 1800.0),
+        },
+        starting_equity_usd=10_000.0,
+    )
+
+    assert result.violation_counts_by_guard == {
+        "maximum_per_trade_usd_gross_leverage": 1
+    }
+
+    violation = result.violations[0]
+    assert violation.symbol == "USDJPY"
+    assert violation.side == "buy"
+    assert violation.raw_stop_distance == pytest.approx(0.01)
+    assert violation.lots is not None
+    assert violation.notional_usd is not None
+    assert violation.gross_leverage is not None
+    assert violation.gross_leverage > 10.0
+    assert violation.maximum_gross_leverage == 10.0
+
+
+def test_scan_records_portfolio_leverage_violation_severity() -> None:
+    times = _times()
+    h017_result = _h017_like_result(
+        times=times,
+        usdjpy_position=0.01,
+        xauusd_position=0.01,
+        usdjpy_long_stop=149.85,
+        xauusd_long_stop=1798.0,
+    )
+
+    result = scan_h018_guard_violations_from_masked_result(
+        h017_result=h017_result,
+        h4_by_symbol={
+            "USDJPY": _h4_panel(times, 150.0),
+            "XAUUSD": _h4_panel(times, 1800.0),
+        },
+        starting_equity_usd=10_000.0,
+    )
+
+    assert result.violation_counts_by_guard == {
+        "maximum_portfolio_usd_gross_leverage": 1
+    }
+
+    violation = result.violations[0]
+    assert violation.symbol is None
+    assert violation.side is None
+    assert violation.portfolio_notional_usd is not None
+    assert violation.portfolio_gross_leverage is not None
+    assert violation.portfolio_gross_leverage > 10.0
+    assert violation.maximum_portfolio_gross_leverage == 10.0

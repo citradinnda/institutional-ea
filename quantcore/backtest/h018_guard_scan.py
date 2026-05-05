@@ -1,4 +1,4 @@
-﻿"""Diagnostic H018 guard-violation scanner.
+"""Diagnostic H018 guard-violation scanner.
 
 This module is diagnostic-only. It does not execute trades, skip trades in a
 validation run, clip sizes, tune H017, promote H018, or approve live trading.
@@ -42,6 +42,15 @@ class H018GuardViolation:
     entry_raw_price: float | None
     stop_price: float | None
     message: str
+    raw_stop_distance: float | None = None
+    minimum_stop_distance: float | None = None
+    lots: float | None = None
+    notional_usd: float | None = None
+    gross_leverage: float | None = None
+    maximum_gross_leverage: float | None = None
+    portfolio_notional_usd: float | None = None
+    portfolio_gross_leverage: float | None = None
+    maximum_portfolio_gross_leverage: float | None = None
 
 
 @dataclass(frozen=True)
@@ -72,6 +81,16 @@ class H018GuardScanResult:
                 violation.symbol
                 for violation in self.violations
                 if violation.symbol is not None
+            )
+        )
+
+    @property
+    def violation_counts_by_side(self) -> dict[str, int]:
+        return dict(
+            Counter(
+                violation.side
+                for violation in self.violations
+                if violation.side is not None
             )
         )
 
@@ -258,6 +277,11 @@ def scan_h018_guard_violations_from_masked_result(
                             f"{_MAXIMUM_PORTFOLIO_USD_GROSS_LEVERAGE}: "
                             f"{portfolio_gross_leverage:.12f}"
                         ),
+                        portfolio_notional_usd=portfolio_notional_usd,
+                        portfolio_gross_leverage=portfolio_gross_leverage,
+                        maximum_portfolio_gross_leverage=(
+                            _MAXIMUM_PORTFOLIO_USD_GROSS_LEVERAGE
+                        ),
                     )
                 )
 
@@ -300,7 +324,23 @@ def _violation_from_exception(
         entry_raw_price=snapshot.entry_raw_price,
         stop_price=snapshot.stop_price,
         message=str(exc),
+        raw_stop_distance=_float_attr(exc, "raw_stop_distance"),
+        minimum_stop_distance=_float_attr(exc, "minimum_stop_distance"),
+        lots=_float_attr(exc, "lots"),
+        notional_usd=_float_attr(exc, "notional_usd"),
+        gross_leverage=_float_attr(exc, "gross_leverage"),
+        maximum_gross_leverage=_float_attr(exc, "maximum_gross_leverage"),
     )
+
+
+def _float_attr(obj: object, name: str) -> float | None:
+    value = getattr(obj, name, None)
+    if value is None:
+        return None
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return None
 
 
 def _symbol_snapshot(

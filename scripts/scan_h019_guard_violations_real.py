@@ -1,4 +1,4 @@
-﻿"""Scan real broker-native data for H019 guard violations.
+"""Scan real broker-native data for H019 guard violations.
 
 Diagnostic-only:
 - does not tune H019,
@@ -13,6 +13,7 @@ Purpose:
 
 from __future__ import annotations
 
+from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -137,6 +138,73 @@ def _print_loader_summary(label: str, result: MT5LoadResult) -> None:
     )
 
 
+def _summary(values: Iterable[float]) -> dict[str, float] | None:
+    series = pd.Series(list(values), dtype="float64").dropna()
+    if series.empty:
+        return None
+
+    return {
+        "count": float(series.count()),
+        "min": float(series.min()),
+        "median": float(series.median()),
+        "p95": float(series.quantile(0.95)),
+        "max": float(series.max()),
+    }
+
+
+def _format_summary(summary: dict[str, float] | None) -> str:
+    if summary is None:
+        return "{}"
+
+    return (
+        "{"
+        f"'count': {int(summary['count'])}, "
+        f"'min': {summary['min']:.6f}, "
+        f"'median': {summary['median']:.6f}, "
+        f"'p95': {summary['p95']:.6f}, "
+        f"'max': {summary['max']:.6f}"
+        "}"
+    )
+
+
+def _print_violation_severity(scan: H018GuardScanResult) -> None:
+    per_trade_leverage = [
+        violation.gross_leverage
+        for violation in scan.violations
+        if violation.guard_name == "maximum_per_trade_usd_gross_leverage"
+        and violation.gross_leverage is not None
+    ]
+    portfolio_leverage = [
+        violation.portfolio_gross_leverage
+        for violation in scan.violations
+        if violation.guard_name == "maximum_portfolio_usd_gross_leverage"
+        and violation.portfolio_gross_leverage is not None
+    ]
+    stop_distance_ratio = [
+        violation.raw_stop_distance / violation.minimum_stop_distance
+        for violation in scan.violations
+        if violation.guard_name == "minimum_stop_distance"
+        and violation.raw_stop_distance is not None
+        and violation.minimum_stop_distance not in (None, 0.0)
+    ]
+
+    print("Violation severity")
+    print("-" * 40)
+    print(
+        "per_trade_gross_leverage="
+        f"{_format_summary(_summary(per_trade_leverage))}"
+    )
+    print(
+        "portfolio_gross_leverage="
+        f"{_format_summary(_summary(portfolio_leverage))}"
+    )
+    print(
+        "minimum_stop_distance_ratio="
+        f"{_format_summary(_summary(stop_distance_ratio))}"
+    )
+    print()
+
+
 def _print_bridge_window_assessment(
     assessment: CommonCompleteBridgeWindowAssessment,
 ) -> None:
@@ -221,7 +289,10 @@ def main() -> None:
     print(f"violation_count={scan.violation_count}")
     print(f"violation_counts_by_guard={scan.violation_counts_by_guard}")
     print(f"violation_counts_by_symbol={scan.violation_counts_by_symbol}")
+    print(f"violation_counts_by_side={scan.violation_counts_by_side}")
     print()
+
+    _print_violation_severity(scan)
 
     print("First violations")
     print("-" * 40)
@@ -233,7 +304,10 @@ def main() -> None:
             f"decision_time={violation.decision_time}, "
             f"entry_time={violation.entry_time}, "
             f"entry_raw_price={violation.entry_raw_price}, "
-            f"stop_price={violation.stop_price}"
+            f"stop_price={violation.stop_price}, "
+            f"raw_stop_distance={violation.raw_stop_distance}, "
+            f"gross_leverage={violation.gross_leverage}, "
+            f"portfolio_gross_leverage={violation.portfolio_gross_leverage}"
         )
 
     print()
