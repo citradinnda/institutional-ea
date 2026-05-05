@@ -473,3 +473,59 @@ def _validate_config(config: H020SizingConfig) -> None:
         raise ValueError("per_trade_max_gross_leverage must be positive")
     if config.portfolio_max_gross_leverage <= 0.0:
         raise ValueError("portfolio_max_gross_leverage must be positive")
+
+def generate_h020_intent_panel(
+    *,
+    positions: pd.DataFrame,
+    stops_long: pd.DataFrame,
+    stops_short: pd.DataFrame,
+    h4_by_symbol: Mapping[str, pd.DataFrame],
+    equity_usd: float = 10000.0,
+    config: H020SizingConfig | None = None,
+    instrument_specs: Mapping[str, InstrumentSpec] | None = None,
+) -> list[H020IntervalSizingResult]:
+    """Iterate decision intervals and generate H020 explicit sizing intents."""
+    results = []
+    symbols = list(positions.columns)
+    timestamps = positions.index
+
+    for i in range(len(timestamps) - 1):
+        decision_time = timestamps[i]
+        entry_time = timestamps[i + 1]
+
+        signed_risk_by_symbol = {}
+        entry_raw_price_by_symbol = {}
+        sl_long = {}
+        sl_short = {}
+
+        for sym in symbols:
+            risk = positions.at[decision_time, sym]
+            if pd.isna(risk) or risk == 0.0:
+                continue
+
+            df = h4_by_symbol.get(sym)
+            if df is None or entry_time not in df.index:
+                continue
+
+            signed_risk_by_symbol[sym] = float(risk)
+            entry_raw_price_by_symbol[sym] = float(df.at[entry_time, "open"])
+            sl_long[sym] = float(stops_long.at[decision_time, sym])
+            sl_short[sym] = float(stops_short.at[decision_time, sym])
+
+        if not signed_risk_by_symbol:
+            continue
+
+        res = size_h020_interval_intents(
+            decision_time=decision_time,
+            entry_time=entry_time,
+            equity_usd=equity_usd,
+            signed_risk_by_symbol=signed_risk_by_symbol,
+            entry_raw_price_by_symbol=entry_raw_price_by_symbol,
+            stops_long_by_symbol=sl_long,
+            stops_short_by_symbol=sl_short,
+            config=config,
+            instrument_specs=instrument_specs,
+        )
+        results.append(res)
+
+    return results

@@ -3,7 +3,7 @@ from __future__ import annotations
 import pandas as pd
 import pytest
 
-from quantcore.strategy.h020 import H020SizingConfig, size_h020_interval_intents
+from quantcore.strategy.h020 import H020SizingConfig, size_h020_interval_intents, generate_h020_intent_panel
 
 
 def _run_interval(
@@ -146,3 +146,48 @@ def test_h020_rejects_non_positive_equity() -> None:
 def test_h020_rejects_non_positive_caps() -> None:
     with pytest.raises(ValueError, match="per_trade_max_gross_leverage"):
         _run_interval(config=H020SizingConfig(per_trade_max_gross_leverage=0.0))
+
+def test_h020_generate_intent_panel() -> None:
+    timestamps = pd.date_range("2024-01-01 00:00:00", periods=3, freq="4h", tz="UTC")
+    positions = pd.DataFrame({
+        "USDJPY": [0.01, 0.01, 0.0],
+        "XAUUSD": [0.0, -0.01, 0.0],
+    }, index=timestamps)
+    stops_long = pd.DataFrame({
+        "USDJPY": [149.0, 149.0, 149.0],
+        "XAUUSD": [1790.0, 1790.0, 1790.0],
+    }, index=timestamps)
+    stops_short = pd.DataFrame({
+        "USDJPY": [151.0, 151.0, 151.0],
+        "XAUUSD": [1810.0, 1810.0, 1810.0],
+    }, index=timestamps)
+
+    h4_usdjpy = pd.DataFrame({"open": [150.0, 150.5, 151.0]}, index=timestamps)
+    h4_xauusd = pd.DataFrame({"open": [1800.0, 1795.0, 1790.0]}, index=timestamps)
+
+    results = generate_h020_intent_panel(
+        positions=positions,
+        stops_long=stops_long,
+        stops_short=stops_short,
+        h4_by_symbol={"USDJPY": h4_usdjpy, "XAUUSD": h4_xauusd},
+        equity_usd=10000.0,
+    )
+
+    assert len(results) == 2
+
+    # Interval 0 -> Entry at Interval 1
+    res0 = results[0]
+    assert res0.decision_time == timestamps[0]
+    assert res0.entry_time == timestamps[1]
+    assert "USDJPY" in res0.intents
+    assert "XAUUSD" in res0.intents
+    assert res0.intents["XAUUSD"].suppressed is True
+    assert res0.intents["XAUUSD"].suppression_reason == "flat_signal"
+    assert res0.intents["USDJPY"].entry_raw_price == 150.5
+
+    # Interval 1 -> Entry at Interval 2
+    res1 = results[1]
+    assert "USDJPY" in res1.intents
+    assert "XAUUSD" in res1.intents
+    assert res1.intents["XAUUSD"].side == "sell"
+    assert res1.intents["XAUUSD"].entry_raw_price == 1790.0
