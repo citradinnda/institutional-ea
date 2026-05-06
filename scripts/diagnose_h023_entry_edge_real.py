@@ -1,4 +1,4 @@
-﻿"""H023 entry-edge falsification diagnostic.
+"""H023 entry-edge falsification diagnostic.
 
 Research diagnostic only.
 
@@ -495,4 +495,3 @@ def _format_percent(value: float) -> str:
 
 if __name__ == "__main__":
     main()
-
