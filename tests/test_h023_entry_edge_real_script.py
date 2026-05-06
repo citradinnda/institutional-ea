@@ -1,4 +1,4 @@
-﻿import pandas as pd
+import pandas as pd
 import pytest
 
 from quantcore.strategy.h017 import H017Result
@@ -7,6 +7,7 @@ from scripts.diagnose_h023_entry_edge_real import (
     assess_h023_bridge_windows,
     backtest_h023_entry_edge_forward_horizon,
     format_h023_summary_table,
+    h023_signal_source_from_h020_bridge_shim_result,
     summarize_h023_entry_edge_result,
 )
 
@@ -197,3 +198,10 @@ def test_h023_bridge_window_helper_uses_existing_usdjpy_xauusd_api():
 
     assert assessment.accepted_count == 1
     assert list(assessment.accepted_timestamps) == [_utc("2024-01-01 00:00")]
+def test_h023_uses_h020_bridge_shim_h017_result_directly():
+    source = _h017_result()
+
+    assert h023_signal_source_from_h020_bridge_shim_result(source) is source
+
+    with pytest.raises(TypeError, match="must be an H017Result"):
+        h023_signal_source_from_h020_bridge_shim_result(object())

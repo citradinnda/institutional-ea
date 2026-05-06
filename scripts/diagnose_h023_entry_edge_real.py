@@ -316,6 +316,12 @@ def assess_h023_bridge_windows(
         expected_h4_delta=expected_h4_delta,
     )
 
+def h023_signal_source_from_h020_bridge_shim_result(result: H017Result) -> H017Result:
+    """Document that run_h020_bridge_shim returns H017Result directly."""
+    if not isinstance(result, H017Result):
+        raise TypeError("run_h020_bridge_shim result must be an H017Result")
+    return result
+
 
 def main() -> None:
     print("H023 entry-edge falsification diagnostic")
@@ -354,14 +360,16 @@ def main() -> None:
             f"got {len(accepted_entry_times)}"
         )
 
-    h020_result = run_h020_bridge_shim(
-        usdjpy_ohlcv=usdjpy_h4.bars,
-        xauusd_ohlcv=xauusd_h4.bars,
+    h020_signal = h023_signal_source_from_h020_bridge_shim_result(
+        run_h020_bridge_shim(
+            usdjpy_ohlcv=usdjpy_h4.bars,
+            xauusd_ohlcv=xauusd_h4.bars,
+        )
     )
 
     results = tuple(
         backtest_h023_entry_edge_forward_horizon(
-            h017_result=h020_result.h017,
+            h017_result=h020_signal,
             usdjpy_h4=usdjpy_h4.bars,
             xauusd_h4=xauusd_h4.bars,
             usdjpy_m1=usdjpy_m1.bars,
