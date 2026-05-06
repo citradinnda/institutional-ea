@@ -297,6 +297,25 @@ def format_h023_summary_table(rows: Sequence[H023EntryEdgeSummary]) -> str:
         )
     return "\n".join(lines)
 
+def assess_h023_bridge_windows(
+    *,
+    usdjpy_h4: pd.DataFrame,
+    xauusd_h4: pd.DataFrame,
+    usdjpy_m1: pd.DataFrame,
+    xauusd_m1: pd.DataFrame,
+    expected_m1_bars_per_h4: int = EXPECTED_M1_BARS_PER_H4,
+    expected_h4_delta: pd.Timedelta = EXPECTED_H4_DELTA,
+):
+    """Assess strict bridge windows using the existing USDJPY/XAUUSD API."""
+    return assess_common_complete_h4_m1_windows(
+        usdjpy_h4=usdjpy_h4,
+        xauusd_h4=xauusd_h4,
+        usdjpy_m1=usdjpy_m1,
+        xauusd_m1=xauusd_m1,
+        expected_m1_bars_per_h4=expected_m1_bars_per_h4,
+        expected_h4_delta=expected_h4_delta,
+    )
+
 
 def main() -> None:
     print("H023 entry-edge falsification diagnostic")
@@ -318,15 +337,11 @@ def main() -> None:
     xauusd_h4 = load_mt5_csv(XAUUSD_H4_PATH)
     xauusd_m1 = load_mt5_csv(XAUUSD_M1_PATH)
 
-    assessment = assess_common_complete_h4_m1_windows(
-        h4_by_symbol={
-            "USDJPY": usdjpy_h4,
-            "XAUUSD": xauusd_h4,
-        },
-        m1_by_symbol={
-            "USDJPY": usdjpy_m1,
-            "XAUUSD": xauusd_m1,
-        },
+    assessment = assess_h023_bridge_windows(
+        usdjpy_h4=usdjpy_h4.bars,
+        xauusd_h4=xauusd_h4.bars,
+        usdjpy_m1=usdjpy_m1.bars,
+        xauusd_m1=xauusd_m1.bars,
         expected_h4_delta=EXPECTED_H4_DELTA,
         expected_m1_bars_per_h4=EXPECTED_M1_BARS_PER_H4,
     )
@@ -340,17 +355,17 @@ def main() -> None:
         )
 
     h020_result = run_h020_bridge_shim(
-        usdjpy_ohlcv=usdjpy_h4,
-        xauusd_ohlcv=xauusd_h4,
+        usdjpy_ohlcv=usdjpy_h4.bars,
+        xauusd_ohlcv=xauusd_h4.bars,
     )
 
     results = tuple(
         backtest_h023_entry_edge_forward_horizon(
             h017_result=h020_result.h017,
-            usdjpy_h4=usdjpy_h4,
-            xauusd_h4=xauusd_h4,
-            usdjpy_m1=usdjpy_m1,
-            xauusd_m1=xauusd_m1,
+            usdjpy_h4=usdjpy_h4.bars,
+            xauusd_h4=xauusd_h4.bars,
+            usdjpy_m1=usdjpy_m1.bars,
+            xauusd_m1=xauusd_m1.bars,
             accepted_entry_times=accepted_entry_times,
             forward_h4_bars=horizon,
         )
@@ -480,3 +495,4 @@ def _format_percent(value: float) -> str:
 
 if __name__ == "__main__":
     main()
+

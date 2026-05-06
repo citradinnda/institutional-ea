@@ -1,9 +1,10 @@
-import pandas as pd
+﻿import pandas as pd
 import pytest
 
 from quantcore.strategy.h017 import H017Result
 from scripts.diagnose_h023_entry_edge_real import (
     DEFAULT_H023_FORWARD_HORIZONS,
+    assess_h023_bridge_windows,
     backtest_h023_entry_edge_forward_horizon,
     format_h023_summary_table,
     summarize_h023_entry_edge_result,
@@ -173,3 +174,26 @@ def test_h023_skips_incomplete_forward_horizon():
     assert result.executed_entry_count == 0
     assert result.incomplete_horizon_skip_count == 1
     assert len(result.fills) == 0
+def test_h023_bridge_window_helper_uses_existing_usdjpy_xauusd_api():
+    h4 = _h4().iloc[:2].copy()
+    m1 = pd.DataFrame(
+        {
+            "open": [101.0],
+            "high": [102.0],
+            "low": [100.0],
+            "close": [101.5],
+        },
+        index=pd.DatetimeIndex([_utc("2024-01-01 00:00")]),
+    )
+
+    assessment = assess_h023_bridge_windows(
+        usdjpy_h4=h4,
+        xauusd_h4=h4,
+        usdjpy_m1=m1,
+        xauusd_m1=m1,
+        expected_m1_bars_per_h4=1,
+        expected_h4_delta=pd.Timedelta(hours=4),
+    )
+
+    assert assessment.accepted_count == 1
+    assert list(assessment.accepted_timestamps) == [_utc("2024-01-01 00:00")]
