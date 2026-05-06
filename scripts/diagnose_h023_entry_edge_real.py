@@ -297,6 +297,32 @@ def format_h023_summary_table(rows: Sequence[H023EntryEdgeSummary]) -> str:
         )
     return "\n".join(lines)
 
+def format_h023_group_reports(result: H023EntryEdgeResult) -> str:
+    """Format all H023 split reports with existing H021 group helpers."""
+    sections = [
+        format_group_summary_table(
+            summarize_fills_by_field(result.fills, field="symbol"),
+            title="By symbol:",
+        ),
+        format_group_summary_table(
+            summarize_fills_by_field(result.fills, field="side"),
+            title="By side:",
+        ),
+        format_group_summary_table(
+            summarize_chronological_halves(result.fills),
+            title="Chronological halves:",
+        ),
+        format_group_summary_table(
+            summarize_chronological_thirds(result.fills),
+            title="Chronological thirds:",
+        ),
+        format_group_summary_table(
+            summarize_fills_by_year(result.fills),
+            title="By calendar year:",
+        ),
+    ]
+    return "\n\n".join(sections)
+
 def assess_h023_bridge_windows(
     *,
     usdjpy_h4: pd.DataFrame,
@@ -387,20 +413,7 @@ def main() -> None:
     for result in results:
         print()
         print(f"=== {result.forward_h4_bars} H4 forward horizon ===")
-        print("By symbol:")
-        print(format_group_summary_table(summarize_fills_by_field(result.fills, "symbol")))
-        print()
-        print("By side:")
-        print(format_group_summary_table(summarize_fills_by_field(result.fills, "side")))
-        print()
-        print("Chronological halves:")
-        print(format_group_summary_table(summarize_chronological_halves(result.fills)))
-        print()
-        print("Chronological thirds:")
-        print(format_group_summary_table(summarize_chronological_thirds(result.fills)))
-        print()
-        print("By calendar year:")
-        print(format_group_summary_table(summarize_fills_by_year(result.fills)))
+        print(format_h023_group_reports(result))
 
 
 def _build_h023_forward_fill(*, candidate, m1_bars: pd.DataFrame):

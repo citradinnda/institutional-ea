@@ -6,6 +6,7 @@ from scripts.diagnose_h023_entry_edge_real import (
     DEFAULT_H023_FORWARD_HORIZONS,
     assess_h023_bridge_windows,
     backtest_h023_entry_edge_forward_horizon,
+    format_h023_group_reports,
     format_h023_summary_table,
     h023_signal_source_from_h020_bridge_shim_result,
     summarize_h023_entry_edge_result,
@@ -205,3 +206,25 @@ def test_h023_uses_h020_bridge_shim_h017_result_directly():
 
     with pytest.raises(TypeError, match="must be an H017Result"):
         h023_signal_source_from_h020_bridge_shim_result(object())
+def test_h023_group_report_formatter_uses_keyword_helper_arguments():
+    result = backtest_h023_entry_edge_forward_horizon(
+        h017_result=_h017_result(),
+        usdjpy_h4=_h4(),
+        xauusd_h4=_h4(),
+        usdjpy_m1=_m1(),
+        xauusd_m1=_m1(),
+        accepted_entry_times=[
+            _utc("2024-01-01 04:00"),
+            _utc("2024-01-01 08:00"),
+            _utc("2024-01-01 12:00"),
+        ],
+        forward_h4_bars=1,
+    )
+
+    report = format_h023_group_reports(result)
+
+    assert "By symbol:" in report
+    assert "By side:" in report
+    assert "Chronological thirds:" in report
+    assert "By calendar year:" in report
+    assert "label | fills" in report
