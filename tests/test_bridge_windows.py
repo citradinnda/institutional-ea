@@ -6,6 +6,10 @@ import pytest
 from quantcore.data.bridge_windows import (
     CommonCompleteBridgeWindowAssessment,
     assess_common_complete_h4_m1_windows,
+    assess_common_complete_h4_m1_windows_cached,
+    build_common_complete_bridge_window_cache_key,
+    load_common_complete_bridge_window_assessment_cache,
+    write_common_complete_bridge_window_assessment_cache,
 )
 
 
@@ -198,3 +202,100 @@ def test_assess_common_complete_h4_m1_windows_rejects_invalid_expected_counts() 
             xauusd_m1=m1,
             expected_m1_bars_per_h4=0,
         )
+
+
+def test_common_complete_bridge_window_assessment_cache_round_trips(tmp_path) -> None:
+    h4 = _ohlc_frame(_h4_index(3))
+    m1 = _ohlc_frame(_m1_index(480))
+    result = assess_common_complete_h4_m1_windows(
+        usdjpy_h4=h4,
+        xauusd_h4=h4,
+        usdjpy_m1=m1,
+        xauusd_m1=m1,
+    )
+
+    cache_path = tmp_path / "bridge_windows.json"
+    write_common_complete_bridge_window_assessment_cache(
+        cache_path=cache_path,
+        cache_key="cache-key",
+        assessment=result,
+    )
+
+    cached = load_common_complete_bridge_window_assessment_cache(
+        cache_path=cache_path,
+        cache_key="cache-key",
+    )
+
+    assert cached is not None
+    assert cached.accepted_timestamps.equals(result.accepted_timestamps)
+    assert cached.accepted_count == result.accepted_count
+    assert cached.first_accepted_timestamp == result.first_accepted_timestamp
+    assert cached.last_accepted_timestamp == result.last_accepted_timestamp
+    assert cached.rejected_count == result.rejected_count
+    assert cached.rejection_counts == result.rejection_counts
+
+
+def test_common_complete_bridge_window_assessment_cache_ignores_stale_key(tmp_path) -> None:
+    h4 = _ohlc_frame(_h4_index(3))
+    m1 = _ohlc_frame(_m1_index(480))
+    result = assess_common_complete_h4_m1_windows(
+        usdjpy_h4=h4,
+        xauusd_h4=h4,
+        usdjpy_m1=m1,
+        xauusd_m1=m1,
+    )
+
+    cache_path = tmp_path / "bridge_windows.json"
+    write_common_complete_bridge_window_assessment_cache(
+        cache_path=cache_path,
+        cache_key="fresh-key",
+        assessment=result,
+    )
+
+    assert (
+        load_common_complete_bridge_window_assessment_cache(
+            cache_path=cache_path,
+            cache_key="stale-key",
+        )
+        is None
+    )
+
+
+def test_build_common_complete_bridge_window_cache_key_changes_when_source_changes(tmp_path) -> None:
+    source = tmp_path / "H4.csv"
+    source.write_text("first", encoding="utf-8")
+
+    first_key = build_common_complete_bridge_window_cache_key(
+        source_paths={"usdjpy_h4": source},
+    )
+
+    source.write_text("first plus more bytes", encoding="utf-8")
+    second_key = build_common_complete_bridge_window_cache_key(
+        source_paths={"usdjpy_h4": source},
+    )
+
+    assert first_key != second_key
+
+
+def test_assess_common_complete_h4_m1_windows_cached_writes_cache(tmp_path) -> None:
+    h4 = _ohlc_frame(_h4_index(3))
+    m1 = _ohlc_frame(_m1_index(480))
+    cache_path = tmp_path / "bridge_windows.json"
+
+    result = assess_common_complete_h4_m1_windows_cached(
+        cache_path=cache_path,
+        cache_key="cache-key",
+        usdjpy_h4=h4,
+        xauusd_h4=h4,
+        usdjpy_m1=m1,
+        xauusd_m1=m1,
+    )
+
+    cached = load_common_complete_bridge_window_assessment_cache(
+        cache_path=cache_path,
+        cache_key="cache-key",
+    )
+
+    assert cache_path.exists()
+    assert cached is not None
+    assert cached.accepted_timestamps.equals(result.accepted_timestamps)

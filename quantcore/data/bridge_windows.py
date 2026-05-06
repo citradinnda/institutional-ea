@@ -1,6 +1,10 @@
 ﻿from __future__ import annotations
 
 from dataclasses import dataclass
+from pathlib import Path
+from typing import Mapping
+import hashlib
+import json
 
 import pandas as pd
 
@@ -244,3 +248,176 @@ def assess_common_complete_h4_m1_windows(
         rejected_count=len(candidate_common_h4) - len(accepted_timestamps),
         rejection_counts=_rejection_counts(all_rejection_reasons),
     )
+
+
+_CACHE_SCHEMA_VERSION = 1
+
+
+def build_common_complete_bridge_window_cache_key(
+    *,
+    source_paths: Mapping[str, str | Path],
+    expected_m1_bars_per_h4: int = 240,
+    expected_h4_delta: pd.Timedelta = pd.Timedelta(hours=4),
+) -> str:
+    """Build a deterministic cache key from strict bridge-window inputs.
+
+    The key intentionally uses source file path, byte size, and mtime_ns instead
+    of hashing large broker CSVs. This keeps the check cheap while invalidating
+    when MT5 exports are replaced or edited.
+    """
+    source_fingerprints = []
+    for label, raw_path in sorted(source_paths.items()):
+        path = Path(raw_path).resolve()
+        stat = path.stat()
+        source_fingerprints.append(
+            {
+                "label": label,
+                "path": str(path),
+                "size": stat.st_size,
+                "mtime_ns": stat.st_mtime_ns,
+            }
+        )
+
+    payload = {
+        "schema_version": _CACHE_SCHEMA_VERSION,
+        "source_fingerprints": source_fingerprints,
+        "expected_m1_bars_per_h4": int(expected_m1_bars_per_h4),
+        "expected_h4_delta_seconds": float(expected_h4_delta.total_seconds()),
+    }
+    encoded = json.dumps(payload, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    return hashlib.sha256(encoded).hexdigest()
+
+
+def load_common_complete_bridge_window_assessment_cache(
+    *,
+    cache_path: str | Path,
+    cache_key: str,
+) -> CommonCompleteBridgeWindowAssessment | None:
+    """Load a cached strict bridge-window assessment, or return None on miss.
+
+    Corrupt, stale, or schema-mismatched caches are treated as misses so callers
+    recompute from broker-native data instead of trusting ambiguous state.
+    """
+    path = Path(cache_path)
+    if not path.exists():
+        return None
+
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+        if payload.get("schema_version") != _CACHE_SCHEMA_VERSION:
+            return None
+        if payload.get("cache_key") != cache_key:
+            return None
+
+        assessment_payload = payload["assessment"]
+        accepted_timestamps = pd.DatetimeIndex(
+            [pd.Timestamp(value).tz_convert("UTC") for value in assessment_payload["accepted_timestamps"]],
+            tz="UTC",
+        )
+        rejection_counts = tuple(
+            BridgeWindowRejectionCount(
+                reason=str(item["reason"]),
+                count=int(item["count"]),
+            )
+            for item in assessment_payload["rejection_counts"]
+        )
+
+        first_accepted_timestamp = (
+            accepted_timestamps[0] if len(accepted_timestamps) else None
+        )
+        last_accepted_timestamp = (
+            accepted_timestamps[-1] if len(accepted_timestamps) else None
+        )
+
+        return CommonCompleteBridgeWindowAssessment(
+            accepted_timestamps=accepted_timestamps,
+            accepted_count=int(assessment_payload["accepted_count"]),
+            first_accepted_timestamp=first_accepted_timestamp,
+            last_accepted_timestamp=last_accepted_timestamp,
+            candidate_common_h4_count=int(assessment_payload["candidate_common_h4_count"]),
+            usdjpy_complete_count=int(assessment_payload["usdjpy_complete_count"]),
+            xauusd_complete_count=int(assessment_payload["xauusd_complete_count"]),
+            common_complete_count=int(assessment_payload["common_complete_count"]),
+            usdjpy_only_complete_count=int(assessment_payload["usdjpy_only_complete_count"]),
+            xauusd_only_complete_count=int(assessment_payload["xauusd_only_complete_count"]),
+            rejected_count=int(assessment_payload["rejected_count"]),
+            rejection_counts=rejection_counts,
+        )
+    except Exception:
+        return None
+
+
+def write_common_complete_bridge_window_assessment_cache(
+    *,
+    cache_path: str | Path,
+    cache_key: str,
+    assessment: CommonCompleteBridgeWindowAssessment,
+) -> None:
+    """Atomically write a strict bridge-window assessment cache as JSON."""
+    path = Path(cache_path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+
+    payload = {
+        "schema_version": _CACHE_SCHEMA_VERSION,
+        "cache_key": cache_key,
+        "assessment": {
+            "accepted_timestamps": [
+                pd.Timestamp(timestamp).tz_convert("UTC").isoformat()
+                for timestamp in assessment.accepted_timestamps
+            ],
+            "accepted_count": assessment.accepted_count,
+            "candidate_common_h4_count": assessment.candidate_common_h4_count,
+            "usdjpy_complete_count": assessment.usdjpy_complete_count,
+            "xauusd_complete_count": assessment.xauusd_complete_count,
+            "common_complete_count": assessment.common_complete_count,
+            "usdjpy_only_complete_count": assessment.usdjpy_only_complete_count,
+            "xauusd_only_complete_count": assessment.xauusd_only_complete_count,
+            "rejected_count": assessment.rejected_count,
+            "rejection_counts": [
+                {"reason": item.reason, "count": item.count}
+                for item in assessment.rejection_counts
+            ],
+        },
+    }
+
+    temp_path = path.with_suffix(path.suffix + ".tmp")
+    temp_path.write_text(
+        json.dumps(payload, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+    temp_path.replace(path)
+
+
+def assess_common_complete_h4_m1_windows_cached(
+    *,
+    cache_path: str | Path,
+    cache_key: str,
+    usdjpy_h4: pd.DataFrame,
+    xauusd_h4: pd.DataFrame,
+    usdjpy_m1: pd.DataFrame,
+    xauusd_m1: pd.DataFrame,
+    expected_m1_bars_per_h4: int = 240,
+    expected_h4_delta: pd.Timedelta = pd.Timedelta(hours=4),
+) -> CommonCompleteBridgeWindowAssessment:
+    """Load cached strict bridge-window assessment or compute and persist it."""
+    cached = load_common_complete_bridge_window_assessment_cache(
+        cache_path=cache_path,
+        cache_key=cache_key,
+    )
+    if cached is not None:
+        return cached
+
+    assessment = assess_common_complete_h4_m1_windows(
+        usdjpy_h4=usdjpy_h4,
+        xauusd_h4=xauusd_h4,
+        usdjpy_m1=usdjpy_m1,
+        xauusd_m1=xauusd_m1,
+        expected_m1_bars_per_h4=expected_m1_bars_per_h4,
+        expected_h4_delta=expected_h4_delta,
+    )
+    write_common_complete_bridge_window_assessment_cache(
+        cache_path=cache_path,
+        cache_key=cache_key,
+        assessment=assessment,
+    )
+    return assessment

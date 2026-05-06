@@ -16,7 +16,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from math import isnan
-from typing import Iterable, Sequence
+from pathlib import Path
+from typing import Iterable, Mapping, Sequence
 
 import pandas as pd
 
@@ -25,7 +26,11 @@ from quantcore.backtest.h017_event import (
     _validate_maximum_portfolio_usd_gross_leverage,
 )
 from quantcore.backtest.portfolio import build_portfolio_result, fill_pnl_usd
-from quantcore.data.bridge_windows import assess_common_complete_h4_m1_windows
+from quantcore.data.bridge_windows import (
+    assess_common_complete_h4_m1_windows,
+    assess_common_complete_h4_m1_windows_cached,
+    build_common_complete_bridge_window_cache_key,
+)
 from quantcore.data.mt5_loader import load_mt5_csv
 from quantcore.data.preflight import require_existing_files
 from quantcore.strategy.h017 import H017Result
@@ -51,6 +56,12 @@ from scripts.run_h020_strict_event_real import (
 
 DEFAULT_H023_FORWARD_HORIZONS: tuple[int, ...] = (1, 2, 3, 4, 6, 8)
 _SYMBOLS: tuple[str, ...] = ("USDJPY", "XAUUSD")
+BRIDGE_WINDOW_CACHE_PATH = (
+    Path(__file__).resolve().parents[1]
+    / "data"
+    / "cache"
+    / "strict_usdjpy_xauusd_h4_m1_bridge_windows.json"
+)
 
 
 @dataclass(frozen=True)
@@ -331,8 +342,27 @@ def assess_h023_bridge_windows(
     xauusd_m1: pd.DataFrame,
     expected_m1_bars_per_h4: int = EXPECTED_M1_BARS_PER_H4,
     expected_h4_delta: pd.Timedelta = EXPECTED_H4_DELTA,
+    cache_path: str | Path | None = None,
+    source_paths: Mapping[str, str | Path] | None = None,
 ):
     """Assess strict bridge windows using the existing USDJPY/XAUUSD API."""
+    if cache_path is not None and source_paths is not None:
+        cache_key = build_common_complete_bridge_window_cache_key(
+            source_paths=source_paths,
+            expected_m1_bars_per_h4=expected_m1_bars_per_h4,
+            expected_h4_delta=expected_h4_delta,
+        )
+        return assess_common_complete_h4_m1_windows_cached(
+            cache_path=cache_path,
+            cache_key=cache_key,
+            usdjpy_h4=usdjpy_h4,
+            xauusd_h4=xauusd_h4,
+            usdjpy_m1=usdjpy_m1,
+            xauusd_m1=xauusd_m1,
+            expected_m1_bars_per_h4=expected_m1_bars_per_h4,
+            expected_h4_delta=expected_h4_delta,
+        )
+
     return assess_common_complete_h4_m1_windows(
         usdjpy_h4=usdjpy_h4,
         xauusd_h4=xauusd_h4,
@@ -376,6 +406,13 @@ def main() -> None:
         xauusd_m1=xauusd_m1.bars,
         expected_h4_delta=EXPECTED_H4_DELTA,
         expected_m1_bars_per_h4=EXPECTED_M1_BARS_PER_H4,
+        cache_path=BRIDGE_WINDOW_CACHE_PATH,
+        source_paths={
+            "usdjpy_h4": USDJPY_H4_PATH,
+            "xauusd_h4": XAUUSD_H4_PATH,
+            "usdjpy_m1": USDJPY_M1_PATH,
+            "xauusd_m1": XAUUSD_M1_PATH,
+        },
     )
     accepted_entry_times = assessment.accepted_timestamps
 
