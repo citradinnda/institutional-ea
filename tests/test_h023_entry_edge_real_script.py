@@ -1,4 +1,4 @@
-﻿import pandas as pd
+import pandas as pd
 import pytest
 
 from quantcore.strategy.h017 import H017Result
@@ -173,5 +173,3 @@ def test_h023_skips_incomplete_forward_horizon():
     assert result.executed_entry_count == 0
     assert result.incomplete_horizon_skip_count == 1
     assert len(result.fills) == 0
-
-
