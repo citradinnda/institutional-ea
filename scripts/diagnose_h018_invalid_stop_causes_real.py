@@ -10,7 +10,8 @@ import pandas as pd
 from quantcore.backtest.h018_invalid_stop_cause import diagnose_invalid_stop_causes
 from quantcore.data.bridge_windows import (
     CommonCompleteBridgeWindowAssessment,
-    assess_common_complete_h4_m1_windows,
+    assess_common_complete_h4_m1_windows_cached,
+    build_common_complete_bridge_window_cache_key,
 )
 from quantcore.data.mt5_loader import DEFAULT_BROKER_TZ, MT5LoadResult, load_mt5_csv
 from quantcore.data.preflight import require_existing_files
@@ -19,6 +20,12 @@ from quantcore.strategy.h017 import run_h017
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 DATA_ROOT = REPO_ROOT / "data" / "raw"
+BRIDGE_WINDOW_CACHE_PATH = (
+    REPO_ROOT
+    / "data"
+    / "cache"
+    / "strict_usdjpy_xauusd_h4_m1_bridge_windows.json"
+)
 
 USDJPY_H4_PATH = DATA_ROOT / "USDJPY" / "H4.csv"
 XAUUSD_H4_PATH = DATA_ROOT / "XAUUSD" / "H4.csv"
@@ -57,7 +64,19 @@ def _load_broker_native_exports() -> LoadedBrokerNativeExports:
 def _assess_bridge_windows(
     loaded: LoadedBrokerNativeExports,
 ) -> CommonCompleteBridgeWindowAssessment:
-    return assess_common_complete_h4_m1_windows(
+    cache_key = build_common_complete_bridge_window_cache_key(
+        source_paths={
+            "usdjpy_h4": USDJPY_H4_PATH,
+            "xauusd_h4": XAUUSD_H4_PATH,
+            "usdjpy_m1": USDJPY_M1_PATH,
+            "xauusd_m1": XAUUSD_M1_PATH,
+        },
+        expected_m1_bars_per_h4=EXPECTED_M1_BARS_PER_H4,
+        expected_h4_delta=EXPECTED_H4_DELTA,
+    )
+    return assess_common_complete_h4_m1_windows_cached(
+        cache_path=BRIDGE_WINDOW_CACHE_PATH,
+        cache_key=cache_key,
         usdjpy_h4=loaded.usdjpy_h4.bars,
         xauusd_h4=loaded.xauusd_h4.bars,
         usdjpy_m1=loaded.usdjpy_m1.bars,

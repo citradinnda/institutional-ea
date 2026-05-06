@@ -27,7 +27,10 @@ from scripts.run_h020_strict_event_real import (
     XAUUSD_M1_PATH,
 )
 from quantcore.backtest.h020_strict_event import backtest_h020_strict_event
-from quantcore.data.bridge_windows import assess_common_complete_h4_m1_windows
+from quantcore.data.bridge_windows import (
+    assess_common_complete_h4_m1_windows_cached,
+    build_common_complete_bridge_window_cache_key,
+)
 from quantcore.data.mt5_loader import load_mt5_csv
 from quantcore.data.preflight import require_existing_files
 
@@ -152,7 +155,21 @@ def main() -> None:
     usdjpy_m1 = load_mt5_csv(USDJPY_M1_PATH)
     xauusd_m1 = load_mt5_csv(XAUUSD_M1_PATH)
 
-    assessment = assess_common_complete_h4_m1_windows(
+    cache_key = build_common_complete_bridge_window_cache_key(
+        source_paths={
+            "usdjpy_h4": USDJPY_H4_PATH,
+            "xauusd_h4": XAUUSD_H4_PATH,
+            "usdjpy_m1": USDJPY_M1_PATH,
+            "xauusd_m1": XAUUSD_M1_PATH,
+        },
+        expected_m1_bars_per_h4=EXPECTED_M1_BARS_PER_H4,
+        expected_h4_delta=EXPECTED_H4_DELTA,
+    )
+    assessment = assess_common_complete_h4_m1_windows_cached(
+        cache_path=USDJPY_H4_PATH.parents[2]
+        / "cache"
+        / "strict_usdjpy_xauusd_h4_m1_bridge_windows.json",
+        cache_key=cache_key,
         usdjpy_h4=usdjpy_h4.bars,
         xauusd_h4=xauusd_h4.bars,
         usdjpy_m1=usdjpy_m1.bars,
