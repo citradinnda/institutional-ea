@@ -1,4 +1,4 @@
-from pathlib import Path
+﻿from pathlib import Path
 
 from scripts.verify_h024_ea_preflight_log import verify_h024_ea_preflight_log
 
@@ -17,12 +17,17 @@ def write_log(path: Path, rows: list[str]) -> None:
     path.write_text(HEADER + "".join(rows), encoding="utf-8")
 
 
-def valid_row(event: str = "INIT", symbol: str = "USDJPYm", kill_switch: str = "true") -> str:
+def valid_row(
+    event: str = "INIT",
+    symbol: str = "USDJPYm",
+    kill_switch: str = "true",
+    detail: str = "blocked_by_default",
+) -> str:
     return (
         f"2026.05.09 22:00:00,H024_LOG_ONLY_PREFLIGHT,{event},{kill_switch},{symbol},"
         "Exness Technologies Ltd,Exness-MT5Trial6,USD,1246.45,1246.45,2000,"
         "true,true,true,false,false,156.676,156.694,18,0.01,300.00,0.01,0,0,"
-        "0.0010000000,3,blocked_by_default\n"
+        f"0.0010000000,3,{detail}\n"
     )
 
 
@@ -35,6 +40,59 @@ def test_verify_h024_ea_preflight_log_accepts_valid_log(tmp_path: Path) -> None:
     assert result.passed
     assert result.rows == 2
     assert result.violations == []
+
+
+def test_verify_h024_ea_preflight_log_accepts_no_action_intent_rows(tmp_path: Path) -> None:
+    path = tmp_path / "h024_ea_log_only_preflight.csv"
+    write_log(
+        path,
+        [
+            valid_row(symbol="USDJPYm"),
+            valid_row(event="INTENT", symbol="USDJPYm", detail="NO_ACTION:kill_switch_blocked"),
+            valid_row(symbol="XAUUSDm"),
+            valid_row(event="INTENT", symbol="XAUUSDm", detail="NO_ACTION:kill_switch_blocked"),
+        ],
+    )
+
+    result = verify_h024_ea_preflight_log(path)
+
+    assert result.passed
+    assert result.rows == 4
+    assert result.violations == []
+
+
+def test_verify_h024_ea_preflight_log_rejects_would_open_intent_rows(tmp_path: Path) -> None:
+    path = tmp_path / "h024_ea_log_only_preflight.csv"
+    write_log(
+        path,
+        [
+            valid_row(symbol="USDJPYm"),
+            valid_row(event="INTENT", symbol="USDJPYm", detail="WOULD_OPEN:dry_run_only"),
+            valid_row(symbol="XAUUSDm"),
+        ],
+    )
+
+    result = verify_h024_ea_preflight_log(path)
+
+    assert not result.passed
+    assert any("may only emit NO_ACTION intent rows" in item for item in result.violations)
+
+
+def test_verify_h024_ea_preflight_log_rejects_unknown_intent_action(tmp_path: Path) -> None:
+    path = tmp_path / "h024_ea_log_only_preflight.csv"
+    write_log(
+        path,
+        [
+            valid_row(symbol="USDJPYm"),
+            valid_row(event="INTENT", symbol="USDJPYm", detail="SEND_ORDER:forbidden"),
+            valid_row(symbol="XAUUSDm"),
+        ],
+    )
+
+    result = verify_h024_ea_preflight_log(path)
+
+    assert not result.passed
+    assert any("unexpected intent action" in item for item in result.violations)
 
 
 def test_verify_h024_ea_preflight_log_requires_existing_file(tmp_path: Path) -> None:

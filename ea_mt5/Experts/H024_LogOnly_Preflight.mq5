@@ -114,6 +114,12 @@ void WritePreflightRow(const string event_name, const string detail)
    FileFlush(g_file_handle);
 }
 
+void WriteIntentRow()
+{
+   string intent_detail = InpKillSwitchBlocked ? "NO_ACTION:kill_switch_blocked" : "NO_ACTION:log_only_unblocked";
+   WritePreflightRow("INTENT", intent_detail);
+}
+
 int OnInit()
 {
    if(!OpenLogFile())
@@ -128,6 +134,7 @@ int OnInit()
 void OnTick()
 {
    WritePreflightRow("TICK", InpKillSwitchBlocked ? "no_action_blocked" : "no_action_unblocked");
+   WriteIntentRow();
 }
 
 void OnDeinit(const int reason)

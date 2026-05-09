@@ -1,4 +1,4 @@
-from pathlib import Path
+﻿from pathlib import Path
 
 
 EA_PATH = Path("ea_mt5/Experts/H024_LogOnly_Preflight.mq5")
@@ -26,6 +26,9 @@ def test_h024_log_only_preflight_has_runtime_hooks_and_logging() -> None:
         "SymbolInfoTick(_Symbol, tick)",
         "SYMBOL_TRADE_STOPS_LEVEL",
         "SYMBOL_TRADE_FREEZE_LEVEL",
+        "void WriteIntentRow()",
+        '"INTENT"',
+        '"NO_ACTION:kill_switch_blocked"',
     ]
 
     for token in required:
@@ -49,6 +52,11 @@ def test_h024_log_only_preflight_has_no_execution_surface_tokens() -> None:
         "buystop",
         "sellstop",
         "trade.",
+        "mqltraderequest",
+        "mqltraderesult",
+        "trade_action_deal",
+        "trade_action_pending",
+        "trade_action_sltp",
     ]
 
     for token in forbidden:

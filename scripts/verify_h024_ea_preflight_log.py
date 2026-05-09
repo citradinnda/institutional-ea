@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 import argparse
 import csv
@@ -36,7 +36,8 @@ REQUIRED_COLUMNS = [
     "detail",
 ]
 
-ALLOWED_EVENTS = {"INIT", "TICK", "DEINIT"}
+ALLOWED_EVENTS = {"INIT", "TICK", "INTENT", "DEINIT"}
+ALLOWED_INTENT_ACTIONS = {"NO_ACTION", "BLOCKED", "WOULD_OPEN"}
 ALLOWED_SYMBOLS = {"USDJPYm", "XAUUSDm"}
 EXPECTED_RUN_LABEL = "H024_LOG_ONLY_PREFLIGHT"
 
@@ -65,6 +66,10 @@ def _is_int(value: str) -> bool:
     except ValueError:
         return False
     return True
+
+
+def _intent_action(detail: str) -> str:
+    return detail.split(":", 1)[0]
 
 
 def verify_h024_ea_preflight_log(path: Path) -> VerificationResult:
@@ -106,6 +111,14 @@ def verify_h024_ea_preflight_log(path: Path) -> VerificationResult:
 
         if event == "INIT":
             init_count += 1
+
+        if event == "INTENT":
+            detail = row.get("detail", "")
+            action = _intent_action(detail)
+            if action not in ALLOWED_INTENT_ACTIONS:
+                violations.append(f"row {index}: unexpected intent action {action!r}")
+            if action != "NO_ACTION":
+                violations.append(f"row {index}: EA runtime preflight may only emit NO_ACTION intent rows")
 
         if row.get("kill_switch_blocked") != "true":
             violations.append(f"row {index}: kill_switch_blocked must be true")
