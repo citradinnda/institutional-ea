@@ -92,6 +92,7 @@ def verify_h024_ea_preflight_log(path: Path) -> VerificationResult:
         return VerificationResult(rows=0, violations=violations)
 
     init_count = 0
+    symbols_seen: set[str] = set()
 
     for index, row in enumerate(rows, start=2):
         event = row.get("event", "")
@@ -111,6 +112,8 @@ def verify_h024_ea_preflight_log(path: Path) -> VerificationResult:
 
         if symbol not in ALLOWED_SYMBOLS:
             violations.append(f"row {index}: unexpected symbol {symbol!r}")
+        else:
+            symbols_seen.add(symbol)
 
         for bool_column in [
             "account_trade_allowed",
@@ -139,6 +142,10 @@ def verify_h024_ea_preflight_log(path: Path) -> VerificationResult:
 
     if init_count < 1:
         violations.append("log must include at least one INIT row")
+
+    missing_symbols = sorted(ALLOWED_SYMBOLS - symbols_seen)
+    if missing_symbols:
+        violations.append(f"log missing required symbols: {missing_symbols}")
 
     return VerificationResult(rows=len(rows), violations=violations)
 

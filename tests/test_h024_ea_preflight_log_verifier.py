@@ -28,7 +28,7 @@ def valid_row(event: str = "INIT", symbol: str = "USDJPYm", kill_switch: str = "
 
 def test_verify_h024_ea_preflight_log_accepts_valid_log(tmp_path: Path) -> None:
     path = tmp_path / "h024_ea_log_only_preflight.csv"
-    write_log(path, [valid_row("INIT"), valid_row("TICK")])
+    write_log(path, [valid_row(symbol="USDJPYm"), valid_row(symbol="XAUUSDm")])
 
     result = verify_h024_ea_preflight_log(path)
 
@@ -47,7 +47,7 @@ def test_verify_h024_ea_preflight_log_requires_existing_file(tmp_path: Path) -> 
 
 def test_verify_h024_ea_preflight_log_rejects_missing_init(tmp_path: Path) -> None:
     path = tmp_path / "h024_ea_log_only_preflight.csv"
-    write_log(path, [valid_row("TICK")])
+    write_log(path, [valid_row("TICK", "USDJPYm"), valid_row("TICK", "XAUUSDm")])
 
     result = verify_h024_ea_preflight_log(path)
 
@@ -57,7 +57,7 @@ def test_verify_h024_ea_preflight_log_rejects_missing_init(tmp_path: Path) -> No
 
 def test_verify_h024_ea_preflight_log_rejects_unblocked_kill_switch(tmp_path: Path) -> None:
     path = tmp_path / "h024_ea_log_only_preflight.csv"
-    write_log(path, [valid_row(kill_switch="false")])
+    write_log(path, [valid_row(symbol="USDJPYm", kill_switch="false"), valid_row(symbol="XAUUSDm")])
 
     result = verify_h024_ea_preflight_log(path)
 
@@ -67,7 +67,7 @@ def test_verify_h024_ea_preflight_log_rejects_unblocked_kill_switch(tmp_path: Pa
 
 def test_verify_h024_ea_preflight_log_rejects_unexpected_symbol(tmp_path: Path) -> None:
     path = tmp_path / "h024_ea_log_only_preflight.csv"
-    write_log(path, [valid_row(symbol="EURUSDm")])
+    write_log(path, [valid_row(symbol="EURUSDm"), valid_row(symbol="XAUUSDm")])
 
     result = verify_h024_ea_preflight_log(path)
 
@@ -77,10 +77,20 @@ def test_verify_h024_ea_preflight_log_rejects_unexpected_symbol(tmp_path: Path) 
 
 def test_verify_h024_ea_preflight_log_rejects_bad_numeric_field(tmp_path: Path) -> None:
     path = tmp_path / "h024_ea_log_only_preflight.csv"
-    row = valid_row().replace(",2000,", ",not_int,", 1)
-    write_log(path, [row])
+    row = valid_row(symbol="USDJPYm").replace(",2000,", ",not_int,", 1)
+    write_log(path, [row, valid_row(symbol="XAUUSDm")])
 
     result = verify_h024_ea_preflight_log(path)
 
     assert not result.passed
     assert any("account_leverage must be an integer" in item for item in result.violations)
+
+
+def test_verify_h024_ea_preflight_log_requires_both_symbols(tmp_path: Path) -> None:
+    path = tmp_path / "h024_ea_log_only_preflight.csv"
+    write_log(path, [valid_row(symbol="USDJPYm")])
+
+    result = verify_h024_ea_preflight_log(path)
+
+    assert not result.passed
+    assert "log missing required symbols: ['XAUUSDm']" in result.violations
