@@ -25,7 +25,7 @@ def valid_row(
     detail: str = "blocked_by_default",
 ) -> str:
     return (
-        "2026.05.09 22:00:00,h024_ea_log_only_preflight_v2,0.4,manual,1,"
+        "2026.05.09 22:00:00,h024_ea_log_only_preflight_v2,0.5,manual,1,"
         f"log_only_preflight,H024_LOG_ONLY_PREFLIGHT,{event},{kill_switch},{symbol},"
         "Exness Technologies Ltd,Exness-MT5Trial6,USD,1246.45,1246.45,2000,"
         "true,true,true,false,false,156.676,156.694,18,0.01,300.00,0.01,0,0,"
@@ -160,6 +160,53 @@ def test_verify_h024_ea_preflight_log_rejects_bad_bar_observation_detail(tmp_pat
     assert not result.passed
     assert any(
         "BAR_OBSERVATION detail must include closed H4 and M1 observations" in item
+        for item in result.violations
+    )
+
+
+def test_verify_h024_ea_preflight_log_accepts_h024_state_observation_rows(tmp_path: Path) -> None:
+    path = tmp_path / "h024_ea_log_only_preflight.csv"
+    detail = (
+        "closed_h4_time=2026.05.08 16:00:00;h4_warmup_bars=256;slow_window=5;slope_lag=2;atr_window=3;"
+        "pullback_window=3;slow_ma=1.0000000000;slow_ma_lag=0.9000000000;atr=0.1000000000;"
+        "previous_atr=0.1000000000;slope=0.1000000000;slope_threshold=0.0050000000;"
+        "trend_up=true;trend_down=false;previous_bearish=true;previous_bullish=false;"
+        "recent_high_before_signal=1.2000000000;recent_low_before_signal=0.8000000000;"
+        "long_pullback_depth_atr=1.0000000000;short_pullback_depth_atr=0.5000000000;"
+        "long_pullback_ok=true;short_pullback_ok=true;long_resumption=true;short_resumption=false;"
+        "long_signal_observed=true;short_signal_observed=false;action=NO_ACTION:state_observation_only"
+    )
+    write_log(
+        path,
+        [
+            valid_row(symbol="USDJPYm"),
+            valid_row(event="H024_STATE_OBSERVATION", symbol="USDJPYm", detail=detail),
+            valid_row(symbol="XAUUSDm"),
+            valid_row(event="H024_STATE_OBSERVATION", symbol="XAUUSDm", detail="unavailable:insufficient_h4_warmup_bars"),
+        ],
+    )
+
+    result = verify_h024_ea_preflight_log(path)
+
+    assert result.passed
+
+
+def test_verify_h024_ea_preflight_log_rejects_bad_h024_state_observation_detail(tmp_path: Path) -> None:
+    path = tmp_path / "h024_ea_log_only_preflight.csv"
+    write_log(
+        path,
+        [
+            valid_row(symbol="USDJPYm"),
+            valid_row(event="H024_STATE_OBSERVATION", symbol="USDJPYm", detail="closed_h4_time=2026.05.08 16:00:00"),
+            valid_row(symbol="XAUUSDm"),
+        ],
+    )
+
+    result = verify_h024_ea_preflight_log(path)
+
+    assert not result.passed
+    assert any(
+        "H024_STATE_OBSERVATION detail must include frozen H024 state fields" in item
         for item in result.violations
     )
 

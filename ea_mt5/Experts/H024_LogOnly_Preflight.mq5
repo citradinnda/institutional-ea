@@ -5,7 +5,7 @@
 input bool   InpKillSwitchBlocked = true;
 input string InpRunLabel = "H024_LOG_ONLY_PREFLIGHT";
 input string InpSchemaVersion = "h024_ea_log_only_preflight_v2";
-input string InpEaVersion = "0.4";
+input string InpEaVersion = "0.5";
 input string InpSourceVersion = "manual";
 input string InpRuntimeMode = "log_only_preflight";
 input string InpOutputFile = "h024_ea_log_only_preflight.csv";
@@ -188,6 +188,209 @@ void WriteBarObservationRow()
    WritePreflightRow("BAR_OBSERVATION", detail);
 }
 
+double TrueRangeAt(const MqlRates &rates[], const int index)
+{
+   const double range_high_low = rates[index].high - rates[index].low;
+   if(index + 1 >= ArraySize(rates))
+   {
+      return range_high_low;
+   }
+
+   const double previous_close = rates[index + 1].close;
+   const double range_high_close = MathAbs(rates[index].high - previous_close);
+   const double range_low_close = MathAbs(rates[index].low - previous_close);
+
+   return MathMax(range_high_low, MathMax(range_high_close, range_low_close));
+}
+
+double WilderAtrForClosedBar(const MqlRates &rates[], const int closed_shift, const int window)
+{
+   const int count = ArraySize(rates);
+   if(count < closed_shift + window)
+   {
+      return EMPTY_VALUE;
+   }
+
+   // rates[] is series-indexed: 0 is forming/current, larger indices are older.
+   // Compute a bounded Wilder ATR chronologically from the oldest copied bars
+   // toward the requested closed bar. This mirrors the Python recurrence over
+   // the available runtime warmup window.
+   const int oldest = count - 1;
+   if(oldest - window + 1 < closed_shift)
+   {
+      return EMPTY_VALUE;
+   }
+
+   double atr = 0.0;
+   for(int offset = oldest; offset >= oldest - window + 1; --offset)
+   {
+      atr += TrueRangeAt(rates, offset);
+   }
+   atr /= window;
+
+   for(int offset = oldest - window; offset >= closed_shift; --offset)
+   {
+      atr = ((atr * (window - 1)) + TrueRangeAt(rates, offset)) / window;
+   }
+
+   return atr;
+}
+
+double SimpleMeanClose(const MqlRates &rates[], const int closed_shift, const int window)
+{
+   if(ArraySize(rates) < closed_shift + window)
+   {
+      return EMPTY_VALUE;
+   }
+
+   double total = 0.0;
+   for(int offset = closed_shift; offset < closed_shift + window; ++offset)
+   {
+      total += rates[offset].close;
+   }
+   return total / window;
+}
+
+double HighestHighBeforeSignal(const MqlRates &rates[], const int closed_shift, const int window)
+{
+   if(ArraySize(rates) < closed_shift + 1 + window)
+   {
+      return EMPTY_VALUE;
+   }
+
+   double value = rates[closed_shift + 1].high;
+   for(int offset = closed_shift + 2; offset <= closed_shift + window; ++offset)
+   {
+      value = MathMax(value, rates[offset].high);
+   }
+   return value;
+}
+
+double LowestLowBeforeSignal(const MqlRates &rates[], const int closed_shift, const int window)
+{
+   if(ArraySize(rates) < closed_shift + 1 + window)
+   {
+      return EMPTY_VALUE;
+   }
+
+   double value = rates[closed_shift + 1].low;
+   for(int offset = closed_shift + 2; offset <= closed_shift + window; ++offset)
+   {
+      value = MathMin(value, rates[offset].low);
+   }
+   return value;
+}
+
+string BoolText(const bool value)
+{
+   return value ? "true" : "false";
+}
+
+string DoubleText(const double value)
+{
+   if(value == EMPTY_VALUE || !MathIsValidNumber(value))
+   {
+      return "nan";
+   }
+   return DoubleToString(value, 10);
+}
+
+void WriteH024StateObservationRow()
+{
+   MqlRates rates[];
+   ArraySetAsSeries(rates, true);
+
+   const int copied = CopyRates(_Symbol, PERIOD_H4, 0, 256, rates);
+   if(copied < 10)
+   {
+      WritePreflightRow("H024_STATE_OBSERVATION", "unavailable:insufficient_h4_warmup_bars");
+      return;
+   }
+
+   const int closed_shift = 1;
+   const int slow_window = 5;
+   const int slope_lag = 2;
+   const int atr_window = 3;
+   const int pullback_window = 3;
+   const double min_pullback_atr = 0.25;
+   const double max_pullback_atr = 3.0;
+   const double min_slope_atr = 0.05;
+
+   const double slow_ma = SimpleMeanClose(rates, closed_shift, slow_window);
+   const double slow_ma_lag = SimpleMeanClose(rates, closed_shift + slope_lag, slow_window);
+   const double atr = WilderAtrForClosedBar(rates, closed_shift, atr_window);
+   const double previous_atr = WilderAtrForClosedBar(rates, closed_shift + 1, atr_window);
+
+   const double slope = slow_ma - slow_ma_lag;
+   const double slope_threshold = atr * min_slope_atr;
+
+   const bool trend_up = rates[closed_shift].close > slow_ma && slope > slope_threshold;
+   const bool trend_down = rates[closed_shift].close < slow_ma && slope < -slope_threshold;
+
+   const bool previous_bearish = rates[closed_shift + 1].close < rates[closed_shift + 1].open;
+   const bool previous_bullish = rates[closed_shift + 1].close > rates[closed_shift + 1].open;
+
+   const double recent_high_before_signal = HighestHighBeforeSignal(rates, closed_shift, pullback_window);
+   const double recent_low_before_signal = LowestLowBeforeSignal(rates, closed_shift, pullback_window);
+
+   double long_pullback_depth_atr = EMPTY_VALUE;
+   double short_pullback_depth_atr = EMPTY_VALUE;
+   if(previous_atr > 0.0 && previous_atr != EMPTY_VALUE)
+   {
+      long_pullback_depth_atr = (recent_high_before_signal - rates[closed_shift + 1].low) / previous_atr;
+      short_pullback_depth_atr = (rates[closed_shift + 1].high - recent_low_before_signal) / previous_atr;
+   }
+
+   const bool long_pullback_ok = (
+      long_pullback_depth_atr != EMPTY_VALUE &&
+      long_pullback_depth_atr >= min_pullback_atr &&
+      long_pullback_depth_atr <= max_pullback_atr
+   );
+   const bool short_pullback_ok = (
+      short_pullback_depth_atr != EMPTY_VALUE &&
+      short_pullback_depth_atr >= min_pullback_atr &&
+      short_pullback_depth_atr <= max_pullback_atr
+   );
+
+   const bool long_resumption = rates[closed_shift].close > rates[closed_shift + 1].high;
+   const bool short_resumption = rates[closed_shift].close < rates[closed_shift + 1].low;
+
+   const bool long_signal_observed = trend_up && previous_bearish && long_pullback_ok && long_resumption;
+   const bool short_signal_observed = trend_down && previous_bullish && short_pullback_ok && short_resumption;
+
+   const string detail = StringFormat(
+      "closed_h4_time=%s;h4_warmup_bars=%d;slow_window=%d;slope_lag=%d;atr_window=%d;pullback_window=%d;slow_ma=%s;slow_ma_lag=%s;atr=%s;previous_atr=%s;slope=%s;slope_threshold=%s;trend_up=%s;trend_down=%s;previous_bearish=%s;previous_bullish=%s;recent_high_before_signal=%s;recent_low_before_signal=%s;long_pullback_depth_atr=%s;short_pullback_depth_atr=%s;long_pullback_ok=%s;short_pullback_ok=%s;long_resumption=%s;short_resumption=%s;long_signal_observed=%s;short_signal_observed=%s;action=NO_ACTION:state_observation_only",
+      TimeToString(rates[closed_shift].time, TIME_DATE | TIME_SECONDS),
+      copied,
+      slow_window,
+      slope_lag,
+      atr_window,
+      pullback_window,
+      DoubleText(slow_ma),
+      DoubleText(slow_ma_lag),
+      DoubleText(atr),
+      DoubleText(previous_atr),
+      DoubleText(slope),
+      DoubleText(slope_threshold),
+      BoolText(trend_up),
+      BoolText(trend_down),
+      BoolText(previous_bearish),
+      BoolText(previous_bullish),
+      DoubleText(recent_high_before_signal),
+      DoubleText(recent_low_before_signal),
+      DoubleText(long_pullback_depth_atr),
+      DoubleText(short_pullback_depth_atr),
+      BoolText(long_pullback_ok),
+      BoolText(short_pullback_ok),
+      BoolText(long_resumption),
+      BoolText(short_resumption),
+      BoolText(long_signal_observed),
+      BoolText(short_signal_observed)
+   );
+
+   WritePreflightRow("H024_STATE_OBSERVATION", detail);
+}
+
 int OnInit()
 {
    if(!OpenLogFile())
@@ -200,6 +403,7 @@ int OnInit()
    WriteIntentRow();
    WriteMarketStateRow();
    WriteBarObservationRow();
+   WriteH024StateObservationRow();
    return INIT_SUCCEEDED;
 }
 
@@ -209,6 +413,7 @@ void OnTick()
    WriteIntentRow();
    WriteMarketStateRow();
    WriteBarObservationRow();
+   WriteH024StateObservationRow();
 }
 
 void OnTimer()
@@ -216,6 +421,7 @@ void OnTimer()
    WriteIntentRow();
    WriteMarketStateRow();
    WriteBarObservationRow();
+   WriteH024StateObservationRow();
 }
 
 void OnDeinit(const int reason)

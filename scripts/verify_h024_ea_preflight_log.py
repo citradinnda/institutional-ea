@@ -41,12 +41,12 @@ REQUIRED_COLUMNS = [
     "detail",
 ]
 
-ALLOWED_EVENTS = {"INIT", "TICK", "INTENT", "MARKET_STATE", "BAR_OBSERVATION", "DEINIT"}
+ALLOWED_EVENTS = {"INIT", "TICK", "INTENT", "MARKET_STATE", "BAR_OBSERVATION", "H024_STATE_OBSERVATION", "DEINIT"}
 ALLOWED_INTENT_ACTIONS = {"NO_ACTION", "BLOCKED", "WOULD_OPEN"}
 ALLOWED_SYMBOLS = {"USDJPYm", "XAUUSDm"}
 EXPECTED_RUN_LABEL = "H024_LOG_ONLY_PREFLIGHT"
 EXPECTED_SCHEMA_VERSION = "h024_ea_log_only_preflight_v2"
-EXPECTED_EA_VERSION = "0.4"
+EXPECTED_EA_VERSION = "0.5"
 EXPECTED_RUNTIME_MODE = "log_only_preflight"
 
 
@@ -152,6 +152,28 @@ def verify_h024_ea_preflight_log(path: Path) -> VerificationResult:
             detail = row.get("detail", "")
             if "H4_closed:" not in detail or "M1_closed:" not in detail:
                 violations.append(f"row {index}: BAR_OBSERVATION detail must include closed H4 and M1 observations")
+
+        if event == "H024_STATE_OBSERVATION":
+            detail = row.get("detail", "")
+            required_fragments = [
+                "closed_h4_time=",
+                "slow_window=5",
+                "slope_lag=2",
+                "atr_window=3",
+                "pullback_window=3",
+                "trend_up=",
+                "trend_down=",
+                "long_signal_observed=",
+                "short_signal_observed=",
+                "action=NO_ACTION:state_observation_only",
+            ]
+            if not (
+                detail.startswith("unavailable:")
+                or all(fragment in detail for fragment in required_fragments)
+            ):
+                violations.append(
+                    f"row {index}: H024_STATE_OBSERVATION detail must include frozen H024 state fields"
+                )
 
         if row.get("kill_switch_blocked") != "true":
             violations.append(f"row {index}: kill_switch_blocked must be true")
