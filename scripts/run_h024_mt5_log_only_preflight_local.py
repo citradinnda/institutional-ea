@@ -4,6 +4,7 @@ import argparse
 import shutil
 import subprocess
 from dataclasses import dataclass
+from datetime import datetime
 from pathlib import Path
 
 from scripts.verify_h024_ea_preflight_log import verify_h024_ea_preflight_log
@@ -13,6 +14,19 @@ REPO_EA_SOURCE = Path("ea_mt5/Experts/H024_LogOnly_Preflight.mq5")
 EA_FILENAME = "H024_LogOnly_Preflight.mq5"
 RUNTIME_LOG_FILENAME = "h024_ea_log_only_preflight.csv"
 DEFAULT_REPORT_PATH = Path("reports") / RUNTIME_LOG_FILENAME
+
+
+@dataclass(frozen=True)
+class CompileOutcome:
+    return_code: int
+    stdout: str
+    stderr: str
+    ex5_path: Path
+    ex5_refreshed: bool
+
+    @property
+    def accepted(self) -> bool:
+        return self.return_code == 0 or self.ex5_refreshed
 
 
 @dataclass(frozen=True)
@@ -34,6 +48,10 @@ class LocalPreflightPaths:
         return self.terminal_experts_dir / EA_FILENAME
 
     @property
+    def terminal_ea_binary(self) -> Path:
+        return self.terminal_experts_dir / EA_FILENAME.replace(".mq5", ".ex5")
+
+    @property
     def terminal_runtime_log(self) -> Path:
         return self.terminal_files_dir / RUNTIME_LOG_FILENAME
 
@@ -47,19 +65,52 @@ def copy_ea_source(paths: LocalPreflightPaths) -> Path:
     return paths.terminal_ea_source
 
 
-def compile_ea(metaeditor: Path, source_path: Path, *, timeout_seconds: int = 60) -> subprocess.CompletedProcess[str]:
+def reset_runtime_log(paths: LocalPreflightPaths) -> bool:
+    if not paths.terminal_runtime_log.exists():
+        return False
+
+    paths.terminal_runtime_log.unlink()
+    return True
+
+
+def _mtime(path: Path) -> float | None:
+    if not path.exists():
+        return None
+    return path.stat().st_mtime
+
+
+def compile_ea(metaeditor: Path, source_path: Path, *, timeout_seconds: int = 60) -> CompileOutcome:
     if not metaeditor.exists():
         raise FileNotFoundError(f"missing MetaEditor executable: {metaeditor}")
 
     if not source_path.exists():
         raise FileNotFoundError(f"missing EA source to compile: {source_path}")
 
-    return subprocess.run(
+    ex5_path = source_path.with_suffix(".ex5")
+    before_mtime = _mtime(ex5_path)
+    started_at = datetime.now().timestamp()
+
+    completed = subprocess.run(
         [str(metaeditor), f"/compile:{source_path}"],
         capture_output=True,
         text=True,
         timeout=timeout_seconds,
         check=False,
+    )
+
+    after_mtime = _mtime(ex5_path)
+    ex5_refreshed = after_mtime is not None and (
+        before_mtime is None
+        or after_mtime > before_mtime
+        or after_mtime >= started_at
+    )
+
+    return CompileOutcome(
+        return_code=completed.returncode,
+        stdout=completed.stdout,
+        stderr=completed.stderr,
+        ex5_path=ex5_path,
+        ex5_refreshed=ex5_refreshed,
     )
 
 
@@ -81,7 +132,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description=(
             "Local helper for H024 MT5 log-only EA preflight. "
-            "Copies source, optionally compiles, optionally collects runtime CSV, and verifies it. "
+            "Copies source, optionally compiles, optionally resets/collects runtime CSV, and verifies it. "
             "Does not attach EAs, place orders, modify orders, close orders, or call MT5 trade APIs."
         )
     )
@@ -101,6 +152,11 @@ def build_parser() -> argparse.ArgumentParser:
         type=Path,
         default=DEFAULT_REPORT_PATH,
         help="Destination path for collected runtime CSV.",
+    )
+    parser.add_argument(
+        "--reset-runtime-log",
+        action="store_true",
+        help="Delete the terminal runtime CSV before manual EA attachment.",
     )
     parser.add_argument(
         "--collect",
@@ -134,21 +190,29 @@ def main() -> int:
     copied_to = copy_ea_source(paths)
     print(f"Copied EA source to: {copied_to}")
 
+    if args.reset_runtime_log:
+        removed = reset_runtime_log(paths)
+        print(f"Runtime CSV reset: {'removed existing file' if removed else 'no existing file'}")
+
     if args.metaeditor is not None:
-        compile_result = compile_ea(
+        compile_outcome = compile_ea(
             args.metaeditor,
             copied_to,
             timeout_seconds=args.compile_timeout_seconds,
         )
-        print(f"MetaEditor compile return code: {compile_result.returncode}")
-        if compile_result.stdout.strip():
+        print(f"MetaEditor compile return code: {compile_outcome.return_code}")
+        print(f"EX5 path: {compile_outcome.ex5_path}")
+        print(f"EX5 refreshed: {compile_outcome.ex5_refreshed}")
+        if compile_outcome.stdout.strip():
             print("MetaEditor stdout:")
-            print(compile_result.stdout.strip())
-        if compile_result.stderr.strip():
+            print(compile_outcome.stdout.strip())
+        if compile_outcome.stderr.strip():
             print("MetaEditor stderr:")
-            print(compile_result.stderr.strip())
-        if compile_result.returncode != 0:
-            return compile_result.returncode
+            print(compile_outcome.stderr.strip())
+        if not compile_outcome.accepted:
+            return compile_outcome.return_code if compile_outcome.return_code != 0 else 1
+        if compile_outcome.return_code != 0:
+            print("Compile accepted because EX5 was refreshed despite nonzero MetaEditor return code.")
 
     if not args.collect:
         print()

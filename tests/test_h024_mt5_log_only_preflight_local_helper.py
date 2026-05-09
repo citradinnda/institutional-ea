@@ -12,6 +12,7 @@ from scripts.run_h024_mt5_log_only_preflight_local import (
     collect_runtime_log,
     compile_ea,
     copy_ea_source,
+    reset_runtime_log,
     run_verify,
 )
 
@@ -41,6 +42,7 @@ def test_local_paths_resolve_terminal_locations(tmp_path: Path) -> None:
     assert paths.terminal_experts_dir == tmp_path / "MQL5" / "Experts"
     assert paths.terminal_files_dir == tmp_path / "MQL5" / "Files"
     assert paths.terminal_ea_source == tmp_path / "MQL5" / "Experts" / EA_FILENAME
+    assert paths.terminal_ea_binary == tmp_path / "MQL5" / "Experts" / "H024_LogOnly_Preflight.ex5"
     assert paths.terminal_runtime_log == tmp_path / "MQL5" / "Files" / RUNTIME_LOG_FILENAME
 
 
@@ -70,18 +72,36 @@ def test_copy_ea_source_rejects_missing_repo_source(tmp_path: Path) -> None:
         copy_ea_source(paths)
 
 
-def test_compile_ea_invokes_metaeditor_without_shell(tmp_path: Path) -> None:
+def test_reset_runtime_log_removes_existing_terminal_csv(tmp_path: Path) -> None:
+    paths = LocalPreflightPaths(terminal_data_dir=tmp_path / "terminal")
+    paths.terminal_files_dir.mkdir(parents=True)
+    paths.terminal_runtime_log.write_text("old\n", encoding="utf-8")
+
+    assert reset_runtime_log(paths)
+    assert not paths.terminal_runtime_log.exists()
+
+
+def test_reset_runtime_log_returns_false_when_no_terminal_csv_exists(tmp_path: Path) -> None:
+    paths = LocalPreflightPaths(terminal_data_dir=tmp_path / "terminal")
+
+    assert not reset_runtime_log(paths)
+
+
+def test_compile_ea_invokes_metaeditor_without_shell_and_accepts_zero_return(tmp_path: Path) -> None:
     metaeditor = tmp_path / "MetaEditor64.exe"
     source = tmp_path / EA_FILENAME
+    ex5 = tmp_path / "H024_LogOnly_Preflight.ex5"
     metaeditor.write_text("stub", encoding="utf-8")
     source.write_text("#property strict\n", encoding="utf-8")
+    ex5.write_text("compiled", encoding="utf-8")
 
     completed = Mock(returncode=0, stdout="", stderr="")
 
     with patch("scripts.run_h024_mt5_log_only_preflight_local.subprocess.run", return_value=completed) as run:
         result = compile_ea(metaeditor, source, timeout_seconds=7)
 
-    assert result is completed
+    assert result.return_code == 0
+    assert result.accepted
     run.assert_called_once_with(
         [str(metaeditor), f"/compile:{source}"],
         capture_output=True,
@@ -89,6 +109,41 @@ def test_compile_ea_invokes_metaeditor_without_shell(tmp_path: Path) -> None:
         timeout=7,
         check=False,
     )
+
+
+def test_compile_ea_accepts_nonzero_return_when_ex5_is_refreshed(tmp_path: Path) -> None:
+    metaeditor = tmp_path / "MetaEditor64.exe"
+    source = tmp_path / EA_FILENAME
+    ex5 = tmp_path / "H024_LogOnly_Preflight.ex5"
+    metaeditor.write_text("stub", encoding="utf-8")
+    source.write_text("#property strict\n", encoding="utf-8")
+
+    def fake_run(*_args: object, **_kwargs: object) -> Mock:
+        ex5.write_text("compiled after warning", encoding="utf-8")
+        return Mock(returncode=1, stdout="", stderr="")
+
+    with patch("scripts.run_h024_mt5_log_only_preflight_local.subprocess.run", side_effect=fake_run):
+        result = compile_ea(metaeditor, source, timeout_seconds=7)
+
+    assert result.return_code == 1
+    assert result.ex5_refreshed
+    assert result.accepted
+
+
+def test_compile_ea_rejects_nonzero_return_when_ex5_is_not_refreshed(tmp_path: Path) -> None:
+    metaeditor = tmp_path / "MetaEditor64.exe"
+    source = tmp_path / EA_FILENAME
+    metaeditor.write_text("stub", encoding="utf-8")
+    source.write_text("#property strict\n", encoding="utf-8")
+
+    completed = Mock(returncode=2, stdout="", stderr="")
+
+    with patch("scripts.run_h024_mt5_log_only_preflight_local.subprocess.run", return_value=completed):
+        result = compile_ea(metaeditor, source, timeout_seconds=7)
+
+    assert result.return_code == 2
+    assert not result.ex5_refreshed
+    assert not result.accepted
 
 
 def test_compile_ea_rejects_missing_metaeditor(tmp_path: Path) -> None:
