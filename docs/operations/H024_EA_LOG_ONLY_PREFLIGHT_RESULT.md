@@ -156,3 +156,59 @@ The EA emitted timer-driven INTENT rows without requiring market ticks.
 Kill switch remained blocked.
 This remains log-only preflight evidence.
 This does not approve demo trading, live trading, Phase 4 execution, order placement, order modification, or order closing.
+
+## Runtime Market-State Recheck - 2026-05-09
+
+After commit `e611d62 Add H024 EA market-state preflight rows`, the log-only EA was copied, compiled, runtime log was reset, manually attached to both required broker symbols, removed, collected, and verified.
+
+Static source verifier:
+
+```text id="ddf501"
+Violations: 0
+Verdict: PASS
+
+Compile/reset result:
+
+Runtime CSV reset: removed existing file
+MetaEditor compile return code: 1
+EX5 refreshed: True
+Compile accepted because EX5 was refreshed despite nonzero MetaEditor return code.
+
+Collected runtime CSV verifier:
+
+Rows: 22
+Violations: 0
+Verdict: PASS
+
+Runtime grouped rows:
+
+Schema version    EA version    Runtime mode    Symbol    Event    Count
+h024_ea_log_only_preflight_v2    0.3    log_only_preflight    USDJPYm    INIT    1
+h024_ea_log_only_preflight_v2    0.3    log_only_preflight    USDJPYm    INTENT    4
+h024_ea_log_only_preflight_v2    0.3    log_only_preflight    USDJPYm    MARKET_STATE    4
+h024_ea_log_only_preflight_v2    0.3    log_only_preflight    USDJPYm    DEINIT    1
+h024_ea_log_only_preflight_v2    0.3    log_only_preflight    XAUUSDm    INIT    1
+h024_ea_log_only_preflight_v2    0.3    log_only_preflight    XAUUSDm    INTENT    5
+h024_ea_log_only_preflight_v2    0.3    log_only_preflight    XAUUSDm    MARKET_STATE    5
+h024_ea_log_only_preflight_v2    0.3    log_only_preflight    XAUUSDm    DEINIT    1
+
+Observed market-state examples:
+
+USDJPYm:
+H4:time=2026.05.08 20:00:00;open=156.726;high=156.754;low=156.647;close=156.676;tick_volume=1028
+M1:time=2026.05.08 20:58:00;open=156.691;high=156.695;low=156.670;close=156.676;tick_volume=19
+
+XAUUSDm:
+H4:time=2026.05.08 20:00:00;open=4723.858;high=4724.334;low=4714.357;close=4715.309;tick_volume=4458
+M1:time=2026.05.08 20:57:00;open=4715.503;high=4715.503;low=4715.002;close=4715.309;tick_volume=42
+
+Interpretation:
+
+Fresh terminal-attached runtime evidence now includes no-order H4/M1 market-state observations.
+The verifier accepted the EA 0.3 runtime CSV.
+Both required H024 broker symbols were covered.
+The EA emitted timer-driven INTENT and MARKET_STATE rows without requiring market ticks.
+Runtime H4 and M1 data access from EA context is confirmed for both symbols.
+Kill switch remained blocked.
+This remains log-only preflight evidence.
+This does not approve demo trading, live trading, Phase 4 execution, order placement, order modification, or order closing.
