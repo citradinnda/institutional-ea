@@ -5,6 +5,7 @@
 input bool   InpKillSwitchBlocked = true;
 input string InpRunLabel = "H024_LOG_ONLY_PREFLIGHT";
 input string InpOutputFile = "h024_ea_log_only_preflight.csv";
+input int    InpTimerSeconds = 1;
 
 int g_file_handle = INVALID_HANDLE;
 
@@ -127,7 +128,9 @@ int OnInit()
       return INIT_FAILED;
    }
 
+   EventSetTimer(InpTimerSeconds);
    WritePreflightRow("INIT", InpKillSwitchBlocked ? "blocked_by_default" : "not_blocked");
+   WriteIntentRow();
    return INIT_SUCCEEDED;
 }
 
@@ -137,8 +140,14 @@ void OnTick()
    WriteIntentRow();
 }
 
+void OnTimer()
+{
+   WriteIntentRow();
+}
+
 void OnDeinit(const int reason)
 {
+   EventKillTimer();
    WritePreflightRow("DEINIT", IntegerToString(reason));
 
    if(g_file_handle != INVALID_HANDLE)

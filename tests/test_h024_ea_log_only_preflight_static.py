@@ -13,9 +13,13 @@ def test_h024_log_only_preflight_has_runtime_hooks_and_logging() -> None:
 
     required = [
         "InpKillSwitchBlocked = true",
+        "InpTimerSeconds = 1",
         "int OnInit()",
         "void OnTick()",
+        "void OnTimer()",
         "void OnDeinit(const int reason)",
+        "EventSetTimer(InpTimerSeconds)",
+        "EventKillTimer()",
         "FileOpen(",
         "FileWrite(",
         "FileFlush(",
