@@ -141,3 +141,7 @@ def test_h024_robustness_rejects_bad_scenarios():
                 ),
             ),
         )
+def test_h024_robustness_script_has_main_entrypoint():
+    import scripts.diagnose_h024_robustness_real as module
+
+    assert callable(module.main)
