@@ -1,5 +1,5 @@
 #property strict
-#property version   "0.3"
+#property version   "0.500"
 #property description "H024 log-only runtime preflight. Research only."
 
 input bool   InpKillSwitchBlocked = true;
@@ -188,7 +188,7 @@ void WriteBarObservationRow()
    WritePreflightRow("BAR_OBSERVATION", detail);
 }
 
-double TrueRangeAt(const MqlRates &rates[], const int index)
+double TrueRangeAt(MqlRates &rates[], const int index)
 {
    const double range_high_low = rates[index].high - rates[index].low;
    if(index + 1 >= ArraySize(rates))
@@ -203,7 +203,7 @@ double TrueRangeAt(const MqlRates &rates[], const int index)
    return MathMax(range_high_low, MathMax(range_high_close, range_low_close));
 }
 
-double WilderAtrForClosedBar(const MqlRates &rates[], const int closed_shift, const int window)
+double WilderAtrForClosedBar(MqlRates &rates[], const int closed_shift, const int window)
 {
    const int count = ArraySize(rates);
    if(count < closed_shift + window)
@@ -236,7 +236,7 @@ double WilderAtrForClosedBar(const MqlRates &rates[], const int closed_shift, co
    return atr;
 }
 
-double SimpleMeanClose(const MqlRates &rates[], const int closed_shift, const int window)
+double SimpleMeanClose(MqlRates &rates[], const int closed_shift, const int window)
 {
    if(ArraySize(rates) < closed_shift + window)
    {
@@ -251,7 +251,7 @@ double SimpleMeanClose(const MqlRates &rates[], const int closed_shift, const in
    return total / window;
 }
 
-double HighestHighBeforeSignal(const MqlRates &rates[], const int closed_shift, const int window)
+double HighestHighBeforeSignal(MqlRates &rates[], const int closed_shift, const int window)
 {
    if(ArraySize(rates) < closed_shift + 1 + window)
    {
@@ -266,7 +266,7 @@ double HighestHighBeforeSignal(const MqlRates &rates[], const int closed_shift, 
    return value;
 }
 
-double LowestLowBeforeSignal(const MqlRates &rates[], const int closed_shift, const int window)
+double LowestLowBeforeSignal(MqlRates &rates[], const int closed_shift, const int window)
 {
    if(ArraySize(rates) < closed_shift + 1 + window)
    {
@@ -279,11 +279,6 @@ double LowestLowBeforeSignal(const MqlRates &rates[], const int closed_shift, co
       value = MathMin(value, rates[offset].low);
    }
    return value;
-}
-
-string BoolText(const bool value)
-{
-   return value ? "true" : "false";
 }
 
 string DoubleText(const double value)
@@ -358,7 +353,7 @@ void WriteH024StateObservationRow()
    const bool long_signal_observed = trend_up && previous_bearish && long_pullback_ok && long_resumption;
    const bool short_signal_observed = trend_down && previous_bullish && short_pullback_ok && short_resumption;
 
-   const string detail = StringFormat(
+   string detail = StringFormat(
       "closed_h4_time=%s;h4_warmup_bars=%d;slow_window=%d;slope_lag=%d;atr_window=%d;pullback_window=%d;slow_ma=%s;slow_ma_lag=%s;atr=%s;previous_atr=%s;slope=%s;slope_threshold=%s;trend_up=%s;trend_down=%s;previous_bearish=%s;previous_bullish=%s;recent_high_before_signal=%s;recent_low_before_signal=%s;long_pullback_depth_atr=%s;short_pullback_depth_atr=%s;long_pullback_ok=%s;short_pullback_ok=%s;long_resumption=%s;short_resumption=%s;long_signal_observed=%s;short_signal_observed=%s;action=NO_ACTION:state_observation_only",
       TimeToString(rates[closed_shift].time, TIME_DATE | TIME_SECONDS),
       copied,
