@@ -92,3 +92,23 @@ add time/session filters
 approve demo trading
 approve live trading
 start Phase 4
+
+## Actual Gross Leverage Audit Addendum
+
+After adding interval-start equity and actual gross leverage fields to the H024 trade ledger, the real-data diagnostic was rerun.
+
+Actual gross leverage distribution:
+
+| Slice | Fills | Min | Median | Mean | P90 | Max |
+|---|---:|---:|---:|---:|---:|---:|
+| all_fills | 459 | 0.238174 | 1.055387 | 1.156458 | 1.975010 | 3.285420 |
+| stop_fills | 56 | 0.242458 | 0.946250 | 1.119561 | 1.824440 | 2.499557 |
+| 2023_stop_fills | 17 | 0.523237 | 1.027594 | 1.121347 | 1.693794 | 2.446090 |
+
+Interpretation:
+
+The 2023 stop-loss weakness does not appear to be a leverage-pathology problem. Actual gross leverage for 2023 stop exits was moderate, with median 1.027594x and max 2.446090x. This is far below the H018 hard 10x gross leverage guard.
+
+The largest losses are therefore better interpreted as ordinary stopped-risk losses under the modeled H024 lifecycle, not as lot-sizing blowups.
+
+This supports continuing execution-realism and market-context audit work, but it does not support demo deployment, live deployment, or Phase 4 approval.
