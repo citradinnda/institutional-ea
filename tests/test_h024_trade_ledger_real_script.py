@@ -1,4 +1,4 @@
-﻿import pandas as pd
+import pandas as pd
 import pytest
 
 from quantcore.backtest.portfolio import fill_pnl_usd
@@ -113,11 +113,22 @@ def test_h024_trade_ledger_builds_fill_level_rows():
     )
 
     assert len(ledger) == len(result.fills)
-    assert set(["decision_time_utc", "stop_price", "raw_stop_distance", "lots", "pnl_usd"]).issubset(
-        ledger.columns
-    )
+    assert set(
+        [
+            "decision_time_utc",
+            "stop_price",
+            "raw_stop_distance",
+            "lots",
+            "interval_start_equity_usd",
+            "actual_gross_leverage",
+            "gross_leverage_vs_10000_usd",
+            "pnl_usd",
+        ]
+    ).issubset(ledger.columns)
     assert (ledger["raw_stop_distance"] > 0.0).all()
     assert (ledger["lots"] > 0.0).all()
+    assert (ledger["interval_start_equity_usd"] > 0.0).all()
+    assert (ledger["actual_gross_leverage"] > 0.0).all()
     assert ledger["pnl_usd"].sum() == pytest.approx(
         sum(fill_pnl_usd(fill=fill) for fill in result.fills)
     )
@@ -168,6 +179,8 @@ def test_h024_trade_ledger_export_writes_csv(tmp_path):
     loaded = pd.read_csv(output_path)
     assert len(loaded) == len(ledger) == len(result.fills)
     assert "pnl_usd" in loaded.columns
+    assert "interval_start_equity_usd" in loaded.columns
+    assert "actual_gross_leverage" in loaded.columns
 
 
 def test_h024_trade_ledger_rejects_bad_inputs():

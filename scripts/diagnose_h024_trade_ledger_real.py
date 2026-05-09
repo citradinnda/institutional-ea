@@ -1,4 +1,4 @@
-﻿"""H024 hold=3 H4 trade ledger export diagnostic.
+"""H024 hold=3 H4 trade ledger export diagnostic.
 
 Research diagnostic only.
 
@@ -84,6 +84,8 @@ _LEDGER_COLUMNS: tuple[str, ...] = (
     "quote_currency",
     "notional_quote",
     "notional_usd",
+    "interval_start_equity_usd",
+    "actual_gross_leverage",
     "gross_leverage_vs_10000_usd",
     "pnl_quote",
     "commission_usd",
@@ -115,6 +117,10 @@ def build_h024_trade_ledger(
     }
 
     rows: list[dict[str, object]] = []
+    interval_start_equity_by_entry_time = _interval_start_equity_by_entry_time(
+        fixed_lifecycle_result=fixed_lifecycle_result,
+    )
+
     for fill in sorted(
         fixed_lifecycle_result.fills,
         key=lambda item: (item.entry_time_utc, item.symbol, item.exit_time_utc),
@@ -161,6 +167,8 @@ def build_h024_trade_ledger(
             else notional_quote
         )
 
+        interval_start_equity_usd = interval_start_equity_by_entry_time[entry_time]
+
         rows.append(
             {
                 "decision_time_utc": decision_time.isoformat(),
@@ -183,6 +191,8 @@ def build_h024_trade_ledger(
                 "quote_currency": spec.quote_currency,
                 "notional_quote": notional_quote,
                 "notional_usd": notional_usd,
+                "interval_start_equity_usd": interval_start_equity_usd,
+                "actual_gross_leverage": notional_usd / interval_start_equity_usd,
                 "gross_leverage_vs_10000_usd": notional_usd / reference_equity_usd,
                 "pnl_quote": float(fill.pnl_quote),
                 "commission_usd": float(fill.commission),
@@ -356,6 +366,40 @@ def main() -> None:
             output_path=DEFAULT_H024_LEDGER_OUTPUT_PATH,
         )
     )
+
+
+def _interval_start_equity_by_entry_time(
+    *,
+    fixed_lifecycle_result: H021FixedLifecycleBacktestResult,
+) -> dict[pd.Timestamp, float]:
+    """Return interval-start equity keyed by H4 entry time.
+
+    The fixed lifecycle backtest sizes each interval from current equity before
+    applying that interval's fills. This reconstructs that equity path from the
+    sorted fills so the audit ledger can report actual gross leverage against
+    the equity used for sizing, not only against the initial 10000 USD anchor.
+    """
+
+    equity = float(fixed_lifecycle_result.portfolio.starting_equity_usd)
+    result: dict[pd.Timestamp, float] = {}
+
+    grouped: dict[pd.Timestamp, list] = {}
+    for fill in fixed_lifecycle_result.fills:
+        entry_time = pd.Timestamp(fill.entry_time_utc).tz_convert("UTC")
+        grouped.setdefault(entry_time, []).append(fill)
+
+    for entry_time in sorted(grouped):
+        result[entry_time] = equity
+        interval_pnl = sum(fill_pnl_usd(fill=fill) for fill in grouped[entry_time])
+        equity += interval_pnl
+        if equity <= 0.0:
+            raise RuntimeError(
+                "ledger equity reconstruction reached non-positive equity: "
+                f"entry_time={entry_time}, ending_equity_usd={equity:.2f}"
+            )
+
+    return result
+
 
 
 def _format_ranked_trades(rows: pd.DataFrame) -> str:
