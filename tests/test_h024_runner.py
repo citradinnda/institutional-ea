@@ -128,12 +128,40 @@ def test_h024_bridge_shim_suppresses_when_no_next_entry_bar():
     assert result.positions.iloc[-1].eq(0.0).all()
 
 
-def test_h024_bridge_shim_rejects_mismatched_indices():
+def test_h024_bridge_shim_aligns_to_common_symbol_index():
+    usdjpy = _long_signal_frame()
+    xauusd = pd.concat(
+        [
+            _short_signal_frame().iloc[:5],
+            pd.DataFrame(
+                {
+                    "open": [999.0],
+                    "high": [1000.0],
+                    "low": [998.0],
+                    "close": [999.5],
+                },
+                index=pd.DatetimeIndex([pd.Timestamp("2024-01-03 00:00", tz="UTC")]),
+            ),
+            _short_signal_frame().iloc[5:],
+        ]
+    ).sort_index()
+
+    result = run_h024_bridge_shim(
+        usdjpy_ohlcv=usdjpy,
+        xauusd_ohlcv=xauusd,
+        config=_config(),
+    )
+
+    assert result.positions.index.equals(usdjpy.index)
+    assert pd.Timestamp("2024-01-03 00:00", tz="UTC") not in result.positions.index
+
+
+def test_h024_bridge_shim_rejects_no_common_indices():
     usdjpy = _long_signal_frame()
     xauusd = _short_signal_frame().copy()
     xauusd.index = pd.date_range("2024-02-01 00:00", periods=len(xauusd), freq="4h", tz="UTC")
 
-    with pytest.raises(ValueError, match="XAUUSD index must match USDJPY index"):
+    with pytest.raises(ValueError, match="no common H4 timestamps"):
         run_h024_bridge_shim(
             usdjpy_ohlcv=usdjpy,
             xauusd_ohlcv=xauusd,

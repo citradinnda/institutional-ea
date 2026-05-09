@@ -44,33 +44,46 @@ def run_h024_bridge_shim(
     - The later event bridge opens at t+1.
     - Stops are generated at decision time from ATR geometry.
     - H020 sizing suppresses invalid/tiny/over-levered intents.
+
+    Real broker-native H4 exports do not need to have identical full raw indices.
+    The bridge shim aligns both symbols to their common H4 timestamps before
+    constructing the H017-compatible panel.
     """
 
     cfg = config or H024BridgeConfig()
     _validate_h024_bridge_config(cfg)
 
-    h4_by_symbol = {
+    raw_h4_by_symbol = {
         "USDJPY": _require_h4_frame(usdjpy_ohlcv, "USDJPY"),
         "XAUUSD": _require_h4_frame(xauusd_ohlcv, "XAUUSD"),
     }
-    _require_matching_index(h4_by_symbol)
+    common_index = _common_h4_index(raw_h4_by_symbol)
 
-    index = h4_by_symbol["USDJPY"].index
+    h4_by_symbol = {
+        symbol: frame.reindex(common_index).copy()
+        for symbol, frame in raw_h4_by_symbol.items()
+    }
+
+    index = common_index
     positions = pd.DataFrame(0.0, index=index, columns=_SYMBOLS)
     signals = pd.DataFrame(0.0, index=index, columns=_SYMBOLS)
     stops_long = pd.DataFrame(float("nan"), index=index, columns=_SYMBOLS)
     stops_short = pd.DataFrame(float("nan"), index=index, columns=_SYMBOLS)
 
-    for symbol, frame in h4_by_symbol.items():
-        raw_signals = generate_h024_signals(frame, config=cfg.signal_config)
+    for symbol, raw_frame in raw_h4_by_symbol.items():
+        raw_signals = generate_h024_signals(raw_frame, config=cfg.signal_config)
         signed_signals = raw_signals.astype(float) * float(cfg.signed_risk_fraction)
-        signals[symbol] = signed_signals
-        positions[symbol] = signed_signals
+        aligned_signals = signed_signals.reindex(index).fillna(0.0)
 
-        atr = _wilder_atr(frame, cfg.atr_window)
+        signals[symbol] = aligned_signals
+        positions[symbol] = aligned_signals
+
+        atr = _wilder_atr(raw_frame, cfg.atr_window).reindex(index)
         stop_distance = atr * float(cfg.stop_atr_multiple)
-        stops_long[symbol] = frame["close"].astype(float) - stop_distance
-        stops_short[symbol] = frame["close"].astype(float) + stop_distance
+        close = h4_by_symbol[symbol]["close"].astype(float)
+
+        stops_long[symbol] = close - stop_distance
+        stops_short[symbol] = close + stop_distance
 
     panels = generate_h020_intent_panel(
         positions=positions,
@@ -130,11 +143,14 @@ def _require_h4_frame(frame: pd.DataFrame, symbol: str) -> pd.DataFrame:
     return frame.copy()
 
 
-def _require_matching_index(h4_by_symbol: dict[str, pd.DataFrame]) -> None:
-    reference = h4_by_symbol["USDJPY"].index
-    for symbol, frame in h4_by_symbol.items():
-        if not frame.index.equals(reference):
-            raise ValueError(f"{symbol} index must match USDJPY index")
+def _common_h4_index(h4_by_symbol: dict[str, pd.DataFrame]) -> pd.DatetimeIndex:
+    common = h4_by_symbol["USDJPY"].index.intersection(h4_by_symbol["XAUUSD"].index)
+    common = pd.DatetimeIndex(common).sort_values()
+
+    if common.empty:
+        raise ValueError("USDJPY and XAUUSD have no common H4 timestamps")
+
+    return common
 
 
 def _wilder_atr(frame: pd.DataFrame, window: int) -> pd.Series:
