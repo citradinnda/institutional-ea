@@ -6,7 +6,7 @@ from typing import Mapping, Sequence
 
 import pandas as pd
 
-from quantcore.backtest.cost_model import get_default_cost_spec, price_with_execution_costs
+from quantcore.backtest.cost_model import SymbolCostSpec, get_default_cost_spec, price_with_execution_costs
 from quantcore.backtest.fill_engine import Fill, simulate_bracket_trade
 from quantcore.backtest.portfolio import (
     InstrumentSpec,
@@ -309,6 +309,7 @@ class _SymbolIntervalCandidate:
     stop_price: float
     raw_stop_distance: float
     instrument_spec: InstrumentSpec
+    cost_spec: SymbolCostSpec
     position_size: PositionSize
     notional_usd: float
 
@@ -321,6 +322,7 @@ def backtest_h017_event_driven(
     config: H017Config | None = None,
     starting_equity_usd: float = 10_000.0,
     slippage_atr_by_symbol: Mapping[str, pd.Series] | None = None,
+    cost_specs_by_symbol: Mapping[str, SymbolCostSpec] | None = None,
 ) -> H017EventBacktestResult:
     """Run H017, then execute its positions with M1 intrabar simulation.
 
@@ -344,6 +346,7 @@ def backtest_h017_event_driven(
         xauusd_m1=xauusd_m1,
         starting_equity_usd=starting_equity_usd,
         slippage_atr_by_symbol=slippage_atr_by_symbol,
+        cost_specs_by_symbol=cost_specs_by_symbol,
     )
 
 
@@ -356,6 +359,7 @@ def backtest_h017_event_from_result(
     xauusd_m1: pd.DataFrame,
     starting_equity_usd: float = 10_000.0,
     slippage_atr_by_symbol: Mapping[str, pd.Series] | None = None,
+    cost_specs_by_symbol: Mapping[str, SymbolCostSpec] | None = None,
 ) -> H017EventBacktestResult:
     """Execute an already-built H017 result with H4 timing and M1 fills.
 
@@ -424,6 +428,7 @@ def backtest_h017_event_from_result(
                 entry_time=entry_time,
                 forced_exit_time=forced_exit_time,
                 equity_usd=interval_start_equity,
+                cost_specs_by_symbol=cost_specs_by_symbol,
             )
 
             if maybe_candidate is None:
@@ -486,6 +491,7 @@ def _build_symbol_interval_candidate(
     entry_time: pd.Timestamp,
     forced_exit_time: pd.Timestamp,
     equity_usd: float,
+    cost_specs_by_symbol: Mapping[str, SymbolCostSpec] | None = None,
 ) -> _SymbolIntervalCandidate | None:
     signed_risk_fraction = float(h017_result.positions.at[decision_time, symbol])
 
@@ -501,6 +507,10 @@ def _build_symbol_interval_candidate(
 
     entry_raw_price = float(h4_bars.at[entry_time, "open"])
     forced_exit_raw_price = float(h4_bars.at[forced_exit_time, "open"])
+    cost_spec = _cost_spec_for_symbol(
+        symbol=symbol,
+        cost_specs_by_symbol=cost_specs_by_symbol,
+    )
     _validate_directional_stop(
         symbol=symbol,
         side=side,
@@ -518,6 +528,7 @@ def _build_symbol_interval_candidate(
         entry_raw_price=entry_raw_price,
         stop_price=stop_price,
         raw_stop_distance=stop_distance_price,
+        cost_spec=cost_spec,
     )
 
     if stop_distance_price <= 0.0:
@@ -567,6 +578,7 @@ def _build_symbol_interval_candidate(
         stop_price=stop_price,
         raw_stop_distance=stop_distance_price,
         instrument_spec=instrument_spec,
+        cost_spec=cost_spec,
         position_size=position_size,
         notional_usd=notional_usd,
     )
@@ -589,6 +601,7 @@ def _build_symbol_interval_fill(
         action="entry",
         raw_price=candidate.entry_raw_price,
         lots=position_size.lots,
+        cost_spec=candidate.cost_spec,
     )
 
     raw_fill = simulate_bracket_trade(
@@ -622,6 +635,7 @@ def _build_symbol_interval_fill(
         lots=position_size.lots,
         exit_reason=raw_fill.exit_reason,
         atr=atr_for_slippage,
+        cost_spec=candidate.cost_spec,
     )
 
     commission = entry_cost.commission_usd + exit_cost.commission_usd
@@ -691,6 +705,29 @@ def _validate_directional_stop(
 
 
 
+def _cost_spec_for_symbol(
+    *,
+    symbol: str,
+    cost_specs_by_symbol: Mapping[str, SymbolCostSpec] | None,
+) -> SymbolCostSpec:
+    if cost_specs_by_symbol is None:
+        return get_default_cost_spec(symbol)
+
+    normalized = symbol.upper()
+    try:
+        spec = cost_specs_by_symbol[normalized]
+    except KeyError as exc:
+        supported = ", ".join(sorted(cost_specs_by_symbol))
+        raise ValueError(
+            f"missing cost spec for symbol {symbol!r}; provided: {supported}"
+        ) from exc
+
+    if spec.symbol.upper() != normalized:
+        raise ValueError("cost spec symbol must match symbol")
+
+    return spec
+
+
 def _validate_minimum_stop_distance(
     *,
     symbol: str,
@@ -700,8 +737,9 @@ def _validate_minimum_stop_distance(
     entry_raw_price: float,
     stop_price: float,
     raw_stop_distance: float,
+    cost_spec: SymbolCostSpec,
 ) -> None:
-    minimum_stop_distance = float(get_default_cost_spec(symbol).spread_price)
+    minimum_stop_distance = float(cost_spec.spread_price)
 
     if raw_stop_distance < minimum_stop_distance and not math.isclose(
         raw_stop_distance,

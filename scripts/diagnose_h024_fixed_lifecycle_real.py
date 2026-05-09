@@ -18,10 +18,11 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Sequence
+from typing import Mapping, Sequence
 
 import pandas as pd
 
+from quantcore.backtest.cost_model import SymbolCostSpec
 from quantcore.data.bridge_windows import (
     assess_common_complete_h4_m1_windows_cached,
     build_common_complete_bridge_window_cache_key,
@@ -78,6 +79,7 @@ def run_h024_fixed_lifecycle_diagnostic(
     hold_h4_bars_values: Sequence[int] = DEFAULT_H024_HOLD_H4_BARS,
     bridge_config: H024BridgeConfig | None = None,
     starting_equity_usd: float = 10_000.0,
+    cost_specs_by_symbol: Mapping[str, SymbolCostSpec] | None = None,
 ) -> tuple[H024DiagnosticRun, ...]:
     """Run H024 fixed-lifecycle diagnostics from already-loaded bars."""
 
@@ -106,6 +108,7 @@ def run_h024_fixed_lifecycle_diagnostic(
             accepted_entry_times=accepted_entry_times,
             hold_h4_bars=hold_h4_bars,
             starting_equity_usd=starting_equity_usd,
+            cost_specs_by_symbol=cost_specs_by_symbol,
         )
         summary = summarize_lifecycle_backtest(result)
         runs.append(

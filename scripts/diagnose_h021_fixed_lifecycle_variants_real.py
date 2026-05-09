@@ -20,6 +20,7 @@ from typing import Iterable, Mapping, Sequence
 
 import pandas as pd
 
+from quantcore.backtest.cost_model import SymbolCostSpec
 from quantcore.backtest.fill_engine import Fill
 from quantcore.backtest.h017_event import (
     _build_symbol_interval_candidate,
@@ -111,6 +112,7 @@ def backtest_fixed_lifecycle_from_result(
     accepted_entry_times: Iterable[pd.Timestamp],
     hold_h4_bars: int,
     starting_equity_usd: float = 10_000.0,
+    cost_specs_by_symbol: Mapping[str, SymbolCostSpec] | None = None,
 ) -> H021FixedLifecycleBacktestResult:
     """Run a non-overlapping fixed-horizon lifecycle portfolio backtest.
 
@@ -190,6 +192,7 @@ def backtest_fixed_lifecycle_from_result(
                 entry_time=entry_time,
                 forced_exit_time=forced_exit_time,
                 equity_usd=interval_start_equity,
+                cost_specs_by_symbol=cost_specs_by_symbol,
             )
             if candidate is not None:
                 interval_candidates.append(candidate)
