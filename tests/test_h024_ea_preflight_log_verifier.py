@@ -25,7 +25,7 @@ def valid_row(
     detail: str = "blocked_by_default",
 ) -> str:
     return (
-        "2026.05.09 22:00:00,h024_ea_log_only_preflight_v2,0.5,manual,1,"
+        "2026.05.09 22:00:00,h024_ea_log_only_preflight_v2,0.6,manual,1,"
         f"log_only_preflight,H024_LOG_ONLY_PREFLIGHT,{event},{kill_switch},{symbol},"
         "Exness Technologies Ltd,Exness-MT5Trial6,USD,1246.45,1246.45,2000,"
         "true,true,true,false,false,156.676,156.694,18,0.01,300.00,0.01,0,0,"
@@ -230,7 +230,30 @@ def test_verify_h024_ea_preflight_log_accepts_no_action_intent_rows(tmp_path: Pa
     assert result.violations == []
 
 
-def test_verify_h024_ea_preflight_log_rejects_would_open_intent_rows(tmp_path: Path) -> None:
+def test_verify_h024_ea_preflight_log_accepts_constrained_would_open_intent_rows(tmp_path: Path) -> None:
+    path = tmp_path / "h024_ea_log_only_preflight.csv"
+    write_log(
+        path,
+        [
+            valid_row(symbol="USDJPYm"),
+            valid_row(
+                event="INTENT",
+                symbol="USDJPYm",
+                detail=(
+                    "WOULD_OPEN:side=long;closed_h4_time=2026.05.08 16:00:00;"
+                    "source=H024_STATE_OBSERVATION;mode=log_only_no_execution"
+                ),
+            ),
+            valid_row(symbol="XAUUSDm"),
+        ],
+    )
+
+    result = verify_h024_ea_preflight_log(path)
+
+    assert result.passed
+
+
+def test_verify_h024_ea_preflight_log_rejects_unconstrained_would_open_intent_rows(tmp_path: Path) -> None:
     path = tmp_path / "h024_ea_log_only_preflight.csv"
     write_log(
         path,
@@ -244,7 +267,7 @@ def test_verify_h024_ea_preflight_log_rejects_would_open_intent_rows(tmp_path: P
     result = verify_h024_ea_preflight_log(path)
 
     assert not result.passed
-    assert any("may only emit NO_ACTION intent rows" in item for item in result.violations)
+    assert any("WOULD_OPEN intent rows must be log-only" in item for item in result.violations)
 
 
 def test_verify_h024_ea_preflight_log_rejects_unknown_intent_action(tmp_path: Path) -> None:

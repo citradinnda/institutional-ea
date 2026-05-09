@@ -46,7 +46,7 @@ ALLOWED_INTENT_ACTIONS = {"NO_ACTION", "BLOCKED", "WOULD_OPEN"}
 ALLOWED_SYMBOLS = {"USDJPYm", "XAUUSDm"}
 EXPECTED_RUN_LABEL = "H024_LOG_ONLY_PREFLIGHT"
 EXPECTED_SCHEMA_VERSION = "h024_ea_log_only_preflight_v2"
-EXPECTED_EA_VERSION = "0.5"
+EXPECTED_EA_VERSION = "0.6"
 EXPECTED_RUNTIME_MODE = "log_only_preflight"
 
 
@@ -140,8 +140,15 @@ def verify_h024_ea_preflight_log(path: Path) -> VerificationResult:
             action = _intent_action(detail)
             if action not in ALLOWED_INTENT_ACTIONS:
                 violations.append(f"row {index}: unexpected intent action {action!r}")
-            if action != "NO_ACTION":
-                violations.append(f"row {index}: EA runtime preflight may only emit NO_ACTION intent rows")
+            if action == "WOULD_OPEN":
+                if row.get("kill_switch_blocked") != "true":
+                    violations.append(f"row {index}: WOULD_OPEN intent rows require kill_switch_blocked=true")
+                if "mode=log_only_no_execution" not in detail:
+                    violations.append(f"row {index}: WOULD_OPEN intent rows must be log-only no-execution observations")
+                if "side=long" not in detail and "side=short" not in detail:
+                    violations.append(f"row {index}: WOULD_OPEN intent rows must include side=long or side=short")
+            elif action != "NO_ACTION":
+                violations.append(f"row {index}: EA runtime preflight may only emit NO_ACTION or constrained WOULD_OPEN intent rows")
 
         if event == "MARKET_STATE":
             detail = row.get("detail", "")

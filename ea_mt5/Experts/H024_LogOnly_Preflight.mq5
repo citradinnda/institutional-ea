@@ -1,11 +1,11 @@
 #property strict
-#property version   "0.500"
+#property version   "0.600"
 #property description "H024 log-only runtime preflight. Research only."
 
 input bool   InpKillSwitchBlocked = true;
 input string InpRunLabel = "H024_LOG_ONLY_PREFLIGHT";
 input string InpSchemaVersion = "h024_ea_log_only_preflight_v2";
-input string InpEaVersion = "0.5";
+input string InpEaVersion = "0.6";
 input string InpSourceVersion = "manual";
 input string InpRuntimeMode = "log_only_preflight";
 input string InpOutputFile = "h024_ea_log_only_preflight.csv";
@@ -133,6 +133,98 @@ void WriteIntentRow()
 {
    string intent_detail = InpKillSwitchBlocked ? "NO_ACTION:kill_switch_blocked" : "NO_ACTION:log_only_unblocked";
    WritePreflightRow("INTENT", intent_detail);
+}
+
+string H024StrategyIntentDetail()
+{
+   MqlRates rates[];
+   ArraySetAsSeries(rates, true);
+
+   const int copied = CopyRates(_Symbol, PERIOD_H4, 0, 256, rates);
+   if(copied < 10)
+   {
+      return "NO_ACTION:strategy_unavailable_insufficient_h4_warmup";
+   }
+
+   const int closed_shift = 1;
+   const int slow_window = 5;
+   const int slope_lag = 2;
+   const int atr_window = 3;
+   const int pullback_window = 3;
+   const double min_pullback_atr = 0.25;
+   const double max_pullback_atr = 3.0;
+   const double min_slope_atr = 0.05;
+
+   const double slow_ma = SimpleMeanClose(rates, closed_shift, slow_window);
+   const double slow_ma_lag = SimpleMeanClose(rates, closed_shift + slope_lag, slow_window);
+   const double atr = WilderAtrForClosedBar(rates, closed_shift, atr_window);
+   const double previous_atr = WilderAtrForClosedBar(rates, closed_shift + 1, atr_window);
+
+   const double slope = slow_ma - slow_ma_lag;
+   const double slope_threshold = atr * min_slope_atr;
+
+   const bool trend_up = rates[closed_shift].close > slow_ma && slope > slope_threshold;
+   const bool trend_down = rates[closed_shift].close < slow_ma && slope < -slope_threshold;
+
+   const bool previous_bearish = rates[closed_shift + 1].close < rates[closed_shift + 1].open;
+   const bool previous_bullish = rates[closed_shift + 1].close > rates[closed_shift + 1].open;
+
+   const double recent_high_before_signal = HighestHighBeforeSignal(rates, closed_shift, pullback_window);
+   const double recent_low_before_signal = LowestLowBeforeSignal(rates, closed_shift, pullback_window);
+
+   double long_pullback_depth_atr = EMPTY_VALUE;
+   double short_pullback_depth_atr = EMPTY_VALUE;
+   if(previous_atr > 0.0 && previous_atr != EMPTY_VALUE)
+   {
+      long_pullback_depth_atr = (recent_high_before_signal - rates[closed_shift + 1].low) / previous_atr;
+      short_pullback_depth_atr = (rates[closed_shift + 1].high - recent_low_before_signal) / previous_atr;
+   }
+
+   const bool long_pullback_ok = (
+      long_pullback_depth_atr != EMPTY_VALUE &&
+      long_pullback_depth_atr >= min_pullback_atr &&
+      long_pullback_depth_atr <= max_pullback_atr
+   );
+   const bool short_pullback_ok = (
+      short_pullback_depth_atr != EMPTY_VALUE &&
+      short_pullback_depth_atr >= min_pullback_atr &&
+      short_pullback_depth_atr <= max_pullback_atr
+   );
+
+   const bool long_resumption = rates[closed_shift].close > rates[closed_shift + 1].high;
+   const bool short_resumption = rates[closed_shift].close < rates[closed_shift + 1].low;
+
+   const bool long_signal_observed = trend_up && previous_bearish && long_pullback_ok && long_resumption;
+   const bool short_signal_observed = trend_down && previous_bullish && short_pullback_ok && short_resumption;
+
+   if(long_signal_observed && short_signal_observed)
+   {
+      return "BLOCKED:strategy_conflict_log_only";
+   }
+   if(long_signal_observed)
+   {
+      return StringFormat(
+         "WOULD_OPEN:side=long;closed_h4_time=%s;source=H024_STATE_OBSERVATION;mode=log_only_no_execution",
+         TimeToString(rates[closed_shift].time, TIME_DATE | TIME_SECONDS)
+      );
+   }
+   if(short_signal_observed)
+   {
+      return StringFormat(
+         "WOULD_OPEN:side=short;closed_h4_time=%s;source=H024_STATE_OBSERVATION;mode=log_only_no_execution",
+         TimeToString(rates[closed_shift].time, TIME_DATE | TIME_SECONDS)
+      );
+   }
+
+   return StringFormat(
+      "NO_ACTION:strategy_no_signal;closed_h4_time=%s;mode=log_only_no_execution",
+      TimeToString(rates[closed_shift].time, TIME_DATE | TIME_SECONDS)
+   );
+}
+
+void WriteH024StrategyIntentRow()
+{
+   WritePreflightRow("INTENT", H024StrategyIntentDetail());
 }
 
 string BarObservationDetail(const ENUM_TIMEFRAMES timeframe, const string label)
@@ -399,6 +491,8 @@ int OnInit()
    WriteMarketStateRow();
    WriteBarObservationRow();
    WriteH024StateObservationRow();
+   WriteH024StrategyIntentRow();
+   WriteH024StrategyIntentRow();
    return INIT_SUCCEEDED;
 }
 
@@ -409,6 +503,9 @@ void OnTick()
    WriteMarketStateRow();
    WriteBarObservationRow();
    WriteH024StateObservationRow();
+   WriteH024StrategyIntentRow();
+   WriteH024StrategyIntentRow();
+   WriteH024StrategyIntentRow();
 }
 
 void OnTimer()
@@ -417,6 +514,8 @@ void OnTimer()
    WriteMarketStateRow();
    WriteBarObservationRow();
    WriteH024StateObservationRow();
+   WriteH024StrategyIntentRow();
+   WriteH024StrategyIntentRow();
 }
 
 void OnDeinit(const int reason)

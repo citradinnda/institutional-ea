@@ -31,7 +31,7 @@ HEADER = (
 
 def valid_row(event: str = "INIT", symbol: str = "USDJPYm", detail: str = "blocked_by_default") -> str:
     return (
-        "2026.05.09 22:00:00,h024_ea_log_only_preflight_v2,0.5,manual,1,"
+        "2026.05.09 22:00:00,h024_ea_log_only_preflight_v2,0.6,manual,1,"
         f"log_only_preflight,H024_LOG_ONLY_PREFLIGHT,{event},true,{symbol},"
         "Exness Technologies Ltd,Exness-MT5Trial6,USD,1246.45,1246.45,2000,"
         "true,true,true,false,true,156.676,156.694,18,0.01,300.00,0.01,0,0,"
@@ -209,10 +209,10 @@ def test_validate_automation_target_accepts_expected_local_shape(tmp_path: Path)
     repo_source.write_text(
         """
 #property strict
-#property version   "0.5"
+#property version   "0.600"
 input bool   InpKillSwitchBlocked = true;
 input string InpSchemaVersion = "h024_ea_log_only_preflight_v2";
-input string InpEaVersion = "0.5";
+input string InpEaVersion = "0.6";
 input string InpRuntimeMode = "log_only_preflight";
 int OnInit() { return INIT_SUCCEEDED; }
 void OnTick() {}
@@ -236,10 +236,10 @@ def test_validate_automation_target_rejects_missing_terminal_shape(tmp_path: Pat
     repo_source.write_text(
         """
 #property strict
-#property version   "0.5"
+#property version   "0.600"
 input bool   InpKillSwitchBlocked = true;
 input string InpSchemaVersion = "h024_ea_log_only_preflight_v2";
-input string InpEaVersion = "0.5";
+input string InpEaVersion = "0.6";
 input string InpRuntimeMode = "log_only_preflight";
 int OnInit() { return INIT_SUCCEEDED; }
 void OnTick() {}
@@ -268,10 +268,10 @@ def test_validate_automation_target_rejects_wrong_schema_token(tmp_path: Path) -
     repo_source.write_text(
         """
 #property strict
-#property version   "0.5"
+#property version   "0.600"
 input bool   InpKillSwitchBlocked = true;
 input string InpSchemaVersion = "old_schema";
-input string InpEaVersion = "0.5";
+input string InpEaVersion = "0.6";
 input string InpRuntimeMode = "log_only_preflight";
 int OnInit() { return INIT_SUCCEEDED; }
 void OnTick() {}
