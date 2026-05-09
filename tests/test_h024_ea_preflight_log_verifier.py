@@ -1,10 +1,11 @@
-﻿from pathlib import Path
+from pathlib import Path
 
 from scripts.verify_h024_ea_preflight_log import verify_h024_ea_preflight_log
 
 
 HEADER = (
-    "generated_at_server,run_label,event,kill_switch_blocked,symbol,"
+    "generated_at_server,schema_version,ea_version,source_version,timer_seconds,"
+    "runtime_mode,run_label,event,kill_switch_blocked,symbol,"
     "account_company,account_server,account_currency,account_balance,"
     "account_equity,account_leverage,account_trade_allowed,account_trade_expert,"
     "terminal_connected,terminal_trade_allowed,mql_trade_allowed,bid,ask,"
@@ -24,7 +25,8 @@ def valid_row(
     detail: str = "blocked_by_default",
 ) -> str:
     return (
-        f"2026.05.09 22:00:00,H024_LOG_ONLY_PREFLIGHT,{event},{kill_switch},{symbol},"
+        "2026.05.09 22:00:00,h024_ea_log_only_preflight_v2,0.2,manual,1,"
+        f"log_only_preflight,H024_LOG_ONLY_PREFLIGHT,{event},{kill_switch},{symbol},"
         "Exness Technologies Ltd,Exness-MT5Trial6,USD,1246.45,1246.45,2000,"
         "true,true,true,false,false,156.676,156.694,18,0.01,300.00,0.01,0,0,"
         f"0.0010000000,3,{detail}\n"
@@ -40,6 +42,40 @@ def test_verify_h024_ea_preflight_log_accepts_valid_log(tmp_path: Path) -> None:
     assert result.passed
     assert result.rows == 2
     assert result.violations == []
+
+
+def test_verify_h024_ea_preflight_log_rejects_stale_unversioned_log(tmp_path: Path) -> None:
+    path = tmp_path / "h024_ea_log_only_preflight.csv"
+    stale_header = (
+        "generated_at_server,run_label,event,kill_switch_blocked,symbol,"
+        "account_company,account_server,account_currency,account_balance,"
+        "account_equity,account_leverage,account_trade_allowed,account_trade_expert,"
+        "terminal_connected,terminal_trade_allowed,mql_trade_allowed,bid,ask,"
+        "spread_points,volume_min,volume_max,volume_step,stops_level,freeze_level,"
+        "point,digits,detail\n"
+    )
+    stale_row = (
+        "2026.05.09 22:00:00,H024_LOG_ONLY_PREFLIGHT,INIT,true,USDJPYm,"
+        "Exness Technologies Ltd,Exness-MT5Trial6,USD,1246.45,1246.45,2000,"
+        "true,true,true,false,false,156.676,156.694,18,0.01,300.00,0.01,0,0,"
+        "0.0010000000,3,blocked_by_default\n"
+    )
+    path.write_text(stale_header + stale_row, encoding="utf-8")
+
+    result = verify_h024_ea_preflight_log(path)
+
+    assert not result.passed
+    assert any("missing columns" in item for item in result.violations)
+
+
+def test_verify_h024_ea_preflight_log_rejects_wrong_schema_version(tmp_path: Path) -> None:
+    path = tmp_path / "h024_ea_log_only_preflight.csv"
+    write_log(path, [valid_row(symbol="USDJPYm").replace("h024_ea_log_only_preflight_v2", "v1", 1), valid_row(symbol="XAUUSDm")])
+
+    result = verify_h024_ea_preflight_log(path)
+
+    assert not result.passed
+    assert any("unexpected schema_version" in item for item in result.violations)
 
 
 def test_verify_h024_ea_preflight_log_accepts_no_action_intent_rows(tmp_path: Path) -> None:

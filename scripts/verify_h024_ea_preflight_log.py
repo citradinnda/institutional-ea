@@ -1,4 +1,4 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 import argparse
 import csv
@@ -8,6 +8,11 @@ from pathlib import Path
 
 REQUIRED_COLUMNS = [
     "generated_at_server",
+    "schema_version",
+    "ea_version",
+    "source_version",
+    "timer_seconds",
+    "runtime_mode",
     "run_label",
     "event",
     "kill_switch_blocked",
@@ -40,6 +45,9 @@ ALLOWED_EVENTS = {"INIT", "TICK", "INTENT", "DEINIT"}
 ALLOWED_INTENT_ACTIONS = {"NO_ACTION", "BLOCKED", "WOULD_OPEN"}
 ALLOWED_SYMBOLS = {"USDJPYm", "XAUUSDm"}
 EXPECTED_RUN_LABEL = "H024_LOG_ONLY_PREFLIGHT"
+EXPECTED_SCHEMA_VERSION = "h024_ea_log_only_preflight_v2"
+EXPECTED_EA_VERSION = "0.2"
+EXPECTED_RUNTIME_MODE = "log_only_preflight"
 
 
 @dataclass(frozen=True)
@@ -102,6 +110,21 @@ def verify_h024_ea_preflight_log(path: Path) -> VerificationResult:
     for index, row in enumerate(rows, start=2):
         event = row.get("event", "")
         symbol = row.get("symbol", "")
+
+        if row.get("schema_version") != EXPECTED_SCHEMA_VERSION:
+            violations.append(f"row {index}: unexpected schema_version {row.get('schema_version')!r}")
+
+        if row.get("ea_version") != EXPECTED_EA_VERSION:
+            violations.append(f"row {index}: unexpected ea_version {row.get('ea_version')!r}")
+
+        if not row.get("source_version"):
+            violations.append(f"row {index}: source_version must be populated")
+
+        if row.get("runtime_mode") != EXPECTED_RUNTIME_MODE:
+            violations.append(f"row {index}: unexpected runtime_mode {row.get('runtime_mode')!r}")
+
+        if not _is_int(row.get("timer_seconds", "")):
+            violations.append(f"row {index}: timer_seconds must be an integer")
 
         if row.get("run_label") != EXPECTED_RUN_LABEL:
             violations.append(f"row {index}: unexpected run_label {row.get('run_label')!r}")

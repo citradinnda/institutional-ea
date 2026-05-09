@@ -1,9 +1,13 @@
 #property strict
-#property version   "0.1"
+#property version   "0.2"
 #property description "H024 log-only runtime preflight. Research only."
 
 input bool   InpKillSwitchBlocked = true;
 input string InpRunLabel = "H024_LOG_ONLY_PREFLIGHT";
+input string InpSchemaVersion = "h024_ea_log_only_preflight_v2";
+input string InpEaVersion = "0.2";
+input string InpSourceVersion = "manual";
+input string InpRuntimeMode = "log_only_preflight";
 input string InpOutputFile = "h024_ea_log_only_preflight.csv";
 input int    InpTimerSeconds = 1;
 
@@ -38,6 +42,11 @@ bool OpenLogFile()
       FileWrite(
          g_file_handle,
          "generated_at_server",
+         "schema_version",
+         "ea_version",
+         "source_version",
+         "timer_seconds",
+         "runtime_mode",
          "run_label",
          "event",
          "kill_switch_blocked",
@@ -84,6 +93,11 @@ void WritePreflightRow(const string event_name, const string detail)
    FileWrite(
       g_file_handle,
       TimeToString(TimeCurrent(), TIME_DATE | TIME_SECONDS),
+      InpSchemaVersion,
+      InpEaVersion,
+      InpSourceVersion,
+      IntegerToString(InpTimerSeconds),
+      InpRuntimeMode,
       InpRunLabel,
       event_name,
       BoolText(InpKillSwitchBlocked),

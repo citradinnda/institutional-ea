@@ -1,4 +1,4 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 from pathlib import Path
 from unittest.mock import Mock, patch
@@ -18,7 +18,8 @@ from scripts.run_h024_mt5_log_only_preflight_local import (
 
 
 HEADER = (
-    "generated_at_server,run_label,event,kill_switch_blocked,symbol,"
+    "generated_at_server,schema_version,ea_version,source_version,timer_seconds,"
+    "runtime_mode,run_label,event,kill_switch_blocked,symbol,"
     "account_company,account_server,account_currency,account_balance,"
     "account_equity,account_leverage,account_trade_allowed,account_trade_expert,"
     "terminal_connected,terminal_trade_allowed,mql_trade_allowed,bid,ask,"
@@ -29,7 +30,8 @@ HEADER = (
 
 def valid_row(event: str = "INIT", symbol: str = "USDJPYm", detail: str = "blocked_by_default") -> str:
     return (
-        f"2026.05.09 22:00:00,H024_LOG_ONLY_PREFLIGHT,{event},true,{symbol},"
+        "2026.05.09 22:00:00,h024_ea_log_only_preflight_v2,0.2,manual,1,"
+        f"log_only_preflight,H024_LOG_ONLY_PREFLIGHT,{event},true,{symbol},"
         "Exness Technologies Ltd,Exness-MT5Trial6,USD,1246.45,1246.45,2000,"
         "true,true,true,false,true,156.676,156.694,18,0.01,300.00,0.01,0,0,"
         f"0.0010000000,3,{detail}\n"

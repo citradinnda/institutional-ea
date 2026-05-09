@@ -1,4 +1,4 @@
-﻿from pathlib import Path
+from pathlib import Path
 
 
 EA_PATH = Path("ea_mt5/Experts/H024_LogOnly_Preflight.mq5")
@@ -14,6 +14,12 @@ def test_h024_log_only_preflight_has_runtime_hooks_and_logging() -> None:
     required = [
         "InpKillSwitchBlocked = true",
         "InpTimerSeconds = 1",
+        "InpSchemaVersion",
+        "h024_ea_log_only_preflight_v2",
+        "InpEaVersion",
+        "InpSourceVersion",
+        "InpRuntimeMode",
+        "log_only_preflight",
         "int OnInit()",
         "void OnTick()",
         "void OnTimer()",
