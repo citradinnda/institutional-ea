@@ -14,6 +14,7 @@ from scripts.run_h024_mt5_log_only_preflight_local import (
     copy_ea_source,
     reset_runtime_log,
     run_verify,
+    validate_automation_target,
 )
 
 
@@ -196,3 +197,92 @@ def test_run_verify_accepts_valid_collected_runtime_log(tmp_path: Path) -> None:
 
     assert rows == 4
     assert violations == []
+
+
+def test_validate_automation_target_accepts_expected_local_shape(tmp_path: Path) -> None:
+    terminal = tmp_path / "terminal"
+    (terminal / "MQL5" / "Experts").mkdir(parents=True)
+    (terminal / "MQL5" / "Files").mkdir(parents=True)
+
+    repo_source = tmp_path / "repo" / EA_FILENAME
+    repo_source.parent.mkdir()
+    repo_source.write_text(
+        """
+#property strict
+#property version   "0.3"
+input bool   InpKillSwitchBlocked = true;
+input string InpSchemaVersion = "h024_ea_log_only_preflight_v2";
+input string InpEaVersion = "0.3";
+input string InpRuntimeMode = "log_only_preflight";
+int OnInit() { return INIT_SUCCEEDED; }
+void OnTick() {}
+void OnDeinit(const int reason) {}
+string f = "h024_ea_log_only_preflight.csv";
+""",
+        encoding="ascii",
+    )
+
+    metaeditor = tmp_path / "MetaEditor64.exe"
+    metaeditor.write_text("stub", encoding="utf-8")
+
+    paths = LocalPreflightPaths(terminal_data_dir=terminal, repo_ea_source=repo_source)
+
+    assert validate_automation_target(paths, metaeditor) == []
+
+
+def test_validate_automation_target_rejects_missing_terminal_shape(tmp_path: Path) -> None:
+    repo_source = tmp_path / "repo" / EA_FILENAME
+    repo_source.parent.mkdir()
+    repo_source.write_text(
+        """
+#property strict
+#property version   "0.3"
+input bool   InpKillSwitchBlocked = true;
+input string InpSchemaVersion = "h024_ea_log_only_preflight_v2";
+input string InpEaVersion = "0.3";
+input string InpRuntimeMode = "log_only_preflight";
+int OnInit() { return INIT_SUCCEEDED; }
+void OnTick() {}
+void OnDeinit(const int reason) {}
+string f = "h024_ea_log_only_preflight.csv";
+""",
+        encoding="ascii",
+    )
+
+    paths = LocalPreflightPaths(terminal_data_dir=tmp_path / "missing_terminal", repo_ea_source=repo_source)
+
+    violations = validate_automation_target(paths)
+
+    assert any("terminal data dir does not exist" in item for item in violations)
+    assert any("terminal Experts dir does not exist" in item for item in violations)
+    assert any("terminal Files dir does not exist" in item for item in violations)
+
+
+def test_validate_automation_target_rejects_wrong_schema_token(tmp_path: Path) -> None:
+    terminal = tmp_path / "terminal"
+    (terminal / "MQL5" / "Experts").mkdir(parents=True)
+    (terminal / "MQL5" / "Files").mkdir(parents=True)
+
+    repo_source = tmp_path / "repo" / EA_FILENAME
+    repo_source.parent.mkdir()
+    repo_source.write_text(
+        """
+#property strict
+#property version   "0.3"
+input bool   InpKillSwitchBlocked = true;
+input string InpSchemaVersion = "old_schema";
+input string InpEaVersion = "0.3";
+input string InpRuntimeMode = "log_only_preflight";
+int OnInit() { return INIT_SUCCEEDED; }
+void OnTick() {}
+void OnDeinit(const int reason) {}
+string f = "h024_ea_log_only_preflight.csv";
+""",
+        encoding="ascii",
+    )
+
+    paths = LocalPreflightPaths(terminal_data_dir=terminal, repo_ea_source=repo_source)
+
+    violations = validate_automation_target(paths)
+
+    assert any("repo EA source missing expected token" in item for item in violations)

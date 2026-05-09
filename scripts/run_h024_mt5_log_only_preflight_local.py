@@ -1,4 +1,4 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 import argparse
 import shutil
@@ -7,13 +7,25 @@ from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 
-from scripts.verify_h024_ea_preflight_log import verify_h024_ea_preflight_log
+from scripts.verify_h024_ea_preflight_log import (
+    ALLOWED_SYMBOLS,
+    EXPECTED_EA_VERSION,
+    EXPECTED_SCHEMA_VERSION,
+    verify_h024_ea_preflight_log,
+)
+from scripts.verify_h024_ea_source_static import verify_source
 
 
 REPO_EA_SOURCE = Path("ea_mt5/Experts/H024_LogOnly_Preflight.mq5")
 EA_FILENAME = "H024_LogOnly_Preflight.mq5"
 RUNTIME_LOG_FILENAME = "h024_ea_log_only_preflight.csv"
 DEFAULT_REPORT_PATH = Path("reports") / RUNTIME_LOG_FILENAME
+EXPECTED_EA_SOURCE_TOKENS = (
+    f'InpSchemaVersion = "{EXPECTED_SCHEMA_VERSION}"',
+    f'InpEaVersion = "{EXPECTED_EA_VERSION}"',
+    'InpKillSwitchBlocked = true',
+    'InpRuntimeMode = "log_only_preflight"',
+)
 
 
 @dataclass(frozen=True)
@@ -128,6 +140,45 @@ def run_verify(report_path: Path) -> tuple[int, list[str]]:
     return result.rows, result.violations
 
 
+def validate_automation_target(paths: LocalPreflightPaths, metaeditor: Path | None = None) -> list[str]:
+    """Validate the local MT5 target before any future profile/template automation.
+
+    This is intentionally read-only. It does not attach EAs, launch GUI automation,
+    place orders, modify orders, close orders, or call MT5 trade APIs.
+    """
+
+    violations: list[str] = []
+
+    if not paths.terminal_data_dir.exists():
+        violations.append(f"terminal data dir does not exist: {paths.terminal_data_dir}")
+
+    if not paths.terminal_experts_dir.exists():
+        violations.append(f"terminal Experts dir does not exist: {paths.terminal_experts_dir}")
+
+    if not paths.terminal_files_dir.exists():
+        violations.append(f"terminal Files dir does not exist: {paths.terminal_files_dir}")
+
+    if metaeditor is not None and not metaeditor.exists():
+        violations.append(f"MetaEditor executable does not exist: {metaeditor}")
+
+    if not paths.repo_ea_source.exists():
+        violations.append(f"repo EA source does not exist: {paths.repo_ea_source}")
+        return violations
+
+    violations.extend(verify_source(paths.repo_ea_source))
+
+    source = paths.repo_ea_source.read_text(encoding="ascii")
+    for token in EXPECTED_EA_SOURCE_TOKENS:
+        if token not in source:
+            violations.append(f"repo EA source missing expected token: {token}")
+
+    for symbol in sorted(ALLOWED_SYMBOLS):
+        if symbol not in {"USDJPYm", "XAUUSDm"}:
+            violations.append(f"unexpected verifier symbol configured: {symbol}")
+
+    return violations
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description=(
@@ -169,6 +220,20 @@ def build_parser() -> argparse.ArgumentParser:
         default=60,
         help="MetaEditor compile timeout in seconds.",
     )
+    parser.add_argument(
+        "--automation-target-preflight",
+        action="store_true",
+        help=(
+            "Read-only safety preflight for future MT5 profile/template automation. "
+            "Validates paths, source invariants, expected schema/version, and symbols. "
+            "Does not attach/detach EAs or automate the MT5 GUI."
+        ),
+    )
+    parser.add_argument(
+        "--attach-detach",
+        action="store_true",
+        help="Reserved. Always rejected; attach/detach automation is not approved.",
+    )
     return parser
 
 
@@ -186,6 +251,29 @@ def main() -> int:
     print("Research only. No demo/live/Phase 4 approval.")
     print("No EA attachment automation. No order-send capability.")
     print()
+
+    if args.attach_detach:
+        print("Attach/detach automation is not approved for this helper.")
+        return 2
+
+    if args.automation_target_preflight:
+        violations = validate_automation_target(paths, args.metaeditor)
+        print("Automation target preflight:")
+        print(f"- terminal_data_dir: {paths.terminal_data_dir}")
+        print(f"- terminal_experts_dir: {paths.terminal_experts_dir}")
+        print(f"- terminal_files_dir: {paths.terminal_files_dir}")
+        print(f"- repo_ea_source: {paths.repo_ea_source}")
+        print(f"- expected_schema_version: {EXPECTED_SCHEMA_VERSION}")
+        print(f"- expected_ea_version: {EXPECTED_EA_VERSION}")
+        print(f"- expected_symbols: {', '.join(sorted(ALLOWED_SYMBOLS))}")
+        print(f"Violations: {len(violations)}")
+        for violation in violations:
+            print(f"- {violation}")
+        print()
+        print("Verdict: PASS" if not violations else "Verdict: FAIL")
+        if violations:
+            return 1
+        print()
 
     copied_to = copy_ea_source(paths)
     print(f"Copied EA source to: {copied_to}")
