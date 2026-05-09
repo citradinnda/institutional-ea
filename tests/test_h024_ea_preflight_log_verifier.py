@@ -25,7 +25,7 @@ def valid_row(
     detail: str = "blocked_by_default",
 ) -> str:
     return (
-        "2026.05.09 22:00:00,h024_ea_log_only_preflight_v2,0.3,manual,1,"
+        "2026.05.09 22:00:00,h024_ea_log_only_preflight_v2,0.4,manual,1,"
         f"log_only_preflight,H024_LOG_ONLY_PREFLIGHT,{event},{kill_switch},{symbol},"
         "Exness Technologies Ltd,Exness-MT5Trial6,USD,1246.45,1246.45,2000,"
         "true,true,true,false,false,156.676,156.694,18,0.01,300.00,0.01,0,0,"
@@ -112,6 +112,56 @@ def test_verify_h024_ea_preflight_log_rejects_bad_market_state_detail(tmp_path: 
 
     assert not result.passed
     assert any("MARKET_STATE detail must include H4 and M1 observations" in item for item in result.violations)
+
+
+def test_verify_h024_ea_preflight_log_accepts_bar_observation_rows(tmp_path: Path) -> None:
+    path = tmp_path / "h024_ea_log_only_preflight.csv"
+    write_log(
+        path,
+        [
+            valid_row(symbol="USDJPYm"),
+            valid_row(
+                event="BAR_OBSERVATION",
+                symbol="USDJPYm",
+                detail=(
+                    "H4_closed:time=2026.05.09 20:00:00;open=156.000;high=157.000;"
+                    "low=155.000;close=156.500;tick_volume=10|"
+                    "M1_closed:time=2026.05.09 23:59:00;open=156.400;high=156.600;"
+                    "low=156.300;close=156.500;tick_volume=5"
+                ),
+            ),
+            valid_row(symbol="XAUUSDm"),
+            valid_row(
+                event="BAR_OBSERVATION",
+                symbol="XAUUSDm",
+                detail="H4_closed:unavailable|M1_closed:unavailable",
+            ),
+        ],
+    )
+
+    result = verify_h024_ea_preflight_log(path)
+
+    assert result.passed
+
+
+def test_verify_h024_ea_preflight_log_rejects_bad_bar_observation_detail(tmp_path: Path) -> None:
+    path = tmp_path / "h024_ea_log_only_preflight.csv"
+    write_log(
+        path,
+        [
+            valid_row(symbol="USDJPYm"),
+            valid_row(event="BAR_OBSERVATION", symbol="USDJPYm", detail="H4:unavailable|M1:unavailable"),
+            valid_row(symbol="XAUUSDm"),
+        ],
+    )
+
+    result = verify_h024_ea_preflight_log(path)
+
+    assert not result.passed
+    assert any(
+        "BAR_OBSERVATION detail must include closed H4 and M1 observations" in item
+        for item in result.violations
+    )
 
 
 def test_verify_h024_ea_preflight_log_accepts_no_action_intent_rows(tmp_path: Path) -> None:

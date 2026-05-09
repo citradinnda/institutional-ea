@@ -5,7 +5,7 @@
 input bool   InpKillSwitchBlocked = true;
 input string InpRunLabel = "H024_LOG_ONLY_PREFLIGHT";
 input string InpSchemaVersion = "h024_ea_log_only_preflight_v2";
-input string InpEaVersion = "0.3";
+input string InpEaVersion = "0.4";
 input string InpSourceVersion = "manual";
 input string InpRuntimeMode = "log_only_preflight";
 input string InpOutputFile = "h024_ea_log_only_preflight.csv";
@@ -160,6 +160,34 @@ void WriteMarketStateRow()
    WritePreflightRow("MARKET_STATE", detail);
 }
 
+string ClosedBarObservationDetail(const ENUM_TIMEFRAMES timeframe, const string label)
+{
+   MqlRates rates[];
+   ArraySetAsSeries(rates, true);
+   const int copied = CopyRates(_Symbol, timeframe, 1, 1, rates);
+   if(copied < 1)
+   {
+      return label + "_closed:unavailable";
+   }
+
+   return StringFormat(
+      "%s_closed:time=%s;open=%.10f;high=%.10f;low=%.10f;close=%.10f;tick_volume=%I64d",
+      label,
+      TimeToString(rates[0].time, TIME_DATE | TIME_SECONDS),
+      rates[0].open,
+      rates[0].high,
+      rates[0].low,
+      rates[0].close,
+      rates[0].tick_volume
+   );
+}
+
+void WriteBarObservationRow()
+{
+   string detail = ClosedBarObservationDetail(PERIOD_H4, "H4") + "|" + ClosedBarObservationDetail(PERIOD_M1, "M1");
+   WritePreflightRow("BAR_OBSERVATION", detail);
+}
+
 int OnInit()
 {
    if(!OpenLogFile())
@@ -171,6 +199,7 @@ int OnInit()
    WritePreflightRow("INIT", InpKillSwitchBlocked ? "blocked_by_default" : "not_blocked");
    WriteIntentRow();
    WriteMarketStateRow();
+   WriteBarObservationRow();
    return INIT_SUCCEEDED;
 }
 
@@ -179,12 +208,14 @@ void OnTick()
    WritePreflightRow("TICK", InpKillSwitchBlocked ? "no_action_blocked" : "no_action_unblocked");
    WriteIntentRow();
    WriteMarketStateRow();
+   WriteBarObservationRow();
 }
 
 void OnTimer()
 {
    WriteIntentRow();
    WriteMarketStateRow();
+   WriteBarObservationRow();
 }
 
 void OnDeinit(const int reason)
