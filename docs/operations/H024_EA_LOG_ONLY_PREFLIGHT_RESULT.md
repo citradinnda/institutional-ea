@@ -212,3 +212,90 @@ Runtime H4 and M1 data access from EA context is confirmed for both symbols.
 Kill switch remained blocked.
 This remains log-only preflight evidence.
 This does not approve demo trading, live trading, Phase 4 execution, order placement, order modification, or order closing.
+
+## H024 EA 0.4 Closed-Bar Observation Runtime Preflight
+
+Result date: 2026-05-09
+
+Purpose:
+
+Validate that the log-only MT5 EA can emit closed-bar observation rows from terminal runtime context for both required H024 broker symbols without adding any order-send surface.
+
+Safety boundary:
+
+- Research only.
+- No demo approval.
+- No live approval.
+- No Phase 4 approval.
+- No attach/detach automation approval.
+- No GUI automation approval.
+- No order placement, modification, closing, or deletion.
+- Kill switch remained blocked.
+
+Commands:
+
+```powershell
+python .\scripts\verify_h024_ea_source_static.py
+
+python .\scripts\run_h024_mt5_log_only_preflight_local.py `
+  --terminal-data-dir "C:\Users\equin\AppData\Roaming\MetaQuotes\Terminal\D0E8209F77C8CF37AD8BF550E51FF075" `
+  --metaeditor "C:\Program Files\MetaTrader 5\MetaEditor64.exe" `
+  --automation-target-preflight `
+  --reset-runtime-log
+
+python .\scripts\run_h024_mt5_log_only_preflight_local.py `
+  --terminal-data-dir "C:\Users\equin\AppData\Roaming\MetaQuotes\Terminal\D0E8209F77C8CF37AD8BF550E51FF075" `
+  --collect
+
+Static source verifier:
+
+Violations: 0
+Verdict: PASS
+
+Automation target preflight:
+
+expected_schema_version: h024_ea_log_only_preflight_v2
+expected_ea_version: 0.4
+expected_symbols: USDJPYm, XAUUSDm
+Violations: 0
+Verdict: PASS
+
+Compile/reset:
+
+Runtime CSV reset: removed existing file
+MetaEditor compile return code: 1
+EX5 refreshed: True
+Compile accepted because EX5 was refreshed despite nonzero MetaEditor return code.
+
+Runtime collection/verifier:
+
+Rows: 52
+Violations: 0
+Verdict: PASS
+
+Runtime grouped rows:
+
+h024_ea_log_only_preflight_v2, 0.4, log_only_preflight, XAUUSDm, INIT                1
+h024_ea_log_only_preflight_v2, 0.4, log_only_preflight, XAUUSDm, INTENT              8
+h024_ea_log_only_preflight_v2, 0.4, log_only_preflight, XAUUSDm, MARKET_STATE        8
+h024_ea_log_only_preflight_v2, 0.4, log_only_preflight, XAUUSDm, BAR_OBSERVATION     8
+h024_ea_log_only_preflight_v2, 0.4, log_only_preflight, XAUUSDm, DEINIT              1
+h024_ea_log_only_preflight_v2, 0.4, log_only_preflight, USDJPYm, INIT                1
+h024_ea_log_only_preflight_v2, 0.4, log_only_preflight, USDJPYm, INTENT              8
+h024_ea_log_only_preflight_v2, 0.4, log_only_preflight, USDJPYm, MARKET_STATE        8
+h024_ea_log_only_preflight_v2, 0.4, log_only_preflight, USDJPYm, BAR_OBSERVATION     8
+h024_ea_log_only_preflight_v2, 0.4, log_only_preflight, USDJPYm, DEINIT              1
+
+Observed BAR_OBSERVATION example:
+
+symbol: XAUUSDm
+event: BAR_OBSERVATION
+detail: H4_closed:time=2026.05.08 16:00:00;open=4706.9830000000;high=4729.0040000000;low=4705.5030000000;close=4723.7890000000;tick_volume=29031|M1_closed:time=2026.05.08 20:56:00;open=4715.1460000000;high=4715.6100000000;low=4714.9540000000;close=4715.5580000000;tick_volume=67
+
+Interpretation:
+
+The EA 0.4 terminal-attached log-only runtime preflight passed.
+
+The runtime now emits closed-bar BAR_OBSERVATION rows for both required H024 broker symbols. This confirms that the EA can read latest completed H4 and M1 bars from MT5 runtime context and write them into the versioned preflight CSV.
+
+This is a necessary runtime-ingestion preparation step only. It does not compute H024 strategy state, does not emit strategy-derived WOULD_OPEN rows, and does not approve demo trading, live trading, Phase 4, attach/detach automation, GUI automation, or order-send code.
