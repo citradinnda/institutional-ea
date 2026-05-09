@@ -112,3 +112,74 @@ The 2023 stop-loss weakness does not appear to be a leverage-pathology problem. 
 The largest losses are therefore better interpreted as ordinary stopped-risk losses under the modeled H024 lifecycle, not as lot-sizing blowups.
 
 This supports continuing execution-realism and market-context audit work, but it does not support demo deployment, live deployment, or Phase 4 approval.
+
+## 2023 Stop-Exit Ledger Audit Addendum
+
+A direct ledger audit was run against the regenerated H024 hold=3 trade ledger.
+
+Command shape:
+
+```powershell
+python .\tmp_h024_ledger_audit.py
+
+Temporary script only. No temporary script committed.
+
+PnL Decile Findings
+
+The worst PnL decile contained 46 fills with total PnL -5113.274204 USD.
+
+That worst decile had:
+
+average actual gross leverage: 1.268542x
+average raw stop distance: 8.853993
+stop exits: 43 of 46 fills
+
+The best PnL decile contained 46 fills with total PnL +7366.081209 USD.
+
+That best decile had:
+
+average actual gross leverage: 1.435053x
+average raw stop distance: 7.632218
+stop exits: 0 of 46 fills
+
+Interpretation:
+
+The loss concentration is stop-exit driven, not leverage driven. The best decile had higher average leverage than the worst decile.
+
+2023 Stop Exits
+
+The 17 2023 stop exits were inspected directly.
+
+Actual gross leverage range across those 17 stop exits:
+
+min: 0.523237x
+max: 2.446090x
+
+The largest 2023 stop loss was:
+
+USDJPY sell
+entry: 2023-09-29T05:00:00+00:00
+exit: 2023-09-29T11:12:00+00:00
+lots: 0.28
+raw stop distance: 0.591751
+actual gross leverage: 2.446090x
+PnL: -122.250019 USD
+
+Interpretation:
+
+The 2023 weakness remains real, but the observed 2023 stop exits do not look like lot-sizing blowups. They look like ordinary stopped-risk losses clustered in an adverse market regime.
+
+This supports the current failure-mode diagnosis:
+
+H024 has passed directional negative control.
+H024 has not proven future survivability.
+The main unresolved issue is stop-hit clustering under adverse regimes.
+No 2023 filter, session filter, or post-hoc exclusion is approved.
+Status
+
+This addendum does not approve:
+
+demo trading
+live trading
+Phase 4
+execution deployment
