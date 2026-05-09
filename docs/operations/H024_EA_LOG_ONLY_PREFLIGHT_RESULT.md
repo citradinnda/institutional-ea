@@ -107,3 +107,52 @@ Execution adapter.
 OrderSend.
 CTrade.
 Phase 4 execution.
+
+## Versioned Runtime Schema Recheck - 2026-05-09
+
+After commit `e043de5 Version H024 EA runtime preflight schema`, the log-only EA was copied, compiled, runtime log was reset, manually attached to both required broker symbols, removed, collected, and verified.
+
+Command family:
+
+```text
+python .\scripts\verify_h024_ea_source_static.py
+python .\scripts\run_h024_mt5_log_only_preflight_local.py --terminal-data-dir <local-terminal-data-dir> --metaeditor <local-metaeditor-path> --reset-runtime-log
+python .\scripts\run_h024_mt5_log_only_preflight_local.py --terminal-data-dir <local-terminal-data-dir> --collect
+
+Static source verifier:
+
+Violations: 0
+Verdict: PASS
+
+Compile/reset result:
+
+Runtime CSV reset: removed existing file
+MetaEditor compile return code: 1
+EX5 refreshed: True
+Compile accepted because EX5 was refreshed despite nonzero MetaEditor return code.
+
+Collected runtime CSV verifier:
+
+Rows: 17
+Violations: 0
+Verdict: PASS
+
+Runtime grouped rows:
+
+Schema version    EA version    Runtime mode    Symbol    Event    Count
+h024_ea_log_only_preflight_v2    0.2    log_only_preflight    XAUUSDm    INIT    1
+h024_ea_log_only_preflight_v2    0.2    log_only_preflight    XAUUSDm    INTENT    6
+h024_ea_log_only_preflight_v2    0.2    log_only_preflight    XAUUSDm    DEINIT    1
+h024_ea_log_only_preflight_v2    0.2    log_only_preflight    USDJPYm    INIT    1
+h024_ea_log_only_preflight_v2    0.2    log_only_preflight    USDJPYm    INTENT    7
+h024_ea_log_only_preflight_v2    0.2    log_only_preflight    USDJPYm    DEINIT    1
+
+Interpretation:
+
+Fresh terminal-attached runtime evidence now uses explicit schema metadata.
+The verifier accepted the v2 runtime CSV.
+Both required H024 broker symbols were covered.
+The EA emitted timer-driven INTENT rows without requiring market ticks.
+Kill switch remained blocked.
+This remains log-only preflight evidence.
+This does not approve demo trading, live trading, Phase 4 execution, order placement, order modification, or order closing.
