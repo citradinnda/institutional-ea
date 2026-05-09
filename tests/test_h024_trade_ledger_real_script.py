@@ -152,6 +152,9 @@ def test_h024_trade_ledger_report_contains_audit_sections(tmp_path):
 
     assert "H024 hold=3 H4 trade ledger export/audit diagnostic" in report
     assert "Research only. No demo/live/Phase 4 approval." in report
+    if not ledger.empty:
+        assert "Actual gross leverage audit:" in report
+        assert "2023_stop_fills" in report
     if ledger.empty:
         assert "No fills to rank." in report
     else:

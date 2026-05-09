@@ -249,6 +249,9 @@ def format_h024_trade_ledger_audit_report(
     lines.extend(
         [
             "",
+            "Actual gross leverage audit:",
+            _format_leverage_audit(ledger),
+            "",
             f"Top {top_n} losses:",
             _format_ranked_trades(ledger.nsmallest(top_n, "pnl_usd")),
             "",
@@ -418,6 +421,55 @@ def _format_ranked_trades(rows: pd.DataFrame) -> str:
         "pnl_usd",
     ]
     return rows.loc[:, fields].to_string(index=False)
+
+
+def _format_leverage_audit(ledger: pd.DataFrame) -> str:
+    """Format actual gross leverage distribution from the ledger."""
+
+    if ledger.empty:
+        return "(no rows)"
+
+    rows = []
+    for label, frame in (
+        ("all_fills", ledger),
+        ("stop_fills", ledger.loc[ledger["exit_reason"] == "stop"]),
+        (
+            "2023_stop_fills",
+            ledger.loc[
+                (ledger["exit_year"] == 2023)
+                & (ledger["exit_reason"] == "stop")
+            ],
+        ),
+    ):
+        if frame.empty:
+            rows.append(
+                {
+                    "label": label,
+                    "fills": 0,
+                    "min": float("nan"),
+                    "median": float("nan"),
+                    "mean": float("nan"),
+                    "p90": float("nan"),
+                    "max": float("nan"),
+                }
+            )
+            continue
+
+        leverage = frame["actual_gross_leverage"]
+        rows.append(
+            {
+                "label": label,
+                "fills": len(frame),
+                "min": leverage.min(),
+                "median": leverage.median(),
+                "mean": leverage.mean(),
+                "p90": leverage.quantile(0.90),
+                "max": leverage.max(),
+            }
+        )
+
+    return pd.DataFrame(rows).to_string(index=False, float_format=lambda value: f"{value:.6f}")
+
 
 
 def _format_2023_slice(ledger: pd.DataFrame) -> str:
