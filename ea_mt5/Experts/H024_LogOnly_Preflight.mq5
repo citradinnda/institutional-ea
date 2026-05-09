@@ -1,11 +1,11 @@
 #property strict
-#property version   "0.2"
+#property version   "0.3"
 #property description "H024 log-only runtime preflight. Research only."
 
 input bool   InpKillSwitchBlocked = true;
 input string InpRunLabel = "H024_LOG_ONLY_PREFLIGHT";
 input string InpSchemaVersion = "h024_ea_log_only_preflight_v2";
-input string InpEaVersion = "0.2";
+input string InpEaVersion = "0.3";
 input string InpSourceVersion = "manual";
 input string InpRuntimeMode = "log_only_preflight";
 input string InpOutputFile = "h024_ea_log_only_preflight.csv";
@@ -135,6 +135,31 @@ void WriteIntentRow()
    WritePreflightRow("INTENT", intent_detail);
 }
 
+string BarObservationDetail(const ENUM_TIMEFRAMES timeframe, const string label)
+{
+   int digits = (int)SymbolInfoInteger(_Symbol, SYMBOL_DIGITS);
+   datetime bar_time = iTime(_Symbol, timeframe, 0);
+
+   if(bar_time <= 0)
+   {
+      return label + ":unavailable";
+   }
+
+   return label
+      + ":time=" + TimeToString(bar_time, TIME_DATE | TIME_SECONDS)
+      + ";open=" + DoubleToString(iOpen(_Symbol, timeframe, 0), digits)
+      + ";high=" + DoubleToString(iHigh(_Symbol, timeframe, 0), digits)
+      + ";low=" + DoubleToString(iLow(_Symbol, timeframe, 0), digits)
+      + ";close=" + DoubleToString(iClose(_Symbol, timeframe, 0), digits)
+      + ";tick_volume=" + LongText(iVolume(_Symbol, timeframe, 0));
+}
+
+void WriteMarketStateRow()
+{
+   string detail = BarObservationDetail(PERIOD_H4, "H4") + "|" + BarObservationDetail(PERIOD_M1, "M1");
+   WritePreflightRow("MARKET_STATE", detail);
+}
+
 int OnInit()
 {
    if(!OpenLogFile())
@@ -145,6 +170,7 @@ int OnInit()
    EventSetTimer(InpTimerSeconds);
    WritePreflightRow("INIT", InpKillSwitchBlocked ? "blocked_by_default" : "not_blocked");
    WriteIntentRow();
+   WriteMarketStateRow();
    return INIT_SUCCEEDED;
 }
 
@@ -152,11 +178,13 @@ void OnTick()
 {
    WritePreflightRow("TICK", InpKillSwitchBlocked ? "no_action_blocked" : "no_action_unblocked");
    WriteIntentRow();
+   WriteMarketStateRow();
 }
 
 void OnTimer()
 {
    WriteIntentRow();
+   WriteMarketStateRow();
 }
 
 void OnDeinit(const int reason)

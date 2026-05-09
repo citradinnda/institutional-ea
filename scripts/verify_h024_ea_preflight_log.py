@@ -41,12 +41,12 @@ REQUIRED_COLUMNS = [
     "detail",
 ]
 
-ALLOWED_EVENTS = {"INIT", "TICK", "INTENT", "DEINIT"}
+ALLOWED_EVENTS = {"INIT", "TICK", "INTENT", "MARKET_STATE", "DEINIT"}
 ALLOWED_INTENT_ACTIONS = {"NO_ACTION", "BLOCKED", "WOULD_OPEN"}
 ALLOWED_SYMBOLS = {"USDJPYm", "XAUUSDm"}
 EXPECTED_RUN_LABEL = "H024_LOG_ONLY_PREFLIGHT"
 EXPECTED_SCHEMA_VERSION = "h024_ea_log_only_preflight_v2"
-EXPECTED_EA_VERSION = "0.2"
+EXPECTED_EA_VERSION = "0.3"
 EXPECTED_RUNTIME_MODE = "log_only_preflight"
 
 
@@ -142,6 +142,11 @@ def verify_h024_ea_preflight_log(path: Path) -> VerificationResult:
                 violations.append(f"row {index}: unexpected intent action {action!r}")
             if action != "NO_ACTION":
                 violations.append(f"row {index}: EA runtime preflight may only emit NO_ACTION intent rows")
+
+        if event == "MARKET_STATE":
+            detail = row.get("detail", "")
+            if "H4:" not in detail or "M1:" not in detail:
+                violations.append(f"row {index}: MARKET_STATE detail must include H4 and M1 observations")
 
         if row.get("kill_switch_blocked") != "true":
             violations.append(f"row {index}: kill_switch_blocked must be true")
