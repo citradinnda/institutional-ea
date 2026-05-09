@@ -299,3 +299,68 @@ The EA 0.4 terminal-attached log-only runtime preflight passed.
 The runtime now emits closed-bar BAR_OBSERVATION rows for both required H024 broker symbols. This confirms that the EA can read latest completed H4 and M1 bars from MT5 runtime context and write them into the versioned preflight CSV.
 
 This is a necessary runtime-ingestion preparation step only. It does not compute H024 strategy state, does not emit strategy-derived WOULD_OPEN rows, and does not approve demo trading, live trading, Phase 4, attach/detach automation, GUI automation, or order-send code.
+
+## H024 EA 0.5 Runtime State Observation Preflight
+
+Result date: 2026-05-09
+
+Purpose:
+
+Validate that the log-only MT5 EA can compute and emit frozen H024 state-observation fields from closed H4 bars in terminal runtime context for both required H024 broker symbols.
+
+Safety boundary:
+
+- Research only.
+- No demo approval.
+- No live approval.
+- No Phase 4 approval.
+- No attach/detach automation approval.
+- No GUI automation approval.
+- No order placement, modification, closing, or deletion.
+- No strategy-derived `WOULD_OPEN` runtime intent.
+- Runtime action remained `NO_ACTION:state_observation_only`.
+
+Preflight and compile facts:
+
+```text
+EA runtime input version: 0.5
+MQL5 property version: 0.500
+MetaEditor latest compile: 0 errors, 1 warning
+Terminal EX5 existed after compile: true
+Focused tests before runtime: 52 passed
+Full suite before compile-compatibility commit: 843 passed
+
+Runtime collection/verifier:
+
+Rows: 68
+Violations: 0
+Verdict: PASS
+
+Runtime grouped rows:
+
+h024_ea_log_only_preflight_v2, 0.5, log_only_preflight, USDJPYm, INIT                       1
+h024_ea_log_only_preflight_v2, 0.5, log_only_preflight, USDJPYm, INTENT                     8
+h024_ea_log_only_preflight_v2, 0.5, log_only_preflight, USDJPYm, MARKET_STATE               8
+h024_ea_log_only_preflight_v2, 0.5, log_only_preflight, USDJPYm, BAR_OBSERVATION            8
+h024_ea_log_only_preflight_v2, 0.5, log_only_preflight, USDJPYm, H024_STATE_OBSERVATION     8
+h024_ea_log_only_preflight_v2, 0.5, log_only_preflight, USDJPYm, DEINIT                     1
+h024_ea_log_only_preflight_v2, 0.5, log_only_preflight, XAUUSDm, INIT                       1
+h024_ea_log_only_preflight_v2, 0.5, log_only_preflight, XAUUSDm, INTENT                     8
+h024_ea_log_only_preflight_v2, 0.5, log_only_preflight, XAUUSDm, MARKET_STATE               8
+h024_ea_log_only_preflight_v2, 0.5, log_only_preflight, XAUUSDm, BAR_OBSERVATION            8
+h024_ea_log_only_preflight_v2, 0.5, log_only_preflight, XAUUSDm, H024_STATE_OBSERVATION     8
+h024_ea_log_only_preflight_v2, 0.5, log_only_preflight, XAUUSDm, DEINIT                     1
+
+Observed H024 state-observation example:
+
+symbol: USDJPYm
+event: H024_STATE_OBSERVATION
+detail: closed_h4_time=2026.05.08 16:00:00;h4_warmup_bars=256;slow_window=5;slope_lag=2;atr_window=3;pullback_window=3;slow_ma=156.7548000000;slow_ma_lag=156.8248000000;atr=0.2654464904;previous_atr=0.3061697355;slope=-0.0700000000;slope_threshold=0.0132723245;trend_up=false;trend_down=true;previous_bearish=true;previous_bullish=false;recent_high_before_signal=156.8990000000;recent_low_before_signal=156.4290000000;long_pullback_depth_atr=1.5350962079;short_pullback_depth_atr=1.2901340470;long_pullback_ok=true;short_pullback_ok=true;long_resumption=false;short_resumption=false;long_signal_observed=false;short_signal_observed=false;action=NO_ACTION:state_observation_only
+
+Interpretation:
+
+The EA 0.5 terminal-attached log-only runtime preflight passed.
+
+The runtime now emits H024_STATE_OBSERVATION rows for both required H024 broker symbols. These rows include frozen H024 signal-state ingredients from closed H4 bars, including slow MA, slope, ATR, pullback-depth metrics, resumption flags, and observed long/short signal booleans.
+
+This is runtime strategy-state observation only. It does not emit strategy-derived WOULD_OPEN, does not size positions, does not compute final executable intents, does not include a demo execution adapter, and does not approve demo trading, live trading, Phase 4, attach/detach automation, GUI automation, or order-send code.
