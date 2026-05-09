@@ -1,0 +1,173 @@
+﻿from __future__ import annotations
+
+import argparse
+import shutil
+import subprocess
+from dataclasses import dataclass
+from pathlib import Path
+
+from scripts.verify_h024_ea_preflight_log import verify_h024_ea_preflight_log
+
+
+REPO_EA_SOURCE = Path("ea_mt5/Experts/H024_LogOnly_Preflight.mq5")
+EA_FILENAME = "H024_LogOnly_Preflight.mq5"
+RUNTIME_LOG_FILENAME = "h024_ea_log_only_preflight.csv"
+DEFAULT_REPORT_PATH = Path("reports") / RUNTIME_LOG_FILENAME
+
+
+@dataclass(frozen=True)
+class LocalPreflightPaths:
+    terminal_data_dir: Path
+    repo_ea_source: Path = REPO_EA_SOURCE
+    report_path: Path = DEFAULT_REPORT_PATH
+
+    @property
+    def terminal_experts_dir(self) -> Path:
+        return self.terminal_data_dir / "MQL5" / "Experts"
+
+    @property
+    def terminal_files_dir(self) -> Path:
+        return self.terminal_data_dir / "MQL5" / "Files"
+
+    @property
+    def terminal_ea_source(self) -> Path:
+        return self.terminal_experts_dir / EA_FILENAME
+
+    @property
+    def terminal_runtime_log(self) -> Path:
+        return self.terminal_files_dir / RUNTIME_LOG_FILENAME
+
+
+def copy_ea_source(paths: LocalPreflightPaths) -> Path:
+    if not paths.repo_ea_source.exists():
+        raise FileNotFoundError(f"missing repo EA source: {paths.repo_ea_source}")
+
+    paths.terminal_experts_dir.mkdir(parents=True, exist_ok=True)
+    shutil.copy2(paths.repo_ea_source, paths.terminal_ea_source)
+    return paths.terminal_ea_source
+
+
+def compile_ea(metaeditor: Path, source_path: Path, *, timeout_seconds: int = 60) -> subprocess.CompletedProcess[str]:
+    if not metaeditor.exists():
+        raise FileNotFoundError(f"missing MetaEditor executable: {metaeditor}")
+
+    if not source_path.exists():
+        raise FileNotFoundError(f"missing EA source to compile: {source_path}")
+
+    return subprocess.run(
+        [str(metaeditor), f"/compile:{source_path}"],
+        capture_output=True,
+        text=True,
+        timeout=timeout_seconds,
+        check=False,
+    )
+
+
+def collect_runtime_log(paths: LocalPreflightPaths) -> Path:
+    if not paths.terminal_runtime_log.exists():
+        raise FileNotFoundError(f"missing terminal runtime log: {paths.terminal_runtime_log}")
+
+    paths.report_path.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copy2(paths.terminal_runtime_log, paths.report_path)
+    return paths.report_path
+
+
+def run_verify(report_path: Path) -> tuple[int, list[str]]:
+    result = verify_h024_ea_preflight_log(report_path)
+    return result.rows, result.violations
+
+
+def build_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(
+        description=(
+            "Local helper for H024 MT5 log-only EA preflight. "
+            "Copies source, optionally compiles, optionally collects runtime CSV, and verifies it. "
+            "Does not attach EAs, place orders, modify orders, close orders, or call MT5 trade APIs."
+        )
+    )
+    parser.add_argument(
+        "--terminal-data-dir",
+        type=Path,
+        required=True,
+        help="MT5 terminal data directory containing MQL5/Experts and MQL5/Files.",
+    )
+    parser.add_argument(
+        "--metaeditor",
+        type=Path,
+        help="Optional path to MetaEditor64.exe. If provided, the copied EA source is compiled.",
+    )
+    parser.add_argument(
+        "--report-path",
+        type=Path,
+        default=DEFAULT_REPORT_PATH,
+        help="Destination path for collected runtime CSV.",
+    )
+    parser.add_argument(
+        "--collect",
+        action="store_true",
+        help="Copy terminal MQL5/Files runtime CSV to the repo report path and verify it.",
+    )
+    parser.add_argument(
+        "--compile-timeout-seconds",
+        type=int,
+        default=60,
+        help="MetaEditor compile timeout in seconds.",
+    )
+    return parser
+
+
+def main() -> int:
+    parser = build_parser()
+    args = parser.parse_args()
+
+    paths = LocalPreflightPaths(
+        terminal_data_dir=args.terminal_data_dir,
+        report_path=args.report_path,
+    )
+
+    print("H024 MT5 log-only EA local preflight helper")
+    print("=" * 72)
+    print("Research only. No demo/live/Phase 4 approval.")
+    print("No EA attachment automation. No order-send capability.")
+    print()
+
+    copied_to = copy_ea_source(paths)
+    print(f"Copied EA source to: {copied_to}")
+
+    if args.metaeditor is not None:
+        compile_result = compile_ea(
+            args.metaeditor,
+            copied_to,
+            timeout_seconds=args.compile_timeout_seconds,
+        )
+        print(f"MetaEditor compile return code: {compile_result.returncode}")
+        if compile_result.stdout.strip():
+            print("MetaEditor stdout:")
+            print(compile_result.stdout.strip())
+        if compile_result.stderr.strip():
+            print("MetaEditor stderr:")
+            print(compile_result.stderr.strip())
+        if compile_result.returncode != 0:
+            return compile_result.returncode
+
+    if not args.collect:
+        print()
+        print("Skipped runtime CSV collection. Attach/remove the EA manually, then rerun with --collect.")
+        return 0
+
+    report_path = collect_runtime_log(paths)
+    rows, violations = run_verify(report_path)
+
+    print(f"Collected runtime CSV to: {report_path}")
+    print(f"Rows: {rows}")
+    print(f"Violations: {len(violations)}")
+    for violation in violations:
+        print(f"- {violation}")
+
+    print()
+    print("Verdict: PASS" if not violations else "Verdict: FAIL")
+    return 0 if not violations else 1
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
