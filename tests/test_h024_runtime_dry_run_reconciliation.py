@@ -249,3 +249,33 @@ def test_reconciler_source_has_no_mt5_trade_api_surface():
 
     for token in forbidden_tokens:
         assert token not in source
+
+def test_blocked_rows_with_positive_sizing_diagnostics_do_not_emit_dry_run_requests(tmp_path: Path):
+    csv_path = tmp_path / "runtime.csv"
+    payload = _intended_action_payload(
+        decision="BLOCKED",
+        direction="short",
+        entry_price="155.821",
+        stop_price="158.163",
+        stop_distance_price="2.342",
+        lots="0.0",
+        reason=(
+            "BLOCKED:volume_below_min_for_would_open;"
+            "WOULD_OPEN:side=short;"
+            "source=H024_STATE_OBSERVATION;"
+            "mode=log_only_no_execution"
+        ),
+    )
+    _write_runtime_csv(
+        csv_path,
+        _minimum_valid_rows() + [_header_row(), _action_row(payload=payload)],
+    )
+
+    result = reconcile_h024_runtime_dry_run_requests(csv_path, require_request=False)
+
+    assert result.passed
+    assert result.intended_action_rows == 1
+    assert result.would_open_rows == 0
+    assert result.skipped_rows == 1
+    assert result.dry_run_requests == ()
+    assert result.violations == ()
