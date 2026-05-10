@@ -56,9 +56,6 @@ class H024IntendedActionLogRequest:
 
 
 def _compute_raw_and_final_lots(request: H024IntendedActionLogRequest) -> tuple[float, float]:
-    if request.decision != "WOULD_OPEN":
-        return 0.0, 0.0
-
     stop_distance_price = abs(request.entry_price - request.stop_price)
     risk_usd = request.account_balance_usd * request.risk_fraction
 
@@ -87,6 +84,9 @@ def _compute_raw_and_final_lots(request: H024IntendedActionLogRequest) -> tuple[
     capped_lots = min(raw_lots, request.max_volume)
     stepped_lots = math.floor(capped_lots / request.volume_step) * request.volume_step
 
+    if request.decision != "WOULD_OPEN":
+        return raw_lots, 0.0
+
     if stepped_lots < request.min_volume:
         return raw_lots, 0.0
 
@@ -98,7 +98,7 @@ def build_h024_intended_action_log_row(
 ) -> dict[str, Any]:
     stop_distance_price = (
         abs(request.entry_price - request.stop_price)
-        if request.decision == "WOULD_OPEN"
+        if request.entry_price > 0.0 and request.stop_price > 0.0
         else 0.0
     )
     risk_usd = request.account_balance_usd * request.risk_fraction

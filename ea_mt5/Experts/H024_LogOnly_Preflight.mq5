@@ -332,28 +332,32 @@ string BuildH024IntendedActionLogRow(
    double raw_lots = 0.0;
    double lots = 0.0;
 
-   if(decision == "WOULD_OPEN")
+   if(entry_price > 0.0 && stop_price > 0.0)
    {
       stop_distance_price = MathAbs(entry_price - stop_price);
+   }
 
-      if(entry_price > 0.0 &&
-         stop_price > 0.0 &&
-         stop_distance_price > 0.0 &&
-         tick_size > 0.0 &&
-         tick_value_usd_per_lot > 0.0 &&
-         account_balance_usd > 0.0 &&
-         risk_fraction > 0.0 &&
-         min_volume > 0.0 &&
-         max_volume > 0.0 &&
-         volume_step > 0.0 &&
-         volume_digits >= 0)
+   if(entry_price > 0.0 &&
+      stop_price > 0.0 &&
+      stop_distance_price > 0.0 &&
+      tick_size > 0.0 &&
+      tick_value_usd_per_lot > 0.0 &&
+      account_balance_usd > 0.0 &&
+      risk_fraction > 0.0 &&
+      min_volume > 0.0 &&
+      max_volume > 0.0 &&
+      volume_step > 0.0 &&
+      volume_digits >= 0)
+   {
+      double stop_distance_ticks = stop_distance_price / tick_size;
+      double loss_usd_per_lot = stop_distance_ticks * tick_value_usd_per_lot;
+
+      if(loss_usd_per_lot > 0.0)
       {
-         double stop_distance_ticks = stop_distance_price / tick_size;
-         double loss_usd_per_lot = stop_distance_ticks * tick_value_usd_per_lot;
+         raw_lots = risk_usd / loss_usd_per_lot;
 
-         if(loss_usd_per_lot > 0.0)
+         if(decision == "WOULD_OPEN")
          {
-            raw_lots = risk_usd / loss_usd_per_lot;
             lots = ComputeH024LotSize(
                account_balance_usd,
                risk_fraction,
