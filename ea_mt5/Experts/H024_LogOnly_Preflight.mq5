@@ -8,6 +8,7 @@ input string InpSchemaVersion = "h024_ea_log_only_preflight_v2";
 input string InpEaVersion = "0.6";
 input string InpSourceVersion = "manual";
 input string InpRuntimeMode = "log_only_preflight";
+input double InpRiskFraction = 0.01;
 input string InpOutputFile = "h024_ea_log_only_preflight.csv";
 input int    InpTimerSeconds = 1;
 
@@ -226,6 +227,88 @@ void WriteH024StrategyIntentRow()
 {
    WritePreflightRow("INTENT", H024StrategyIntentDetail());
 }
+
+string H024NormalizedSymbolName(const string symbol)
+{
+   if(StringFind(symbol, "USDJPY") == 0)
+   {
+      return "USDJPY";
+   }
+   if(StringFind(symbol, "XAUUSD") == 0)
+   {
+      return "XAUUSD";
+   }
+   return symbol;
+}
+
+string H024DecisionFromIntentDetail(const string intent_detail)
+{
+   if(StringFind(intent_detail, "WOULD_OPEN:") == 0)
+   {
+      return "WOULD_OPEN";
+   }
+   if(StringFind(intent_detail, "BLOCKED:") == 0)
+   {
+      return "BLOCKED";
+   }
+   return "NO_ACTION";
+}
+
+string H024DirectionFromIntentDetail(const string intent_detail)
+{
+   if(StringFind(intent_detail, "side=long") >= 0)
+   {
+      return "long";
+   }
+   if(StringFind(intent_detail, "side=short") >= 0)
+   {
+      return "short";
+   }
+   return "";
+}
+
+void WriteH024IntendedActionHeaderRow()
+{
+   WritePreflightRow("H024_INTENDED_ACTION_HEADER", BuildH024IntendedActionLogHeader());
+}
+
+void WriteH024IntendedActionRuntimeRow()
+{
+   const string intent_detail = H024StrategyIntentDetail();
+   const string decision = H024DecisionFromIntentDetail(intent_detail);
+   const string direction = H024DirectionFromIntentDetail(intent_detail);
+
+   const double tick_size = SymbolInfoDouble(_Symbol, SYMBOL_TRADE_TICK_SIZE);
+   const double tick_value = SymbolInfoDouble(_Symbol, SYMBOL_TRADE_TICK_VALUE);
+   const double min_volume = SymbolInfoDouble(_Symbol, SYMBOL_VOLUME_MIN);
+   const double max_volume = SymbolInfoDouble(_Symbol, SYMBOL_VOLUME_MAX);
+   const double volume_step = SymbolInfoDouble(_Symbol, SYMBOL_VOLUME_STEP);
+   const int volume_digits = H024VolumeDigits(volume_step);
+
+   const string intended_action_row = BuildH024IntendedActionLogRow(
+      TimeToString(TimeCurrent(), TIME_DATE | TIME_SECONDS),
+      InpEaVersion,
+      _Symbol,
+      H024NormalizedSymbolName(_Symbol),
+      "H4",
+      decision,
+      direction,
+      0.0,
+      0.0,
+      tick_size,
+      tick_value,
+      AccountInfoDouble(ACCOUNT_BALANCE),
+      InpRiskFraction,
+      min_volume,
+      max_volume,
+      volume_step,
+      volume_digits,
+      intent_detail
+   );
+
+   WritePreflightRow("H024_INTENDED_ACTION_ROW", intended_action_row);
+}
+
 
 string BarObservationDetail(const ENUM_TIMEFRAMES timeframe, const string label)
 {
@@ -492,6 +575,8 @@ int OnInit()
    WriteBarObservationRow();
    WriteH024StateObservationRow();
    WriteH024StrategyIntentRow();
+   WriteH024IntendedActionHeaderRow();
+   WriteH024IntendedActionRuntimeRow();
    return INIT_SUCCEEDED;
 }
 
@@ -503,6 +588,7 @@ void OnTick()
    WriteBarObservationRow();
    WriteH024StateObservationRow();
    WriteH024StrategyIntentRow();
+   WriteH024IntendedActionRuntimeRow();
 }
 
 void OnTimer()
@@ -512,6 +598,7 @@ void OnTimer()
    WriteBarObservationRow();
    WriteH024StateObservationRow();
    WriteH024StrategyIntentRow();
+   WriteH024IntendedActionRuntimeRow();
 }
 
 void OnDeinit(const int reason)
