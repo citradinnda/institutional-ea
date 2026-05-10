@@ -286,3 +286,91 @@ string f = "h024_ea_log_only_preflight.csv";
     violations = validate_automation_target(paths)
 
     assert any("repo EA source missing expected token" in item for item in violations)
+
+
+
+def test_validate_automation_target_accepts_cent_account_symbols(tmp_path: Path) -> None:
+    from scripts.verify_h024_ea_preflight_log import CENT_ACCOUNT_ALLOWED_SYMBOLS
+
+    terminal = tmp_path / "terminal"
+    (terminal / "MQL5" / "Experts").mkdir(parents=True)
+    (terminal / "MQL5" / "Files").mkdir(parents=True)
+
+    repo_source = tmp_path / "repo" / EA_FILENAME
+    repo_source.parent.mkdir()
+    repo_source.write_text(
+        """
+#property strict
+#property version   "0.600"
+input bool   InpKillSwitchBlocked = true;
+input string InpSchemaVersion = "h024_ea_log_only_preflight_v2";
+input string InpEaVersion = "0.6";
+input string InpRuntimeMode = "log_only_preflight";
+int OnInit() { return INIT_SUCCEEDED; }
+void OnTick() {}
+void OnDeinit(const int reason) {}
+string f = "h024_ea_log_only_preflight.csv";
+""",
+        encoding="ascii",
+    )
+
+    metaeditor = tmp_path / "MetaEditor64.exe"
+    metaeditor.write_text("stub", encoding="utf-8")
+
+    paths = LocalPreflightPaths(terminal_data_dir=terminal, repo_ea_source=repo_source)
+
+    assert validate_automation_target(
+        paths,
+        metaeditor,
+        expected_symbols=CENT_ACCOUNT_ALLOWED_SYMBOLS,
+    ) == []
+
+
+
+def test_main_automation_target_preflight_stops_before_copy_or_compile(tmp_path: Path, capsys) -> None:
+    from scripts.run_h024_mt5_log_only_preflight_local import main
+
+    terminal = tmp_path / "terminal"
+    (terminal / "MQL5" / "Experts").mkdir(parents=True)
+    (terminal / "MQL5" / "Files").mkdir(parents=True)
+
+    repo_source = tmp_path / "repo" / EA_FILENAME
+    repo_source.parent.mkdir()
+    repo_source.write_text(
+        """
+#property strict
+#property version   "0.600"
+input bool   InpKillSwitchBlocked = true;
+input string InpSchemaVersion = "h024_ea_log_only_preflight_v2";
+input string InpEaVersion = "0.6";
+input string InpRuntimeMode = "log_only_preflight";
+int OnInit() { return INIT_SUCCEEDED; }
+void OnTick() {}
+void OnDeinit(const int reason) {}
+string f = "h024_ea_log_only_preflight.csv";
+""",
+        encoding="ascii",
+    )
+
+    metaeditor = tmp_path / "MetaEditor64.exe"
+    metaeditor.write_text("stub", encoding="utf-8")
+
+    rc = main(
+        [
+            "--terminal-data-dir",
+            str(terminal),
+            "--repo-ea-source",
+            str(repo_source),
+            "--metaeditor",
+            str(metaeditor),
+            "--automation-target-preflight",
+            "--cent-account-symbols",
+        ]
+    )
+
+    out = capsys.readouterr().out
+    assert rc == 0
+    assert "- expected_symbols: USDJPYc, XAUUSDc" in out
+    assert "Verdict: PASS" in out
+    assert "Copied EA source to:" not in out
+    assert "MetaEditor compile return code:" not in out

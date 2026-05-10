@@ -250,12 +250,13 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Expect Exness Standard Cent symbols USDJPYc and XAUUSDc instead of USDJPYm and XAUUSDm.",
     )
+    parser.add_argument("--repo-ea-source", type=Path, default=REPO_EA_SOURCE)
     return parser
 
 
-def main() -> int:
+def main(argv: list[str] | None = None) -> int:
     parser = build_parser()
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
 
     paths = LocalPreflightPaths(
         terminal_data_dir=args.terminal_data_dir,
@@ -271,6 +272,8 @@ def main() -> int:
     if args.attach_detach:
         print("Attach/detach automation is not approved for this helper.")
         return 2
+
+    expected_symbols = CENT_ACCOUNT_ALLOWED_SYMBOLS if args.cent_account_symbols else DEFAULT_ALLOWED_SYMBOLS
 
     if args.automation_target_preflight:
         violations = validate_automation_target(paths, args.metaeditor, expected_symbols=expected_symbols)
@@ -289,6 +292,7 @@ def main() -> int:
         print("Verdict: PASS" if not violations else "Verdict: FAIL")
         if violations:
             return 1
+        return 0
         print()
 
     copied_to = copy_ea_source(paths)
