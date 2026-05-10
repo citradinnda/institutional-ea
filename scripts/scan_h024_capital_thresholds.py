@@ -37,6 +37,52 @@ def count_candidates(
     return sum(1 for candidate in candidates if candidate.symbol == symbol)
 
 
+def expand_high_boundary_until_candidate(
+    *,
+    low_exclusive: int,
+    high_inclusive: int,
+    symbol: str | None,
+    candidate_provider: Callable[[int], list[ExecutableCandidateShift]],
+    max_high: int,
+    high_growth_factor: int = 2,
+) -> int:
+    """Expand high_inclusive until it brackets at least one matching candidate.
+
+    This keeps the exact threshold scanner usable across risk fractions instead
+    of assuming the original 1 percent risk brackets.
+    """
+
+    if low_exclusive < 0:
+        raise ValueError("low_exclusive must be non-negative")
+    if high_inclusive <= low_exclusive:
+        raise ValueError("high_inclusive must be greater than low_exclusive")
+    if max_high < high_inclusive:
+        raise ValueError("max_high must be greater than or equal to high_inclusive")
+    if high_growth_factor < 2:
+        raise ValueError("high_growth_factor must be at least 2")
+
+    low_count = count_candidates(candidate_provider(low_exclusive), symbol)
+    if low_count != 0:
+        raise ValueError(
+            f"low boundary must have zero candidates for {symbol or 'ANY'}; "
+            f"observed {low_count}"
+        )
+
+    high = high_inclusive
+    while True:
+        high_count = count_candidates(candidate_provider(high), symbol)
+        if high_count > 0:
+            return high
+
+        if high >= max_high:
+            raise ValueError(
+                f"could not find high boundary with at least one candidate for "
+                f"{symbol or 'ANY'} up to max_high={max_high}; observed 0"
+            )
+
+        high = min(max_high, max(high + 1, high * high_growth_factor))
+
+
 def find_first_balance_with_candidate(
     *,
     low_exclusive: int,
@@ -83,7 +129,20 @@ def summarize_threshold(
     low_exclusive: int,
     high_inclusive: int,
     candidate_provider: Callable[[int], list[ExecutableCandidateShift]],
+    auto_expand_high: bool = False,
+    max_high: int = 100_000,
+    high_growth_factor: int = 2,
 ) -> CapitalThresholdResult:
+    if auto_expand_high:
+        high_inclusive = expand_high_boundary_until_candidate(
+            low_exclusive=low_exclusive,
+            high_inclusive=high_inclusive,
+            symbol=symbol,
+            candidate_provider=candidate_provider,
+            max_high=max_high,
+            high_growth_factor=high_growth_factor,
+        )
+
     balance = find_first_balance_with_candidate(
         low_exclusive=low_exclusive,
         high_inclusive=high_inclusive,
@@ -132,17 +191,29 @@ def print_result(result: CapitalThresholdResult, risk_fraction: float) -> None:
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--risk-fraction", type=float, default=0.01)
-    parser.add_argument("--any-low", type=int, default=120)
+    parser.add_argument("--any-low", type=int, default=0)
     parser.add_argument("--any-high", type=int, default=250)
-    parser.add_argument("--usdjpy-low", type=int, default=120)
+    parser.add_argument("--usdjpy-low", type=int, default=0)
     parser.add_argument("--usdjpy-high", type=int, default=250)
-    parser.add_argument("--xauusd-low", type=int, default=550)
+    parser.add_argument("--xauusd-low", type=int, default=0)
     parser.add_argument("--xauusd-high", type=int, default=1000)
+    parser.add_argument("--max-high", type=int, default=100_000)
+    parser.add_argument("--high-growth-factor", type=int, default=2)
+    parser.add_argument(
+        "--no-auto-expand-high",
+        action="store_true",
+        help="Disable automatic high-boundary expansion.",
+    )
     args = parser.parse_args()
+
+    if args.risk_fraction <= 0:
+        raise ValueError("--risk-fraction must be positive")
 
     cache: dict[int, list[ExecutableCandidateShift]] = {}
 
     def provider(balance: int) -> list[ExecutableCandidateShift]:
+        if balance <= 0:
+            return []
         if balance not in cache:
             cache[balance] = scan_real_h4_exports(
                 balance=float(balance),
@@ -157,6 +228,8 @@ def main() -> int:
     print("No MT5 access. No order execution.")
     print()
 
+    auto_expand_high = not args.no_auto_expand_high
+
     results = [
         summarize_threshold(
             label="ANY",
@@ -164,6 +237,9 @@ def main() -> int:
             low_exclusive=args.any_low,
             high_inclusive=args.any_high,
             candidate_provider=provider,
+            auto_expand_high=auto_expand_high,
+            max_high=args.max_high,
+            high_growth_factor=args.high_growth_factor,
         ),
         summarize_threshold(
             label="USDJPY",
@@ -171,6 +247,9 @@ def main() -> int:
             low_exclusive=args.usdjpy_low,
             high_inclusive=args.usdjpy_high,
             candidate_provider=provider,
+            auto_expand_high=auto_expand_high,
+            max_high=args.max_high,
+            high_growth_factor=args.high_growth_factor,
         ),
         summarize_threshold(
             label="XAUUSD",
@@ -178,6 +257,9 @@ def main() -> int:
             low_exclusive=args.xauusd_low,
             high_inclusive=args.xauusd_high,
             candidate_provider=provider,
+            auto_expand_high=auto_expand_high,
+            max_high=args.max_high,
+            high_growth_factor=args.high_growth_factor,
         ),
     ]
 

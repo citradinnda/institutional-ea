@@ -106,3 +106,50 @@ def test_summarize_threshold_returns_counts_and_first_matching_candidate():
     assert result.usdjpy_candidates == 1
     assert result.xauusd_candidates == 1
     assert result.first_matching_candidate.symbol == "XAUUSD"
+
+class _SyntheticCandidate:
+    def __init__(self, symbol: str) -> None:
+        self.symbol = symbol
+
+
+def test_expand_high_boundary_until_candidate_expands_initial_empty_high() -> None:
+    from scripts.scan_h024_capital_thresholds import expand_high_boundary_until_candidate
+
+    def provider(balance: int):
+        if balance >= 490:
+            return [_SyntheticCandidate("USDJPY")]
+        return []
+
+    expanded_high = expand_high_boundary_until_candidate(
+        low_exclusive=0,
+        high_inclusive=250,
+        symbol=None,
+        candidate_provider=provider,
+        max_high=1000,
+    )
+
+    assert expanded_high == 500
+
+
+def test_summarize_threshold_auto_expands_high_boundary() -> None:
+    from scripts.scan_h024_capital_thresholds import summarize_threshold
+
+    def provider(balance: int):
+        if balance >= 490:
+            return [_SyntheticCandidate("USDJPY")]
+        return []
+
+    result = summarize_threshold(
+        label="ANY",
+        symbol=None,
+        low_exclusive=0,
+        high_inclusive=250,
+        candidate_provider=provider,
+        auto_expand_high=True,
+        max_high=1000,
+    )
+
+    assert result.balance_usd == 490
+    assert result.total_candidates == 1
+    assert result.usdjpy_candidates == 1
+    assert result.xauusd_candidates == 0
