@@ -374,3 +374,9 @@ string f = "h024_ea_log_only_preflight.csv";
     assert "Verdict: PASS" in out
     assert "Copied EA source to:" not in out
     assert "MetaEditor compile return code:" not in out
+
+def test_collect_path_forwards_selected_expected_symbols_to_verifier():
+    from pathlib import Path
+
+    source = Path("scripts/run_h024_mt5_log_only_preflight_local.py").read_text(encoding="utf-8")
+    assert "rows, violations = run_verify(report_path, expected_symbols=expected_symbols)" in source

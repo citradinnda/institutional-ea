@@ -328,7 +328,7 @@ def main(argv: list[str] | None = None) -> int:
         return 0
 
     report_path = collect_runtime_log(paths)
-    rows, violations = run_verify(report_path)
+    rows, violations = run_verify(report_path, expected_symbols=expected_symbols)
 
     print(f"Collected runtime CSV to: {report_path}")
     print(f"Rows: {rows}")
