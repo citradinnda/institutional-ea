@@ -13,11 +13,30 @@ from collections import Counter, defaultdict
 from pathlib import Path
 
 
-EXPECTED_SYMBOLS = ("USDJPYm", "XAUUSDm")
-EXPECTED_NORMALIZED_SYMBOLS = {
-    "USDJPYm": "USDJPY",
-    "XAUUSDm": "XAUUSD",
-}
+DEFAULT_EXPECTED_SYMBOLS = ("USDJPYm", "XAUUSDm")
+CENT_ACCOUNT_EXPECTED_SYMBOLS = ("USDJPYc", "XAUUSDc")
+EXPECTED_SYMBOLS = DEFAULT_EXPECTED_SYMBOLS
+
+
+def _normalized_symbol_for_broker_symbol(symbol: str) -> str | None:
+    if symbol.startswith("USDJPY"):
+        return "USDJPY"
+    if symbol.startswith("XAUUSD"):
+        return "XAUUSD"
+    return None
+
+
+def expected_normalized_symbols_for(expected_symbols: tuple[str, ...]) -> dict[str, str]:
+    normalized: dict[str, str] = {}
+    for symbol in expected_symbols:
+        normalized_symbol = _normalized_symbol_for_broker_symbol(symbol)
+        if normalized_symbol is None:
+            raise ValueError(f"unsupported expected H024 broker symbol: {symbol!r}")
+        normalized[symbol] = normalized_symbol
+    return normalized
+
+
+EXPECTED_NORMALIZED_SYMBOLS = expected_normalized_symbols_for(EXPECTED_SYMBOLS)
 EXPECTED_EVENTS = {"H024_INTENDED_ACTION_HEADER", "H024_INTENDED_ACTION_ROW"}
 EXPECTED_SCHEMA_VERSION = "h024_intended_action_log_v1"
 EXPECTED_DECISIONS = {"WOULD_OPEN", "BLOCKED", "NO_ACTION"}
@@ -80,9 +99,15 @@ def _is_finite_number(value: str) -> bool:
     return math.isfinite(parsed)
 
 
-def summarize_runtime_csv(path: Path, *, require_would_open: bool = False) -> tuple[list[str], list[str]]:
+def summarize_runtime_csv(
+    path: Path,
+    *,
+    require_would_open: bool = False,
+    expected_symbols: tuple[str, ...] = DEFAULT_EXPECTED_SYMBOLS,
+) -> tuple[list[str], list[str]]:
     violations: list[str] = []
     lines: list[str] = []
+    expected_normalized_symbols = expected_normalized_symbols_for(expected_symbols)
 
     if not path.exists():
         return [], [f"missing CSV: {path}"]
@@ -138,9 +163,9 @@ def summarize_runtime_csv(path: Path, *, require_would_open: bool = False) -> tu
             violations.append(f"row {row_number}: bad timeframe {fields.get('timeframe')!r}")
         if symbol != row.get("symbol"):
             violations.append(f"row {row_number}: payload symbol does not match base symbol")
-        if symbol in EXPECTED_NORMALIZED_SYMBOLS and normalized_symbol != EXPECTED_NORMALIZED_SYMBOLS[symbol]:
+        if symbol in expected_normalized_symbols and normalized_symbol != expected_normalized_symbols[symbol]:
             violations.append(
-                f"row {row_number}: expected normalized_symbol {EXPECTED_NORMALIZED_SYMBOLS[symbol]!r}, "
+                f"row {row_number}: expected normalized_symbol {expected_normalized_symbols[symbol]!r}, "
                 f"got {normalized_symbol!r}"
             )
         if decision not in EXPECTED_DECISIONS:
@@ -159,7 +184,7 @@ def summarize_runtime_csv(path: Path, *, require_would_open: bool = False) -> tu
         except ValueError:
             violations.append(f"row {row_number}: bad integer field volume_digits={fields.get('volume_digits')!r}")
 
-    for symbol in EXPECTED_SYMBOLS:
+    for symbol in expected_symbols:
         if header_symbols[symbol] < 1:
             violations.append(f"missing intended-action header for {symbol}")
         if action_symbols[symbol] < 1:
@@ -181,7 +206,7 @@ def summarize_runtime_csv(path: Path, *, require_would_open: bool = False) -> tu
         lines.append(f"Observed WOULD_OPEN rows: {total_would_open}")
     lines.append("")
 
-    for symbol in EXPECTED_SYMBOLS:
+    for symbol in expected_symbols:
         lines.append(f"{symbol}:")
         lines.append(f"  headers: {header_symbols[symbol]}")
         lines.append(f"  rows: {action_symbols[symbol]}")
@@ -207,9 +232,19 @@ def main(argv: list[str] | None = None) -> int:
         action="store_true",
         help="Fail unless at least one valid runtime WOULD_OPEN intended-action row is present.",
     )
+    parser.add_argument(
+        "--cent-account-symbols",
+        action="store_true",
+        help="Expect Exness Standard Cent symbols USDJPYc and XAUUSDc instead of USDJPYm and XAUUSDm.",
+    )
     args = parser.parse_args(argv)
 
-    lines, violations = summarize_runtime_csv(args.csv_path, require_would_open=args.require_would_open)
+    expected_symbols = CENT_ACCOUNT_EXPECTED_SYMBOLS if args.cent_account_symbols else DEFAULT_EXPECTED_SYMBOLS
+    lines, violations = summarize_runtime_csv(
+        args.csv_path,
+        require_would_open=args.require_would_open,
+        expected_symbols=expected_symbols,
+    )
     for line in lines:
         print(line)
 

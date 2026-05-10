@@ -177,7 +177,27 @@ def _validate_intended_action_payload(index: int, event: str, row: dict, violati
         violations.append(f"row {index}: intended-action reason must be non-empty")
 
 ALLOWED_INTENT_ACTIONS = {"NO_ACTION", "BLOCKED", "WOULD_OPEN"}
-ALLOWED_SYMBOLS = {"USDJPYm", "XAUUSDm"}
+DEFAULT_ALLOWED_SYMBOLS = ("USDJPYm", "XAUUSDm")
+CENT_ACCOUNT_ALLOWED_SYMBOLS = ("USDJPYc", "XAUUSDc")
+ALLOWED_SYMBOLS = set(DEFAULT_ALLOWED_SYMBOLS)
+
+
+def _normalized_symbol_for_broker_symbol(symbol: str) -> str | None:
+    if symbol.startswith("USDJPY"):
+        return "USDJPY"
+    if symbol.startswith("XAUUSD"):
+        return "XAUUSD"
+    return None
+
+
+def expected_normalized_symbols_for(expected_symbols: tuple[str, ...]) -> dict[str, str]:
+    normalized: dict[str, str] = {}
+    for symbol in expected_symbols:
+        normalized_symbol = _normalized_symbol_for_broker_symbol(symbol)
+        if normalized_symbol is None:
+            raise ValueError(f"unsupported expected H024 broker symbol: {symbol!r}")
+        normalized[symbol] = normalized_symbol
+    return normalized
 EXPECTED_RUN_LABEL = "H024_LOG_ONLY_PREFLIGHT"
 EXPECTED_SCHEMA_VERSION = "h024_ea_log_only_preflight_v2"
 EXPECTED_EA_VERSION = "0.6"
@@ -214,7 +234,11 @@ def _intent_action(detail: str) -> str:
     return detail.split(":", 1)[0]
 
 
-def verify_h024_ea_preflight_log(path: Path) -> VerificationResult:
+def verify_h024_ea_preflight_log(
+    path: Path,
+    *,
+    expected_symbols: tuple[str, ...] = DEFAULT_ALLOWED_SYMBOLS,
+) -> VerificationResult:
     violations: list[str] = []
 
     if not path.exists():
@@ -323,7 +347,7 @@ def verify_h024_ea_preflight_log(path: Path) -> VerificationResult:
         if row.get("kill_switch_blocked") != "true":
             violations.append(f"row {index}: kill_switch_blocked must be true")
 
-        if symbol not in ALLOWED_SYMBOLS:
+        if symbol not in set(expected_symbols):
             violations.append(f"row {index}: unexpected symbol {symbol!r}")
         else:
             symbols_seen.add(symbol)
@@ -356,7 +380,7 @@ def verify_h024_ea_preflight_log(path: Path) -> VerificationResult:
     if init_count < 1:
         violations.append("log must include at least one INIT row")
 
-    missing_symbols = sorted(ALLOWED_SYMBOLS - symbols_seen)
+    missing_symbols = sorted(set(expected_symbols) - symbols_seen)
     if missing_symbols:
         violations.append(f"log missing required symbols: {missing_symbols}")
 
@@ -366,9 +390,15 @@ def verify_h024_ea_preflight_log(path: Path) -> VerificationResult:
 def main() -> int:
     parser = argparse.ArgumentParser(description="Verify H024 log-only EA runtime preflight CSV.")
     parser.add_argument("path", type=Path, help="Path to h024_ea_log_only_preflight.csv")
+    parser.add_argument(
+        "--cent-account-symbols",
+        action="store_true",
+        help="Expect Exness Standard Cent symbols USDJPYc and XAUUSDc instead of USDJPYm and XAUUSDm.",
+    )
     args = parser.parse_args()
 
-    result = verify_h024_ea_preflight_log(args.path)
+    expected_symbols = CENT_ACCOUNT_ALLOWED_SYMBOLS if args.cent_account_symbols else DEFAULT_ALLOWED_SYMBOLS
+    result = verify_h024_ea_preflight_log(args.path, expected_symbols=expected_symbols)
 
     print("H024 log-only EA runtime preflight verification")
     print("=" * 72)

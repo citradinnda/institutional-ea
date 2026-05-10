@@ -8,7 +8,8 @@ from datetime import datetime
 from pathlib import Path
 
 from scripts.verify_h024_ea_preflight_log import (
-    ALLOWED_SYMBOLS,
+    CENT_ACCOUNT_ALLOWED_SYMBOLS,
+    DEFAULT_ALLOWED_SYMBOLS,
     EXPECTED_EA_VERSION,
     EXPECTED_SCHEMA_VERSION,
     verify_h024_ea_preflight_log,
@@ -135,12 +136,21 @@ def collect_runtime_log(paths: LocalPreflightPaths) -> Path:
     return paths.report_path
 
 
-def run_verify(report_path: Path) -> tuple[int, list[str]]:
-    result = verify_h024_ea_preflight_log(report_path)
+def run_verify(
+    report_path: Path,
+    *,
+    expected_symbols: tuple[str, ...] = DEFAULT_ALLOWED_SYMBOLS,
+) -> tuple[int, list[str]]:
+    result = verify_h024_ea_preflight_log(report_path, expected_symbols=expected_symbols)
     return result.rows, result.violations
 
 
-def validate_automation_target(paths: LocalPreflightPaths, metaeditor: Path | None = None) -> list[str]:
+def validate_automation_target(
+    paths: LocalPreflightPaths,
+    metaeditor: Path | None = None,
+    *,
+    expected_symbols: tuple[str, ...] = DEFAULT_ALLOWED_SYMBOLS,
+) -> list[str]:
     """Validate the local MT5 target before any future profile/template automation.
 
     This is intentionally read-only. It does not attach EAs, launch GUI automation,
@@ -172,8 +182,9 @@ def validate_automation_target(paths: LocalPreflightPaths, metaeditor: Path | No
         if token not in source:
             violations.append(f"repo EA source missing expected token: {token}")
 
-    for symbol in sorted(ALLOWED_SYMBOLS):
-        if symbol not in {"USDJPYm", "XAUUSDm"}:
+    supported_symbols = set(DEFAULT_ALLOWED_SYMBOLS) | set(CENT_ACCOUNT_ALLOWED_SYMBOLS)
+    for symbol in sorted(expected_symbols):
+        if symbol not in supported_symbols:
             violations.append(f"unexpected verifier symbol configured: {symbol}")
 
     return violations
@@ -234,6 +245,11 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Reserved. Always rejected; attach/detach automation is not approved.",
     )
+    parser.add_argument(
+        "--cent-account-symbols",
+        action="store_true",
+        help="Expect Exness Standard Cent symbols USDJPYc and XAUUSDc instead of USDJPYm and XAUUSDm.",
+    )
     return parser
 
 
@@ -257,7 +273,7 @@ def main() -> int:
         return 2
 
     if args.automation_target_preflight:
-        violations = validate_automation_target(paths, args.metaeditor)
+        violations = validate_automation_target(paths, args.metaeditor, expected_symbols=expected_symbols)
         print("Automation target preflight:")
         print(f"- terminal_data_dir: {paths.terminal_data_dir}")
         print(f"- terminal_experts_dir: {paths.terminal_experts_dir}")
@@ -265,7 +281,7 @@ def main() -> int:
         print(f"- repo_ea_source: {paths.repo_ea_source}")
         print(f"- expected_schema_version: {EXPECTED_SCHEMA_VERSION}")
         print(f"- expected_ea_version: {EXPECTED_EA_VERSION}")
-        print(f"- expected_symbols: {', '.join(sorted(ALLOWED_SYMBOLS))}")
+        print(f"- expected_symbols: {', '.join(sorted(expected_symbols))}")
         print(f"Violations: {len(violations)}")
         for violation in violations:
             print(f"- {violation}")
