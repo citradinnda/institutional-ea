@@ -11,8 +11,22 @@ input string InpRuntimeMode = "log_only_preflight";
 input double InpRiskFraction = 0.01;
 input string InpOutputFile = "h024_ea_log_only_preflight.csv";
 input int    InpTimerSeconds = 1;
+input int    InpH024ClosedShift = 1;
 
 int g_file_handle = INVALID_HANDLE;
+
+int H024EffectiveClosedShift()
+{
+   if(InpH024ClosedShift < 1)
+   {
+      return 1;
+   }
+   if(InpH024ClosedShift > 240)
+   {
+      return 240;
+   }
+   return InpH024ClosedShift;
+}
 
 string BoolText(const bool value)
 {
@@ -147,7 +161,7 @@ string H024StrategyIntentDetail()
       return "NO_ACTION:strategy_unavailable_insufficient_h4_warmup";
    }
 
-   const int closed_shift = 1;
+   const int closed_shift = H024EffectiveClosedShift();
    const int slow_window = 5;
    const int slope_lag = 2;
    const int atr_window = 3;
@@ -653,7 +667,7 @@ void WriteH024StateObservationRow()
       return;
    }
 
-   const int closed_shift = 1;
+   const int closed_shift = H024EffectiveClosedShift();
    const int slow_window = 5;
    const int slope_lag = 2;
    const int atr_window = 3;

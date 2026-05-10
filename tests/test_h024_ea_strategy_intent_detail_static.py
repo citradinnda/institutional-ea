@@ -1,4 +1,4 @@
-﻿from pathlib import Path
+from pathlib import Path
 
 
 EA_SOURCE = Path("ea_mt5/Experts/H024_LogOnly_Preflight.mq5")
@@ -58,7 +58,7 @@ def test_h024_strategy_intent_detail_uses_closed_h4_log_only_inputs() -> None:
 
     assert "CopyRates(_Symbol, PERIOD_H4, 0, 256, rates)" in body
     assert "ArraySetAsSeries(rates, true);" in body
-    assert "const int closed_shift = 1;" in body
+    assert "const int closed_shift = H024EffectiveClosedShift();" in body
     assert 'return "NO_ACTION:strategy_unavailable_insufficient_h4_warmup";' in body
     assert "if(copied < 10)" in body
 
