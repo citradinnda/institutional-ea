@@ -14,7 +14,7 @@ from typing import Callable
 
 from scripts.scan_h024_executable_candidate_shifts import (
     ExecutableCandidateShift,
-    scan_real_h4_exports,
+    build_real_h4_executable_candidate_provider,
 )
 
 
@@ -331,16 +331,23 @@ def main() -> int:
     def make_provider(
         risk_fraction: float,
     ) -> Callable[[int], list[ExecutableCandidateShift]]:
+        if risk_fraction <= 0 or risk_fraction > 1:
+            raise ValueError("risk_fraction must be in (0, 1]")
+
+        real_provider: Callable[[float], list[ExecutableCandidateShift]] | None = None
         cache: dict[int, list[ExecutableCandidateShift]] = {}
 
         def provider(balance: int) -> list[ExecutableCandidateShift]:
+            nonlocal real_provider
+
             if balance <= 0:
                 return []
-            if balance not in cache:
-                cache[balance] = scan_real_h4_exports(
-                    balance=float(balance),
+            if real_provider is None:
+                real_provider = build_real_h4_executable_candidate_provider(
                     risk_fraction=float(risk_fraction),
                 )
+            if balance not in cache:
+                cache[balance] = real_provider(float(balance))
             return cache[balance]
 
         return provider

@@ -22,14 +22,22 @@ import csv
 import math
 from dataclasses import dataclass
 from pathlib import Path
-from types import SimpleNamespace
-from typing import Iterable
+from typing import Callable, Iterable, Mapping
 
 import pandas as pd
 
 from quantcore.data.mt5_loader import load_mt5_csv
 from quantcore.data.preflight import require_existing_files
-from quantcore.strategy.h024_runner import H024BridgeConfig, run_h024_bridge_shim
+from quantcore.strategy.h020 import H020SizingConfig, generate_h020_intent_panel
+from quantcore.strategy.h024 import generate_h024_signals
+from quantcore.strategy.h024_runner import (
+    H024BridgeConfig,
+    _common_h4_index,
+    _require_h4_frame,
+    _validate_h024_bridge_config,
+    _wilder_atr,
+    run_h024_bridge_shim,
+)
 from scripts.run_h020_strict_event_real import USDJPY_H4_PATH, XAUUSD_H4_PATH
 
 
@@ -52,6 +60,17 @@ class ExecutableCandidateShift:
     entry_price: float
     stop_price: float
     stop_distance: float
+
+
+@dataclass(frozen=True)
+class H024ExecutableCandidateScanInputs:
+    index: pd.DatetimeIndex
+    h4_by_symbol: Mapping[str, pd.DataFrame]
+    positions: pd.DataFrame
+    signals: pd.DataFrame
+    stops_long: pd.DataFrame
+    stops_short: pd.DataFrame
+    sizing_config: H020SizingConfig
 
 
 def _finite_nonzero(value: object) -> bool:
@@ -125,13 +144,130 @@ def scan_bridge_result_for_executable_shifts(
     return candidates
 
 
-def scan_real_h4_exports(
+def build_h024_executable_candidate_scan_inputs(
     *,
+    usdjpy_h4: pd.DataFrame,
+    xauusd_h4: pd.DataFrame,
+    config: H024BridgeConfig | None = None,
+) -> H024ExecutableCandidateScanInputs:
+    """Build reusable H024 signal/stop geometry for repeated H020 sizing scans."""
+
+    cfg = config or H024BridgeConfig()
+    _validate_h024_bridge_config(cfg)
+
+    raw_h4_by_symbol = {
+        "USDJPY": _require_h4_frame(usdjpy_h4, "USDJPY"),
+        "XAUUSD": _require_h4_frame(xauusd_h4, "XAUUSD"),
+    }
+    common_index = _common_h4_index(raw_h4_by_symbol)
+
+    h4_by_symbol = {
+        symbol: frame.reindex(common_index).copy()
+        for symbol, frame in raw_h4_by_symbol.items()
+    }
+
+    positions = pd.DataFrame(0.0, index=common_index, columns=["USDJPY", "XAUUSD"])
+    signals = pd.DataFrame(0.0, index=common_index, columns=["USDJPY", "XAUUSD"])
+    stops_long = pd.DataFrame(float("nan"), index=common_index, columns=["USDJPY", "XAUUSD"])
+    stops_short = pd.DataFrame(float("nan"), index=common_index, columns=["USDJPY", "XAUUSD"])
+
+    for symbol, raw_frame in raw_h4_by_symbol.items():
+        raw_signals = generate_h024_signals(raw_frame, config=cfg.signal_config)
+        signed_signals = raw_signals.astype(float) * float(cfg.signed_risk_fraction)
+        aligned_signals = signed_signals.reindex(common_index).fillna(0.0)
+
+        signals[symbol] = aligned_signals
+        positions[symbol] = aligned_signals
+
+        atr = _wilder_atr(raw_frame, cfg.atr_window).reindex(common_index)
+        stop_distance = atr * float(cfg.stop_atr_multiple)
+        close = h4_by_symbol[symbol]["close"].astype(float)
+
+        stops_long[symbol] = close - stop_distance
+        stops_short[symbol] = close + stop_distance
+
+    return H024ExecutableCandidateScanInputs(
+        index=common_index,
+        h4_by_symbol=h4_by_symbol,
+        positions=positions,
+        signals=signals,
+        stops_long=stops_long,
+        stops_short=stops_short,
+        sizing_config=cfg.sizing_config,
+    )
+
+
+def scan_h024_candidate_inputs_for_executable_shifts(
+    *,
+    scan_inputs: H024ExecutableCandidateScanInputs,
     balance: float,
-    risk_fraction: float,
 ) -> list[ExecutableCandidateShift]:
+    """Scan precomputed H024 geometry through H020 sizing at one balance."""
+
     if balance <= 0:
         raise ValueError("balance must be positive")
+
+    panels = generate_h020_intent_panel(
+        positions=scan_inputs.positions,
+        stops_long=scan_inputs.stops_long,
+        stops_short=scan_inputs.stops_short,
+        h4_by_symbol=scan_inputs.h4_by_symbol,
+        equity_usd=float(balance),
+        config=scan_inputs.sizing_config,
+    )
+
+    row_by_decision = {
+        pd.Timestamp(timestamp): row_number
+        for row_number, timestamp in enumerate(scan_inputs.index[:-1])
+    }
+
+    candidates: list[ExecutableCandidateShift] = []
+    for panel in panels:
+        row_number = row_by_decision.get(pd.Timestamp(panel.decision_time))
+        if row_number is None:
+            continue
+
+        ea_closed_shift = len(scan_inputs.index) - row_number
+
+        for symbol in ("USDJPY", "XAUUSD"):
+            intent = panel.intents.get(symbol)
+            if intent is None or intent.suppressed or intent.side is None:
+                continue
+
+            entry_price = float(intent.entry_raw_price)
+            stop_price = float(intent.stop_price)
+            stop_distance = float(intent.raw_stop_distance)
+
+            if not all(
+                math.isfinite(value) and value > 0.0
+                for value in (entry_price, stop_price, stop_distance)
+            ):
+                continue
+
+            candidates.append(
+                ExecutableCandidateShift(
+                    symbol=symbol,
+                    side=intent.side,
+                    decision_time=pd.Timestamp(panel.decision_time),
+                    entry_time=pd.Timestamp(panel.entry_time),
+                    ea_closed_shift_from_latest_common_h4=ea_closed_shift,
+                    signal_signed_risk_fraction=float(intent.signed_risk_fraction),
+                    final_signed_risk_fraction=float(intent.final_signed_risk_fraction),
+                    entry_price=entry_price,
+                    stop_price=stop_price,
+                    stop_distance=stop_distance,
+                )
+            )
+
+    return candidates
+
+
+def build_real_h4_executable_candidate_provider(
+    *,
+    risk_fraction: float,
+) -> Callable[[float], list[ExecutableCandidateShift]]:
+    """Load broker-native H4 once and return a balance -> candidates provider."""
+
     if risk_fraction <= 0 or risk_fraction > 1:
         raise ValueError("risk_fraction must be in (0, 1]")
 
@@ -142,21 +278,37 @@ def scan_real_h4_exports(
 
     usdjpy_h4 = load_mt5_csv(USDJPY_H4_PATH).bars
     xauusd_h4 = load_mt5_csv(XAUUSD_H4_PATH).bars
-
-    bridge_result = run_h024_bridge_shim(
-        usdjpy_ohlcv=usdjpy_h4,
-        xauusd_ohlcv=xauusd_h4,
-        config=H024BridgeConfig(
-            signed_risk_fraction=float(risk_fraction),
-            starting_equity_usd=float(balance),
-        ),
-    )
-
-    return scan_bridge_result_for_executable_shifts(
-        bridge_result=bridge_result,
+    scan_inputs = build_h024_executable_candidate_scan_inputs(
         usdjpy_h4=usdjpy_h4,
         xauusd_h4=xauusd_h4,
+        config=H024BridgeConfig(signed_risk_fraction=float(risk_fraction)),
     )
+
+    cache: dict[float, list[ExecutableCandidateShift]] = {}
+
+    def provider(balance: float) -> list[ExecutableCandidateShift]:
+        if balance <= 0:
+            raise ValueError("balance must be positive")
+        key = float(balance)
+        if key not in cache:
+            cache[key] = scan_h024_candidate_inputs_for_executable_shifts(
+                scan_inputs=scan_inputs,
+                balance=key,
+            )
+        return cache[key]
+
+    return provider
+
+
+def scan_real_h4_exports(
+    *,
+    balance: float,
+    risk_fraction: float,
+) -> list[ExecutableCandidateShift]:
+    provider = build_real_h4_executable_candidate_provider(
+        risk_fraction=float(risk_fraction),
+    )
+    return provider(float(balance))
 
 
 def write_candidates_csv(
