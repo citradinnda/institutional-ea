@@ -1,4 +1,4 @@
-﻿"""Find exact H024 capital thresholds for executable candidate shifts.
+"""Find exact H024 capital thresholds for executable candidate shifts.
 
 Research only. No demo/live/Phase 4 approval.
 Pure Python. Broker-native H4 CSV read only.
@@ -26,6 +26,14 @@ class CapitalThresholdResult:
     usdjpy_candidates: int
     xauusd_candidates: int
     first_matching_candidate: ExecutableCandidateShift
+
+
+@dataclass(frozen=True)
+class RiskFractionThresholdComparisonRow:
+    risk_fraction: float
+    any_threshold: CapitalThresholdResult
+    usdjpy_threshold: CapitalThresholdResult
+    xauusd_threshold: CapitalThresholdResult
 
 
 def count_candidates(
@@ -167,6 +175,110 @@ def summarize_threshold(
     )
 
 
+def parse_risk_fraction_list(raw: str) -> list[float]:
+    values: list[float] = []
+    for part in raw.split(","):
+        stripped = part.strip()
+        if not stripped:
+            raise ValueError("--risk-fractions contains an empty value")
+        value = float(stripped)
+        if value <= 0:
+            raise ValueError("--risk-fractions values must be positive")
+        values.append(value)
+
+    if not values:
+        raise ValueError("--risk-fractions must contain at least one value")
+    return values
+
+
+def summarize_risk_fraction_threshold_comparison(
+    *,
+    risk_fractions: list[float],
+    candidate_provider_factory: Callable[
+        [float],
+        Callable[[int], list[ExecutableCandidateShift]],
+    ],
+    any_low: int = 0,
+    any_high: int = 250,
+    usdjpy_low: int = 0,
+    usdjpy_high: int = 250,
+    xauusd_low: int = 0,
+    xauusd_high: int = 1000,
+    auto_expand_high: bool = True,
+    max_high: int = 100_000,
+    high_growth_factor: int = 2,
+) -> list[RiskFractionThresholdComparisonRow]:
+    if not risk_fractions:
+        raise ValueError("risk_fractions must contain at least one value")
+
+    rows: list[RiskFractionThresholdComparisonRow] = []
+    for risk_fraction in risk_fractions:
+        if risk_fraction <= 0:
+            raise ValueError("risk_fractions values must be positive")
+
+        provider = candidate_provider_factory(risk_fraction)
+        any_threshold = summarize_threshold(
+            label="ANY",
+            symbol=None,
+            low_exclusive=any_low,
+            high_inclusive=any_high,
+            candidate_provider=provider,
+            auto_expand_high=auto_expand_high,
+            max_high=max_high,
+            high_growth_factor=high_growth_factor,
+        )
+        usdjpy_threshold = summarize_threshold(
+            label="USDJPY",
+            symbol="USDJPY",
+            low_exclusive=usdjpy_low,
+            high_inclusive=usdjpy_high,
+            candidate_provider=provider,
+            auto_expand_high=auto_expand_high,
+            max_high=max_high,
+            high_growth_factor=high_growth_factor,
+        )
+        xauusd_threshold = summarize_threshold(
+            label="XAUUSD",
+            symbol="XAUUSD",
+            low_exclusive=xauusd_low,
+            high_inclusive=xauusd_high,
+            candidate_provider=provider,
+            auto_expand_high=auto_expand_high,
+            max_high=max_high,
+            high_growth_factor=high_growth_factor,
+        )
+        rows.append(
+            RiskFractionThresholdComparisonRow(
+                risk_fraction=risk_fraction,
+                any_threshold=any_threshold,
+                usdjpy_threshold=usdjpy_threshold,
+                xauusd_threshold=xauusd_threshold,
+            )
+        )
+
+    return rows
+
+
+def print_risk_fraction_threshold_comparison(
+    rows: list[RiskFractionThresholdComparisonRow],
+) -> None:
+    print("Risk fraction    ANY threshold    USDJPY threshold    XAUUSD threshold")
+    for row in rows:
+        print(
+            f"{row.risk_fraction:.2%}    "
+            f"{row.any_threshold.balance_usd:,} USD    "
+            f"{row.usdjpy_threshold.balance_usd:,} USD    "
+            f"{row.xauusd_threshold.balance_usd:,} USD"
+        )
+
+    print()
+    print("Verdict: PASS")
+    print(
+        "Thresholds quantified only; no higher-risk, no higher-balance, "
+        "no demo/live, and no execution approval implied."
+    )
+
+
 def print_result(result: CapitalThresholdResult, risk_fraction: float) -> None:
     candidate = result.first_matching_candidate
 
@@ -191,6 +303,13 @@ def print_result(result: CapitalThresholdResult, risk_fraction: float) -> None:
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--risk-fraction", type=float, default=0.01)
+    parser.add_argument(
+        "--risk-fractions",
+        help=(
+            "Comma-separated risk fractions for comparison-table mode, "
+            "for example: 0.005,0.0075,0.01,0.015,0.02"
+        ),
+    )
     parser.add_argument("--any-low", type=int, default=0)
     parser.add_argument("--any-high", type=int, default=250)
     parser.add_argument("--usdjpy-low", type=int, default=0)
@@ -209,19 +328,29 @@ def main() -> int:
     if args.risk_fraction <= 0:
         raise ValueError("--risk-fraction must be positive")
 
-    cache: dict[int, list[ExecutableCandidateShift]] = {}
+    def make_provider(
+        risk_fraction: float,
+    ) -> Callable[[int], list[ExecutableCandidateShift]]:
+        cache: dict[int, list[ExecutableCandidateShift]] = {}
 
-    def provider(balance: int) -> list[ExecutableCandidateShift]:
-        if balance <= 0:
-            return []
-        if balance not in cache:
-            cache[balance] = scan_real_h4_exports(
-                balance=float(balance),
-                risk_fraction=float(args.risk_fraction),
-            )
-        return cache[balance]
+        def provider(balance: int) -> list[ExecutableCandidateShift]:
+            if balance <= 0:
+                return []
+            if balance not in cache:
+                cache[balance] = scan_real_h4_exports(
+                    balance=float(balance),
+                    risk_fraction=float(risk_fraction),
+                )
+            return cache[balance]
 
-    print("H024 exact capital threshold scan")
+        return provider
+
+    provider = make_provider(float(args.risk_fraction))
+
+    if args.risk_fractions is None:
+        print("H024 exact capital threshold scan")
+    else:
+        print("H024 risk-fraction capital threshold comparison")
     print("=" * 72)
     print("Research only. No demo/live/Phase 4 approval.")
     print("Pure Python. Broker-native H4 CSV read only.")
@@ -229,6 +358,23 @@ def main() -> int:
     print()
 
     auto_expand_high = not args.no_auto_expand_high
+
+    if args.risk_fractions is not None:
+        rows = summarize_risk_fraction_threshold_comparison(
+            risk_fractions=parse_risk_fraction_list(args.risk_fractions),
+            candidate_provider_factory=make_provider,
+            any_low=args.any_low,
+            any_high=args.any_high,
+            usdjpy_low=args.usdjpy_low,
+            usdjpy_high=args.usdjpy_high,
+            xauusd_low=args.xauusd_low,
+            xauusd_high=args.xauusd_high,
+            auto_expand_high=auto_expand_high,
+            max_high=args.max_high,
+            high_growth_factor=args.high_growth_factor,
+        )
+        print_risk_fraction_threshold_comparison(rows)
+        return 0
 
     results = [
         summarize_threshold(
@@ -286,9 +432,10 @@ def main() -> int:
 
     print()
     print("Verdict: PASS")
-    print("Thresholds quantified only; no higher-balance approval or execution approval implied.")
+    print("Thresholds quantified only; no higher-risk, no higher-balance, no demo/live, and no execution approval implied.")
     return 0
 
 
 if __name__ == "__main__":
     raise SystemExit(main())
+

@@ -8,6 +8,9 @@ from scripts.scan_h024_capital_thresholds import (
     CapitalThresholdResult,
     count_candidates,
     find_first_balance_with_candidate,
+    parse_risk_fraction_list,
+    print_risk_fraction_threshold_comparison,
+    summarize_risk_fraction_threshold_comparison,
     summarize_threshold,
 )
 from scripts.scan_h024_executable_candidate_shifts import ExecutableCandidateShift
@@ -153,3 +156,97 @@ def test_summarize_threshold_auto_expands_high_boundary() -> None:
     assert result.total_candidates == 1
     assert result.usdjpy_candidates == 1
     assert result.xauusd_candidates == 0
+
+def test_parse_risk_fraction_list_parses_comma_separated_values() -> None:
+    assert parse_risk_fraction_list("0.005, 0.0075,0.01") == [
+        0.005,
+        0.0075,
+        0.01,
+    ]
+
+
+def test_parse_risk_fraction_list_rejects_empty_and_nonpositive_values() -> None:
+    with pytest.raises(ValueError, match="empty"):
+        parse_risk_fraction_list("0.005,,0.01")
+
+    with pytest.raises(ValueError, match="positive"):
+        parse_risk_fraction_list("0.005,0")
+
+
+def test_summarize_risk_fraction_threshold_comparison_builds_rows() -> None:
+    thresholds = {
+        0.01: {"USDJPY": 245, "XAUUSD": 935},
+        0.02: {"USDJPY": 123, "XAUUSD": 468},
+    }
+
+    def factory(risk_fraction: float):
+        def provider(balance: int):
+            candidates = []
+            if balance >= thresholds[risk_fraction]["USDJPY"]:
+                candidates.append(_candidate("USDJPY"))
+            if balance >= thresholds[risk_fraction]["XAUUSD"]:
+                candidates.append(_candidate("XAUUSD"))
+            return candidates
+
+        return provider
+
+    rows = summarize_risk_fraction_threshold_comparison(
+        risk_fractions=[0.01, 0.02],
+        candidate_provider_factory=factory,
+        any_high=250,
+        usdjpy_high=250,
+        xauusd_high=500,
+        max_high=1000,
+    )
+
+    assert [row.risk_fraction for row in rows] == [0.01, 0.02]
+    assert rows[0].any_threshold.balance_usd == 245
+    assert rows[0].usdjpy_threshold.balance_usd == 245
+    assert rows[0].xauusd_threshold.balance_usd == 935
+    assert rows[1].any_threshold.balance_usd == 123
+    assert rows[1].usdjpy_threshold.balance_usd == 123
+    assert rows[1].xauusd_threshold.balance_usd == 468
+
+
+def test_print_risk_fraction_threshold_comparison_outputs_research_only_table(
+    capsys,
+) -> None:
+    result_245 = CapitalThresholdResult(
+        label="ANY",
+        balance_usd=245,
+        total_candidates=1,
+        usdjpy_candidates=1,
+        xauusd_candidates=0,
+        first_matching_candidate=_candidate("USDJPY"),
+    )
+    result_935 = CapitalThresholdResult(
+        label="XAUUSD",
+        balance_usd=935,
+        total_candidates=569,
+        usdjpy_candidates=568,
+        xauusd_candidates=1,
+        first_matching_candidate=_candidate("XAUUSD"),
+    )
+    rows = [
+        __import__(
+            "scripts.scan_h024_capital_thresholds",
+            fromlist=["RiskFractionThresholdComparisonRow"],
+        ).RiskFractionThresholdComparisonRow(
+            risk_fraction=0.01,
+            any_threshold=result_245,
+            usdjpy_threshold=result_245,
+            xauusd_threshold=result_935,
+        )
+    ]
+
+    print_risk_fraction_threshold_comparison(rows)
+
+    output = capsys.readouterr().out
+    assert "Risk fraction" in output
+    assert "1.00%" in output
+    assert "245 USD" in output
+    assert "935 USD" in output
+    assert "no higher-risk" in output
+    assert "no higher-balance" in output
+    assert "no execution approval" in output
+
