@@ -1000,7 +1000,7 @@ python scripts\summarize_h024_ea_intended_action_runtime.py `
 
 Useful compact extraction:
 
-@(')
+@'
 import csv, re
 from pathlib import Path
 
@@ -1028,7 +1028,7 @@ for i, row in enumerate(rows, start=1):
         print(f"ROW {i}: symbol={row[34]} action={row[37]} side={row[38]} closed={closed}")
         print(f"  entry={row[39]} stop={row[40]} raw_lots={row[47]} final_lots={row[48]}")
         print(f"  reason={reason}")
-(')@ | python -
+'@ | python -
 22. Recommended Next Engineering Options
 Option A — Real-balance evidence
 
