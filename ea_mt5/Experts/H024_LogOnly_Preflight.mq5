@@ -12,20 +12,86 @@ input double InpRiskFraction = 0.01;
 input string InpOutputFile = "h024_ea_log_only_preflight.csv";
 input int    InpTimerSeconds = 1;
 input int    InpH024ClosedShift = 1;
+input bool   InpH024ReplaySweepEnabled = false;
+input int    InpH024ReplaySweepStartShift = 1;
+input int    InpH024ReplaySweepEndShift = 1;
+input int    InpH024ReplaySweepMaxRows = 20;
 
 int g_file_handle = INVALID_HANDLE;
+int g_h024_replay_sweep_override_shift = 0;
+bool g_h024_replay_sweep_written = false;
 
 int H024EffectiveClosedShift()
 {
-   if(InpH024ClosedShift < 1)
+   if(g_h024_replay_sweep_override_shift <= 0)
+   {
+      if(InpH024ClosedShift < 1)
+      {
+         return 1;
+      }
+      if(InpH024ClosedShift > 240)
+      {
+         return 240;
+      }
+      return InpH024ClosedShift;
+   }
+
+   int requested_shift = InpH024ClosedShift;
+   if(g_h024_replay_sweep_override_shift > 0)
+   {
+      requested_shift = g_h024_replay_sweep_override_shift;
+   }
+
+   if(requested_shift < 1)
    {
       return 1;
    }
-   if(InpH024ClosedShift > 240)
+   if(requested_shift > 240)
    {
       return 240;
    }
-   return InpH024ClosedShift;
+   return requested_shift;
+}
+
+int H024ReplaySweepStartShift()
+{
+   if(InpH024ReplaySweepStartShift < 1)
+   {
+      return 1;
+   }
+   if(InpH024ReplaySweepStartShift > 240)
+   {
+      return 240;
+   }
+   return InpH024ReplaySweepStartShift;
+}
+
+int H024ReplaySweepEndShift()
+{
+   const int start_shift = H024ReplaySweepStartShift();
+   int end_shift = InpH024ReplaySweepEndShift;
+   if(end_shift < start_shift)
+   {
+      return start_shift;
+   }
+   if(end_shift > 240)
+   {
+      return 240;
+   }
+   return end_shift;
+}
+
+int H024ReplaySweepMaxRows()
+{
+   if(InpH024ReplaySweepMaxRows < 1)
+   {
+      return 1;
+   }
+   if(InpH024ReplaySweepMaxRows > 240)
+   {
+      return 240;
+   }
+   return InpH024ReplaySweepMaxRows;
 }
 
 string BoolText(const bool value)
@@ -844,6 +910,54 @@ void WriteH024StateObservationRow()
    WritePreflightRow("H024_STATE_OBSERVATION", detail);
 }
 
+void WriteH024ReplaySweepRows()
+{
+   if(!InpH024ReplaySweepEnabled)
+   {
+      return;
+   }
+   if(g_h024_replay_sweep_written)
+   {
+      return;
+   }
+
+   g_h024_replay_sweep_written = true;
+
+   const int start_shift = H024ReplaySweepStartShift();
+   const int end_shift = H024ReplaySweepEndShift();
+   const int max_rows = H024ReplaySweepMaxRows();
+
+   WritePreflightRow(
+      "H024_REPLAY_SWEEP",
+      StringFormat(
+         "start_shift=%d;end_shift=%d;max_rows=%d;mode=log_only_no_execution",
+         start_shift,
+         end_shift,
+         max_rows
+      )
+   );
+
+   int rows_written = 0;
+   for(int shift = start_shift; shift <= end_shift && rows_written < max_rows; shift++)
+   {
+      g_h024_replay_sweep_override_shift = shift;
+      WritePreflightRow(
+         "H024_REPLAY_SWEEP_SHIFT",
+         StringFormat("closed_shift=%d;mode=log_only_no_execution", shift)
+      );
+      WriteH024StateObservationRow();
+      WriteH024IntendedActionRuntimeRow();
+      rows_written++;
+   }
+
+   g_h024_replay_sweep_override_shift = 0;
+
+   WritePreflightRow(
+      "H024_REPLAY_SWEEP_DONE",
+      StringFormat("rows_written=%d;mode=log_only_no_execution", rows_written)
+   );
+}
+
 int OnInit()
 {
    if(!OpenLogFile())
@@ -856,10 +970,20 @@ int OnInit()
    WriteIntentRow();
    WriteMarketStateRow();
    WriteBarObservationRow();
-   WriteH024StateObservationRow();
-   WriteH024StrategyIntentRow();
-   WriteH024IntendedActionHeaderRow();
-   WriteH024IntendedActionRuntimeRow();
+
+   if(InpH024ReplaySweepEnabled)
+   {
+      WriteH024IntendedActionHeaderRow();
+      WriteH024ReplaySweepRows();
+   }
+   else
+   {
+      WriteH024StateObservationRow();
+      WriteH024StrategyIntentRow();
+      WriteH024IntendedActionHeaderRow();
+      WriteH024IntendedActionRuntimeRow();
+   }
+
    return INIT_SUCCEEDED;
 }
 
@@ -869,9 +993,13 @@ void OnTick()
    WriteIntentRow();
    WriteMarketStateRow();
    WriteBarObservationRow();
-   WriteH024StateObservationRow();
-   WriteH024StrategyIntentRow();
-   WriteH024IntendedActionRuntimeRow();
+
+   if(!InpH024ReplaySweepEnabled)
+   {
+      WriteH024StateObservationRow();
+      WriteH024StrategyIntentRow();
+      WriteH024IntendedActionRuntimeRow();
+   }
 }
 
 void OnTimer()
@@ -879,9 +1007,13 @@ void OnTimer()
    WriteIntentRow();
    WriteMarketStateRow();
    WriteBarObservationRow();
-   WriteH024StateObservationRow();
-   WriteH024StrategyIntentRow();
-   WriteH024IntendedActionRuntimeRow();
+
+   if(!InpH024ReplaySweepEnabled)
+   {
+      WriteH024StateObservationRow();
+      WriteH024StrategyIntentRow();
+      WriteH024IntendedActionRuntimeRow();
+   }
 }
 
 void OnDeinit(const int reason)
