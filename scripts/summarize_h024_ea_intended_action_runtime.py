@@ -8,13 +8,20 @@ from __future__ import annotations
 
 import argparse
 import csv
+import math
 from collections import Counter, defaultdict
 from pathlib import Path
 
 
 EXPECTED_SYMBOLS = ("USDJPYm", "XAUUSDm")
+EXPECTED_NORMALIZED_SYMBOLS = {
+    "USDJPYm": "USDJPY",
+    "XAUUSDm": "XAUUSD",
+}
 EXPECTED_EVENTS = {"H024_INTENDED_ACTION_HEADER", "H024_INTENDED_ACTION_ROW"}
 EXPECTED_SCHEMA_VERSION = "h024_intended_action_log_v1"
+EXPECTED_DECISIONS = {"WOULD_OPEN", "BLOCKED", "NO_ACTION"}
+EXPECTED_WOULD_OPEN_DIRECTIONS = {"long", "short"}
 
 INTENDED_ACTION_ROW_FIELDS = [
     "schema_version",
@@ -41,6 +48,22 @@ INTENDED_ACTION_ROW_FIELDS = [
     "reason",
 ]
 
+NUMERIC_FIELDS = [
+    "entry_price",
+    "stop_price",
+    "stop_distance_price",
+    "tick_size",
+    "tick_value_usd_per_lot",
+    "account_balance_usd",
+    "risk_fraction",
+    "risk_usd",
+    "raw_lots",
+    "lots",
+    "min_volume",
+    "max_volume",
+    "volume_step",
+]
+
 
 def _extra_fields(row: dict[str, str]) -> list[str]:
     extra = row.get(None)  # type: ignore[arg-type]
@@ -49,7 +72,15 @@ def _extra_fields(row: dict[str, str]) -> list[str]:
     return [str(value) for value in extra]
 
 
-def summarize_runtime_csv(path: Path) -> tuple[list[str], list[str]]:
+def _is_finite_number(value: str) -> bool:
+    try:
+        parsed = float(value)
+    except ValueError:
+        return False
+    return math.isfinite(parsed)
+
+
+def summarize_runtime_csv(path: Path, *, require_would_open: bool = False) -> tuple[list[str], list[str]]:
     violations: list[str] = []
     lines: list[str] = []
 
@@ -76,6 +107,7 @@ def summarize_runtime_csv(path: Path) -> tuple[list[str], list[str]]:
 
     decisions_by_symbol: dict[str, Counter[str]] = defaultdict(Counter)
     normalized_by_symbol: dict[str, set[str]] = defaultdict(set)
+    total_would_open = 0
 
     for row_number, row in enumerate(rows, start=2):
         if row.get("event") != "H024_INTENDED_ACTION_ROW":
@@ -97,20 +129,44 @@ def summarize_runtime_csv(path: Path) -> tuple[list[str], list[str]]:
         decisions_by_symbol[symbol][decision] += 1
         normalized_by_symbol[symbol].add(normalized_symbol)
 
+        if decision == "WOULD_OPEN":
+            total_would_open += 1
+
         if fields.get("schema_version") != EXPECTED_SCHEMA_VERSION:
             violations.append(f"row {row_number}: bad schema_version {fields.get('schema_version')!r}")
         if fields.get("timeframe") != "H4":
             violations.append(f"row {row_number}: bad timeframe {fields.get('timeframe')!r}")
         if symbol != row.get("symbol"):
             violations.append(f"row {row_number}: payload symbol does not match base symbol")
-        if decision not in {"WOULD_OPEN", "BLOCKED", "NO_ACTION"}:
+        if symbol in EXPECTED_NORMALIZED_SYMBOLS and normalized_symbol != EXPECTED_NORMALIZED_SYMBOLS[symbol]:
+            violations.append(
+                f"row {row_number}: expected normalized_symbol {EXPECTED_NORMALIZED_SYMBOLS[symbol]!r}, "
+                f"got {normalized_symbol!r}"
+            )
+        if decision not in EXPECTED_DECISIONS:
             violations.append(f"row {row_number}: bad decision {decision!r}")
+        if decision == "WOULD_OPEN" and fields.get("direction") not in EXPECTED_WOULD_OPEN_DIRECTIONS:
+            violations.append(f"row {row_number}: WOULD_OPEN requires long or short direction")
+        if not fields.get("reason", "").strip():
+            violations.append(f"row {row_number}: reason is empty")
+
+        for numeric_field in NUMERIC_FIELDS:
+            if not _is_finite_number(fields.get(numeric_field, "")):
+                violations.append(f"row {row_number}: bad numeric field {numeric_field}={fields.get(numeric_field)!r}")
+
+        try:
+            int(fields.get("volume_digits", ""))
+        except ValueError:
+            violations.append(f"row {row_number}: bad integer field volume_digits={fields.get('volume_digits')!r}")
 
     for symbol in EXPECTED_SYMBOLS:
         if header_symbols[symbol] < 1:
             violations.append(f"missing intended-action header for {symbol}")
         if action_symbols[symbol] < 1:
             violations.append(f"missing intended-action rows for {symbol}")
+
+    if require_would_open and total_would_open < 1:
+        violations.append("missing required runtime WOULD_OPEN intended-action row")
 
     lines.append("H024 intended-action runtime summary")
     lines.append("=" * 72)
@@ -120,6 +176,9 @@ def summarize_runtime_csv(path: Path) -> tuple[list[str], list[str]]:
     lines.append(f"Total rows: {len(rows)}")
     lines.append(f"Intended-action header rows: {len(header_rows)}")
     lines.append(f"Intended-action data rows: {len(action_rows)}")
+    if require_would_open:
+        lines.append("Required WOULD_OPEN rows: at least 1")
+        lines.append(f"Observed WOULD_OPEN rows: {total_would_open}")
     lines.append("")
 
     for symbol in EXPECTED_SYMBOLS:
@@ -143,9 +202,14 @@ def summarize_runtime_csv(path: Path) -> tuple[list[str], list[str]]:
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("csv_path", type=Path)
+    parser.add_argument(
+        "--require-would-open",
+        action="store_true",
+        help="Fail unless at least one valid runtime WOULD_OPEN intended-action row is present.",
+    )
     args = parser.parse_args(argv)
 
-    lines, violations = summarize_runtime_csv(args.csv_path)
+    lines, violations = summarize_runtime_csv(args.csv_path, require_would_open=args.require_would_open)
     for line in lines:
         print(line)
 
