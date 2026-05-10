@@ -492,7 +492,6 @@ int OnInit()
    WriteBarObservationRow();
    WriteH024StateObservationRow();
    WriteH024StrategyIntentRow();
-   WriteH024StrategyIntentRow();
    return INIT_SUCCEEDED;
 }
 
@@ -504,8 +503,6 @@ void OnTick()
    WriteBarObservationRow();
    WriteH024StateObservationRow();
    WriteH024StrategyIntentRow();
-   WriteH024StrategyIntentRow();
-   WriteH024StrategyIntentRow();
 }
 
 void OnTimer()
@@ -514,7 +511,6 @@ void OnTimer()
    WriteMarketStateRow();
    WriteBarObservationRow();
    WriteH024StateObservationRow();
-   WriteH024StrategyIntentRow();
    WriteH024StrategyIntentRow();
 }
 
