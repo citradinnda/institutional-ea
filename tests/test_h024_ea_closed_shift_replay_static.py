@@ -21,7 +21,7 @@ def test_h024_log_only_ea_uses_effective_closed_shift_instead_of_hard_coded_shif
     source = read_source()
 
     assert "const int closed_shift = 1;" not in source
-    assert source.count("const int closed_shift = H024EffectiveClosedShift();") == 2
+    assert source.count("const int closed_shift = H024EffectiveClosedShift();") == 3
 
 
 def test_h024_closed_shift_replay_does_not_add_trade_api_surface():
