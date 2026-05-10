@@ -26,6 +26,7 @@ from typing import Callable, Iterable, Mapping
 
 import pandas as pd
 
+from quantcore.backtest.portfolio import InstrumentSpec
 from quantcore.data.mt5_loader import load_mt5_csv
 from quantcore.data.preflight import require_existing_files
 from quantcore.strategy.h020 import H020SizingConfig, generate_h020_intent_panel
@@ -46,6 +47,37 @@ DEFAULT_OUTPUT_PATH = (
     / "reports"
     / "h024_executable_candidate_shifts.csv"
 )
+
+# Exness Standard Cent account sizing model.
+#
+# These specs keep H020's numeric accounting in account-currency units (USC).
+# The user's cent account exposes USDJPYc and XAUUSDc, but the H024 research
+# signal geometry remains normalized to USDJPY / XAUUSD. Contract sizes are
+# therefore scaled into USC-equivalent accounting:
+#
+# - USDJPYc MT5 contract size is 1,000 USD. H020 converts JPY P/L to account
+#   units using the historical USDJPY price, so multiply by 100 to express the
+#   result in USC rather than USD: 1,000 * 100 = 100,000.
+# - XAUUSDc MT5 contract size is 1 oz. H020 sees USD quote P/L, so multiply by
+#   100 to express the result in USC: 1 * 100 = 100.
+#
+# Research only. This is not order-execution approval.
+CENT_ACCOUNT_USC_INSTRUMENT_SPECS: Mapping[str, InstrumentSpec] = {
+    "USDJPY": InstrumentSpec(
+        symbol="USDJPY",
+        contract_size=100_000.0,
+        quote_currency="JPY",
+        lot_step=0.01,
+        min_lot=0.01,
+    ),
+    "XAUUSD": InstrumentSpec(
+        symbol="XAUUSD",
+        contract_size=100.0,
+        quote_currency="USD",
+        lot_step=0.01,
+        min_lot=0.01,
+    ),
+}
 
 
 @dataclass(frozen=True)
@@ -201,6 +233,7 @@ def scan_h024_candidate_inputs_for_executable_shifts(
     *,
     scan_inputs: H024ExecutableCandidateScanInputs,
     balance: float,
+    instrument_specs: Mapping[str, InstrumentSpec] | None = None,
 ) -> list[ExecutableCandidateShift]:
     """Scan precomputed H024 geometry through H020 sizing at one balance."""
 
@@ -214,6 +247,7 @@ def scan_h024_candidate_inputs_for_executable_shifts(
         h4_by_symbol=scan_inputs.h4_by_symbol,
         equity_usd=float(balance),
         config=scan_inputs.sizing_config,
+        instrument_specs=instrument_specs,
     )
 
     row_by_decision = {
@@ -265,6 +299,7 @@ def scan_h024_candidate_inputs_for_executable_shifts(
 def build_real_h4_executable_candidate_provider(
     *,
     risk_fraction: float,
+    instrument_specs: Mapping[str, InstrumentSpec] | None = None,
 ) -> Callable[[float], list[ExecutableCandidateShift]]:
     """Load broker-native H4 once and return a balance -> candidates provider."""
 
@@ -294,6 +329,7 @@ def build_real_h4_executable_candidate_provider(
             cache[key] = scan_h024_candidate_inputs_for_executable_shifts(
                 scan_inputs=scan_inputs,
                 balance=key,
+                instrument_specs=instrument_specs,
             )
         return cache[key]
 
@@ -304,9 +340,11 @@ def scan_real_h4_exports(
     *,
     balance: float,
     risk_fraction: float,
+    instrument_specs: Mapping[str, InstrumentSpec] | None = None,
 ) -> list[ExecutableCandidateShift]:
     provider = build_real_h4_executable_candidate_provider(
         risk_fraction=float(risk_fraction),
+        instrument_specs=instrument_specs,
     )
     return provider(float(balance))
 
@@ -366,6 +404,7 @@ def print_summary(
     risk_fraction: float,
     output_path: Path,
     max_rows: int,
+    instrument_specs_label: str = "default USD instrument specs",
 ) -> int:
     print("H024 executable candidate shift scan")
     print("=" * 72)
@@ -375,6 +414,7 @@ def print_summary(
     print()
     print(f"balance: {balance:.2f}")
     print(f"risk_fraction: {risk_fraction:.6f}")
+    print(f"instrument_specs: {instrument_specs_label}")
     print(f"executable_candidate_rows: {len(candidates)}")
     print(f"wrote: {output_path}")
     print()
@@ -408,11 +448,31 @@ def main() -> int:
     parser.add_argument("--risk-fraction", type=float, required=True)
     parser.add_argument("--output-csv", type=Path, default=DEFAULT_OUTPUT_PATH)
     parser.add_argument("--max-rows", type=int, default=20)
+    parser.add_argument(
+        "--cent-account-usc-specs",
+        action="store_true",
+        help=(
+            "Use Exness Standard Cent USDJPYc/XAUUSDc sizing specs in USC "
+            "accounting units. Research only; no MT5 access or execution."
+        ),
+    )
     args = parser.parse_args()
+
+    instrument_specs = (
+        CENT_ACCOUNT_USC_INSTRUMENT_SPECS
+        if args.cent_account_usc_specs
+        else None
+    )
+    instrument_specs_label = (
+        "Exness Standard Cent USC specs"
+        if args.cent_account_usc_specs
+        else "default USD instrument specs"
+    )
 
     candidates = scan_real_h4_exports(
         balance=args.balance,
         risk_fraction=args.risk_fraction,
+        instrument_specs=instrument_specs,
     )
     write_candidates_csv(candidates=candidates, output_path=args.output_csv)
 
@@ -422,6 +482,7 @@ def main() -> int:
         risk_fraction=args.risk_fraction,
         output_path=args.output_csv,
         max_rows=args.max_rows,
+        instrument_specs_label=instrument_specs_label,
     )
 
 
