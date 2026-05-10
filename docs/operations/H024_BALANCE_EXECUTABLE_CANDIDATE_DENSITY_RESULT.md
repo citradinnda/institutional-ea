@@ -96,3 +96,42 @@ For larger-balance research, the evidence now suggests:
 - 245 USD: first executable USDJPY threshold only
 - 490 to 550 USD: meaningful USDJPY feasibility begins
 - 935 to 1000 USD: dual-symbol feasibility begins
+
+## Symbol Density Follow-up
+
+A follow-up local report summary split executable candidate rows by symbol.
+
+| Balance | Total | USDJPY | XAUUSD | First USDJPY entry | First XAUUSD entry |
+|---:|---:|---:|---:|---|---|
+| 100 | 0 | 0 | 0 |  |  |
+| 120 | 0 | 0 | 0 |  |  |
+| 123 | 0 | 0 | 0 |  |  |
+| 164 | 0 | 0 | 0 |  |  |
+| 245 | 1 | 1 | 0 | sell 2021-07-18T17:00:00+00:00 |  |
+| 250 | 1 | 1 | 0 | sell 2021-07-18T17:00:00+00:00 |  |
+| 327 | 16 | 16 | 0 | sell 2021-07-18T17:00:00+00:00 |  |
+| 490 | 174 | 174 | 0 | sell 2021-07-15T01:00:00+00:00 |  |
+| 550 | 215 | 215 | 0 | sell 2021-07-06T01:00:00+00:00 |  |
+| 935 | 569 | 568 | 1 | buy 2018-09-27T21:00:00+00:00 | sell 2023-09-26T01:00:00+00:00 |
+| 1000 | 595 | 591 | 4 | buy 2018-09-13T21:00:00+00:00 | sell 2023-09-12T05:00:00+00:00 |
+| 10000 | 1364 | 669 | 695 | sell 2018-08-08T21:00:00+00:00 | sell 2018-07-23T21:00:00+00:00 |
+
+### Symbol Interpretation
+
+The 490 to 550 USD executable-density region is USDJPY-only.
+
+XAUUSD technically begins at 935 USD, but only with one executable historical candidate at that balance.
+
+At 1000 USD, XAUUSD still contributes only four executable historical candidates.
+
+Meaningful dual-symbol executable candidate density is not visible until much larger capital, with the 10000 USD scan showing 669 USDJPY rows and 695 XAUUSD rows.
+
+This strengthens the deployment boundary:
+
+- 100 USD / 1% remains impossible.
+- 245 USD / 1% is only a USDJPY threshold blip.
+- 490 to 550 USD / 1% may be useful for USDJPY-only research.
+- 935 to 1000 USD / 1% is not yet meaningful XAUUSD density.
+- Serious dual-symbol feasibility appears much higher.
+
+This still does not approve demo, live, Phase 4, execution adapter work, or order-send code.
