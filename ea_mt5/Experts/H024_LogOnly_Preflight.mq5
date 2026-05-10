@@ -462,6 +462,60 @@ int H024RuntimeVolumeDigits(const double volume_step)
    return digits;
 }
 
+
+bool H024RuntimeEntryStopPrices(
+   const string direction,
+   double &entry_price,
+   double &stop_price
+)
+{
+   entry_price = 0.0;
+   stop_price = 0.0;
+
+   if(direction != "long" && direction != "short")
+   {
+      return false;
+   }
+
+   MqlRates rates[];
+   ArraySetAsSeries(rates, true);
+
+   const int closed_shift = H024EffectiveClosedShift();
+   const int atr_window = 3;
+   const double stop_atr_multiple = 2.0;
+   const int required_bars = closed_shift + 64;
+
+   const int copied = CopyRates(_Symbol, PERIOD_H4, 0, required_bars, rates);
+   if(copied < closed_shift + atr_window + 1)
+   {
+      return false;
+   }
+
+   const double atr = WilderAtrForClosedBar(rates, closed_shift, atr_window);
+   if(atr == EMPTY_VALUE || atr <= 0.0)
+   {
+      return false;
+   }
+
+   const int price_digits = (int)SymbolInfoInteger(_Symbol, SYMBOL_DIGITS);
+   entry_price = NormalizeDouble(rates[closed_shift].close, price_digits);
+
+   if(direction == "long")
+   {
+      stop_price = NormalizeDouble(entry_price - (atr * stop_atr_multiple), price_digits);
+   }
+   else
+   {
+      stop_price = NormalizeDouble(entry_price + (atr * stop_atr_multiple), price_digits);
+   }
+
+   return (
+      entry_price > 0.0 &&
+      stop_price > 0.0 &&
+      MathAbs(entry_price - stop_price) > 0.0
+   );
+}
+
 void WriteH024IntendedActionRuntimeRow()
 {
    const string intent_detail = H024StrategyIntentDetail();
@@ -475,16 +529,51 @@ void WriteH024IntendedActionRuntimeRow()
    const double volume_step = SymbolInfoDouble(_Symbol, SYMBOL_VOLUME_STEP);
    const int volume_digits = H024RuntimeVolumeDigits(volume_step);
 
+   double entry_price = 0.0;
+   double stop_price = 0.0;
+   string intended_decision = decision;
+   string intended_reason = intent_detail;
+
+   if(decision == "WOULD_OPEN")
+   {
+      if(!H024RuntimeEntryStopPrices(direction, entry_price, stop_price))
+      {
+         intended_decision = "BLOCKED";
+         intended_reason = "BLOCKED:invalid_entry_stop_for_would_open;" + intent_detail;
+      }
+      else
+      {
+         const double preview_lots = ComputeH024LotSize(
+            AccountInfoDouble(ACCOUNT_BALANCE),
+            InpRiskFraction,
+            entry_price,
+            stop_price,
+            tick_size,
+            tick_value,
+            volume_step,
+            min_volume,
+            max_volume,
+            volume_digits
+         );
+
+         if(preview_lots <= 0.0)
+         {
+            intended_decision = "BLOCKED";
+            intended_reason = "BLOCKED:volume_below_min_for_would_open;" + intent_detail;
+         }
+      }
+   }
+
    const string intended_action_row = BuildH024IntendedActionLogRow(
       TimeToString(TimeCurrent(), TIME_DATE | TIME_SECONDS),
       InpEaVersion,
       _Symbol,
       H024NormalizedSymbolName(_Symbol),
       "H4",
-      decision,
+      intended_decision,
       direction,
-      0.0,
-      0.0,
+      entry_price,
+      stop_price,
       tick_size,
       tick_value,
       AccountInfoDouble(ACCOUNT_BALANCE),
@@ -493,7 +582,7 @@ void WriteH024IntendedActionRuntimeRow()
       max_volume,
       volume_step,
       volume_digits,
-      intent_detail
+      intended_reason
    );
 
    WritePreflightRow("H024_INTENDED_ACTION_ROW", intended_action_row);
