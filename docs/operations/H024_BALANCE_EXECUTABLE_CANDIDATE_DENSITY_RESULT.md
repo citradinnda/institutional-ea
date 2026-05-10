@@ -135,3 +135,66 @@ This strengthens the deployment boundary:
 - Serious dual-symbol feasibility appears much higher.
 
 This still does not approve demo, live, Phase 4, execution adapter work, or order-send code.
+
+## Density Threshold Sweep
+
+A wider fixed-risk density sweep was run at 1% risk.
+
+| Balance | Total | USDJPY | XAUUSD |
+|---:|---:|---:|---:|
+| 100 | 0 | 0 | 0 |
+| 120 | 0 | 0 | 0 |
+| 123 | 0 | 0 | 0 |
+| 164 | 0 | 0 | 0 |
+| 200 | 0 | 0 | 0 |
+| 225 | 0 | 0 | 0 |
+| 245 | 1 | 1 | 0 |
+| 250 | 1 | 1 | 0 |
+| 275 | 5 | 5 | 0 |
+| 300 | 9 | 9 | 0 |
+| 327 | 16 | 16 | 0 |
+| 350 | 30 | 30 | 0 |
+| 400 | 63 | 63 | 0 |
+| 450 | 124 | 124 | 0 |
+| 490 | 174 | 174 | 0 |
+| 500 | 178 | 178 | 0 |
+| 550 | 215 | 215 | 0 |
+| 600 | 258 | 258 | 0 |
+| 700 | 374 | 374 | 0 |
+| 800 | 468 | 468 | 0 |
+| 900 | 543 | 543 | 0 |
+| 935 | 569 | 568 | 1 |
+| 1000 | 595 | 591 | 4 |
+| 1250 | 691 | 654 | 37 |
+| 1500 | 788 | 665 | 123 |
+| 2000 | 983 | 669 | 314 |
+| 3000 | 1168 | 669 | 499 |
+| 5000 | 1281 | 669 | 612 |
+| 10000 | 1364 | 669 | 695 |
+
+### Density Thresholds
+
+| Target | ANY threshold | USDJPY threshold | XAUUSD threshold |
+|---:|---:|---:|---:|
+| >= 1 row | 245 USD | 245 USD | 935 USD |
+| >= 10 rows | 327 USD | 327 USD | 1250 USD |
+| >= 50 rows | 400 USD | 400 USD | 1500 USD |
+| >= 100 rows | 450 USD | 450 USD | 1500 USD |
+| >= 200 rows | 550 USD | 550 USD | 2000 USD |
+| >= 500 rows | 900 USD | 900 USD | 5000 USD |
+
+### Deployment-Envelope Interpretation
+
+At 100 USD / 1% risk, H024 remains mechanically non-executable.
+
+At 245 USD / 1% risk, H024 only has a first USDJPY executable threshold row. This is not a meaningful deployment envelope.
+
+At 450 to 550 USD / 1% risk, USDJPY-only executable candidate density becomes more meaningful, reaching at least 100 rows by 450 USD and at least 200 rows by 550 USD.
+
+At 900 USD / 1% risk, USDJPY reaches at least 500 executable historical rows.
+
+XAUUSD remains sparse at 935 to 1000 USD. It reaches at least 100 rows only around 1500 USD, at least 200 rows around 2000 USD, and at least 500 rows around 5000 USD.
+
+This suggests H024's plausible lower-capital path, if any, is USDJPY-only research first. Serious dual-symbol feasibility appears to require much larger capital.
+
+This is still research-only and does not approve demo, live, Phase 4, execution adapter work, or order-send code.
