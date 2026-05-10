@@ -434,3 +434,197 @@ def test_verify_h024_ea_preflight_log_requires_both_symbols(tmp_path: Path) -> N
 
     assert not result.passed
     assert "log missing required symbols: ['XAUUSDm']" in result.violations
+
+
+def _run_preflight_verifier_for_intended_action_test(path):
+    import importlib
+
+    module = importlib.import_module("scripts.verify_h024_ea_preflight_log")
+
+    for name in (
+        "verify_h024_ea_preflight_log",
+        "verify_preflight_log",
+        "verify_log",
+        "verify",
+    ):
+        verifier = getattr(module, name, None)
+        if callable(verifier):
+            try:
+                return verifier(path)
+            except TypeError:
+                return verifier(str(path))
+
+    main = getattr(module, "main", None)
+    if callable(main):
+        return main([str(path)])
+
+    raise AssertionError("Could not find callable verifier in scripts.verify_h024_ea_preflight_log")
+
+
+def _verifier_violations_for_intended_action_test(result):
+    if isinstance(result, int):
+        return [] if result == 0 else [f"verifier returned exit code {result}"]
+    if hasattr(result, "violations"):
+        return list(result.violations)
+    if hasattr(result, "errors"):
+        return list(result.errors)
+    if isinstance(result, (list, tuple)):
+        return list(result)
+    return []
+
+
+def _intended_action_base_columns_for_test():
+    return [
+        "generated_at_server",
+        "schema_version",
+        "ea_version",
+        "source_version",
+        "timer_seconds",
+        "runtime_mode",
+        "run_label",
+        "event",
+        "kill_switch_blocked",
+        "symbol",
+        "account_company",
+        "account_server",
+        "account_currency",
+        "account_balance",
+        "account_equity",
+        "account_leverage",
+        "account_trade_allowed",
+        "account_trade_expert",
+        "terminal_connected",
+        "terminal_trade_allowed",
+        "mql_trade_allowed",
+        "bid",
+        "ask",
+        "spread_points",
+        "volume_min",
+        "volume_max",
+        "volume_step",
+        "stops_level",
+        "freeze_level",
+        "point",
+        "digits",
+        "detail",
+    ]
+
+
+def _intended_action_base_values_for_test(event, symbol, detail):
+    return [
+        "2026.05.10 06:51:16",
+        "h024_ea_log_only_preflight_v2",
+        "0.6",
+        "manual",
+        "1",
+        "log_only_preflight",
+        "H024_LOG_ONLY_PREFLIGHT",
+        event,
+        "true",
+        symbol,
+        "Exness Technologies Ltd",
+        "Exness-MT5Trial6",
+        "USD",
+        "1246.45",
+        "1246.45",
+        "2000",
+        "true",
+        "true",
+        "true",
+        "false",
+        "false",
+        "156.676",
+        "156.694",
+        "18",
+        "0.01",
+        "300.00",
+        "0.01",
+        "0",
+        "0",
+        "0.0010000000",
+        "3",
+        detail,
+    ]
+
+
+def _write_intended_action_preflight_log_for_test(path, *, schema_version="h024_intended_action_log_v1"):
+    header = _intended_action_base_columns_for_test()
+    intended_header_payload = [
+        "schema_version",
+        "ea_version",
+        "symbol",
+        "normalized_symbol",
+        "timeframe",
+        "decision",
+        "direction",
+        "entry_price",
+        "stop_price",
+        "stop_distance_price",
+        "tick_size",
+        "tick_value_usd_per_lot",
+        "account_balance_usd",
+        "risk_fraction",
+        "risk_usd",
+        "raw_lots",
+        "lots",
+        "min_volume",
+        "max_volume",
+        "volume_step",
+        "volume_digits",
+        "reason",
+    ]
+    intended_row_payload = [
+        schema_version,
+        "0.6",
+        "USDJPYm",
+        "USDJPY",
+        "H4",
+        "NO_ACTION",
+        "",
+        "0.0000000000",
+        "0.0000000000",
+        "0.0000000000",
+        "0.0010000000",
+        "0.6381865292",
+        "1246.45",
+        "0.01000000",
+        "12.46",
+        "0.0000000000",
+        "0.0000000000",
+        "0.0100000000",
+        "300.0000000000",
+        "0.0100000000",
+        "2",
+        "NO_ACTION:strategy_no_signal;closed_h4_time=2026.05.08 16:00:00;mode=log_only_no_execution",
+    ]
+
+    rows = [
+        header,
+        _intended_action_base_values_for_test("INIT", "USDJPYm", "blocked_by_default"),
+        _intended_action_base_values_for_test("INIT", "XAUUSDm", "blocked_by_default"),
+        _intended_action_base_values_for_test("H024_INTENDED_ACTION_HEADER", "USDJPYm", "timestamp")
+        + intended_header_payload,
+        _intended_action_base_values_for_test("H024_INTENDED_ACTION_ROW", "USDJPYm", "2026.05.10 06:51:16")
+        + intended_row_payload,
+    ]
+
+    path.write_text("\n".join(",".join(row) for row in rows) + "\n", encoding="utf-8")
+
+
+def test_h024_preflight_verifier_accepts_runtime_intended_action_rows(tmp_path):
+    path = tmp_path / "h024_preflight_with_intended_action.csv"
+    _write_intended_action_preflight_log_for_test(path)
+
+    result = _run_preflight_verifier_for_intended_action_test(path)
+
+    assert _verifier_violations_for_intended_action_test(result) == []
+
+
+def test_h024_preflight_verifier_rejects_bad_intended_action_schema(tmp_path):
+    path = tmp_path / "h024_preflight_with_bad_intended_action_schema.csv"
+    _write_intended_action_preflight_log_for_test(path, schema_version="bad_schema")
+
+    result = _run_preflight_verifier_for_intended_action_test(path)
+    violations = _verifier_violations_for_intended_action_test(result)
+
+    assert any("schema_version" in violation for violation in violations)

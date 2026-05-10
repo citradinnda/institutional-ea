@@ -41,7 +41,141 @@ REQUIRED_COLUMNS = [
     "detail",
 ]
 
-ALLOWED_EVENTS = {"INIT", "TICK", "INTENT", "MARKET_STATE", "BAR_OBSERVATION", "H024_STATE_OBSERVATION", "DEINIT"}
+ALLOWED_EVENTS = {
+    "INIT",
+    "TICK",
+    "INTENT",
+    "MARKET_STATE",
+    "BAR_OBSERVATION",
+    "H024_STATE_OBSERVATION",
+    "H024_INTENDED_ACTION_HEADER",
+    "H024_INTENDED_ACTION_ROW",
+    "DEINIT",
+}
+
+INTENDED_ACTION_EVENTS = {"H024_INTENDED_ACTION_HEADER", "H024_INTENDED_ACTION_ROW"}
+
+INTENDED_ACTION_LOG_HEADER_FIELDS = [
+    "timestamp",
+    "schema_version",
+    "ea_version",
+    "symbol",
+    "normalized_symbol",
+    "timeframe",
+    "decision",
+    "direction",
+    "entry_price",
+    "stop_price",
+    "stop_distance_price",
+    "tick_size",
+    "tick_value_usd_per_lot",
+    "account_balance_usd",
+    "risk_fraction",
+    "risk_usd",
+    "raw_lots",
+    "lots",
+    "min_volume",
+    "max_volume",
+    "volume_step",
+    "volume_digits",
+    "reason",
+]
+
+INTENDED_ACTION_LOG_ROW_FIELDS = INTENDED_ACTION_LOG_HEADER_FIELDS[1:]
+
+
+def _extra_csv_fields(row: dict) -> list[str]:
+    extra = row.get(None)
+    if extra is None:
+        return []
+    return [str(value) for value in extra]
+
+
+def _append_numeric_violation(
+    violations: list[str],
+    index: int,
+    fields: dict[str, str],
+    field_name: str,
+) -> None:
+    try:
+        float(fields[field_name])
+    except (KeyError, TypeError, ValueError):
+        violations.append(f"row {index}: invalid intended-action numeric field {field_name!r}")
+
+
+def _validate_intended_action_payload(index: int, event: str, row: dict, violations: list[str]) -> None:
+    payload = _extra_csv_fields(row)
+
+    if event == "H024_INTENDED_ACTION_HEADER":
+        if row.get("detail") != "timestamp":
+            violations.append(f"row {index}: intended-action header detail must be 'timestamp'")
+        if payload != INTENDED_ACTION_LOG_ROW_FIELDS:
+            violations.append(f"row {index}: intended-action header fields do not match frozen contract")
+        return
+
+    if event != "H024_INTENDED_ACTION_ROW":
+        return
+
+    if len(payload) != len(INTENDED_ACTION_LOG_ROW_FIELDS):
+        violations.append(
+            f"row {index}: intended-action row has {len(payload)} payload fields, "
+            f"expected {len(INTENDED_ACTION_LOG_ROW_FIELDS)}"
+        )
+        return
+
+    fields = dict(zip(INTENDED_ACTION_LOG_ROW_FIELDS, payload))
+
+    if fields.get("schema_version") != "h024_intended_action_log_v1":
+        violations.append(f"row {index}: invalid intended-action schema_version {fields.get('schema_version')!r}")
+
+    if fields.get("timeframe") != "H4":
+        violations.append(f"row {index}: invalid intended-action timeframe {fields.get('timeframe')!r}")
+
+    if fields.get("symbol") != row.get("symbol"):
+        violations.append(f"row {index}: intended-action symbol does not match preflight symbol")
+
+    if fields.get("normalized_symbol") not in {"USDJPY", "XAUUSD"}:
+        violations.append(
+            f"row {index}: invalid intended-action normalized_symbol {fields.get('normalized_symbol')!r}"
+        )
+
+    decision = fields.get("decision")
+    direction = fields.get("direction")
+
+    if decision not in {"WOULD_OPEN", "BLOCKED", "NO_ACTION"}:
+        violations.append(f"row {index}: invalid intended-action decision {decision!r}")
+
+    if decision == "WOULD_OPEN" and direction not in {"long", "short"}:
+        violations.append(f"row {index}: WOULD_OPEN intended-action row must have long/short direction")
+
+    if decision in {"BLOCKED", "NO_ACTION"} and direction not in {"", "long", "short"}:
+        violations.append(f"row {index}: invalid intended-action direction {direction!r}")
+
+    for field_name in [
+        "entry_price",
+        "stop_price",
+        "stop_distance_price",
+        "tick_size",
+        "tick_value_usd_per_lot",
+        "account_balance_usd",
+        "risk_fraction",
+        "risk_usd",
+        "raw_lots",
+        "lots",
+        "min_volume",
+        "max_volume",
+        "volume_step",
+    ]:
+        _append_numeric_violation(violations, index, fields, field_name)
+
+    try:
+        int(fields["volume_digits"])
+    except (KeyError, TypeError, ValueError):
+        violations.append(f"row {index}: invalid intended-action volume_digits")
+
+    if not fields.get("reason"):
+        violations.append(f"row {index}: intended-action reason must be non-empty")
+
 ALLOWED_INTENT_ACTIONS = {"NO_ACTION", "BLOCKED", "WOULD_OPEN"}
 ALLOWED_SYMBOLS = {"USDJPYm", "XAUUSDm"}
 EXPECTED_RUN_LABEL = "H024_LOG_ONLY_PREFLIGHT"
@@ -131,6 +265,10 @@ def verify_h024_ea_preflight_log(path: Path) -> VerificationResult:
 
         if event not in ALLOWED_EVENTS:
             violations.append(f"row {index}: unexpected event {event!r}")
+
+        if event in INTENDED_ACTION_EVENTS:
+            _validate_intended_action_payload(index, event, row, violations)
+            continue
 
         if event == "INIT":
             init_count += 1
