@@ -249,4 +249,3 @@ def test_print_risk_fraction_threshold_comparison_outputs_research_only_table(
     assert "no higher-risk" in output
     assert "no higher-balance" in output
     assert "no execution approval" in output
-
