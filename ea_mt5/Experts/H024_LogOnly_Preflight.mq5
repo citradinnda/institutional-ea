@@ -525,3 +525,61 @@ void OnDeinit(const int reason)
       g_file_handle = INVALID_HANDLE;
    }
 }
+
+//+------------------------------------------------------------------+
+//| Pure Math Position Sizing (H020 Contract)                        |
+//| Isolated from execution state for strict testability              |
+//+------------------------------------------------------------------+
+double ComputeH024LotSize(
+   const double account_balance_usd,
+   const double risk_fraction,
+   const double entry_price,
+   const double stop_price,
+   const double tick_size,
+   const double tick_value_usd_per_lot,
+   const double volume_step,
+   const double min_volume,
+   const double max_volume,
+   const int volume_digits = 2
+)
+{
+   if(account_balance_usd <= 0.0 ||
+      risk_fraction <= 0.0 ||
+      risk_fraction > 1.0 ||
+      entry_price <= 0.0 ||
+      stop_price <= 0.0 ||
+      tick_size <= 0.0 ||
+      tick_value_usd_per_lot <= 0.0 ||
+      volume_step <= 0.0 ||
+      min_volume < 0.0 ||
+      max_volume <= 0.0 ||
+      max_volume < min_volume)
+   {
+      return 0.0;
+   }
+
+   const double stop_distance_price = MathAbs(entry_price - stop_price);
+   if(stop_distance_price <= 0.0)
+   {
+      return 0.0;
+   }
+
+   const double risk_usd = account_balance_usd * risk_fraction;
+   const double stop_distance_ticks = stop_distance_price / tick_size;
+   const double loss_usd_per_lot = stop_distance_ticks * tick_value_usd_per_lot;
+   if(loss_usd_per_lot <= 0.0)
+   {
+      return 0.0;
+   }
+
+   const double raw_lots = risk_usd / loss_usd_per_lot;
+   const double capped_lots = MathMin(raw_lots, max_volume);
+   const double stepped_lots = MathFloor((capped_lots + 0.000000000001) / volume_step) * volume_step;
+
+   if(stepped_lots < min_volume)
+   {
+      return 0.0;
+   }
+
+   return NormalizeDouble(stepped_lots, volume_digits);
+}
