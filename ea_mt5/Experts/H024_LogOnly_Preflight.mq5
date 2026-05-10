@@ -583,3 +583,101 @@ double ComputeH024LotSize(
 
    return NormalizeDouble(stepped_lots, volume_digits);
 }
+const string H024_INTENDED_ACTION_LOG_SCHEMA_VERSION = "h024_intended_action_log_v1";
+
+string BuildH024IntendedActionLogHeader()
+{
+   return "timestamp,schema_version,ea_version,symbol,normalized_symbol,timeframe,decision,direction,entry_price,stop_price,stop_distance_price,tick_size,tick_value_usd_per_lot,account_balance_usd,risk_fraction,risk_usd,raw_lots,lots,min_volume,max_volume,volume_step,volume_digits,reason";
+}
+
+string BuildH024IntendedActionLogRow(
+   const string timestamp,
+   const string ea_version,
+   const string symbol,
+   const string normalized_symbol,
+   const string timeframe,
+   const string decision,
+   const string direction,
+   const double entry_price,
+   const double stop_price,
+   const double tick_size,
+   const double tick_value_usd_per_lot,
+   const double account_balance_usd,
+   const double risk_fraction,
+   const double min_volume,
+   const double max_volume,
+   const double volume_step,
+   const int volume_digits,
+   const string reason
+)
+{
+   double stop_distance_price = 0.0;
+   double risk_usd = account_balance_usd * risk_fraction;
+   double raw_lots = 0.0;
+   double lots = 0.0;
+
+   if(decision == "WOULD_OPEN")
+   {
+      stop_distance_price = MathAbs(entry_price - stop_price);
+
+      if(entry_price > 0.0 &&
+         stop_price > 0.0 &&
+         stop_distance_price > 0.0 &&
+         tick_size > 0.0 &&
+         tick_value_usd_per_lot > 0.0 &&
+         account_balance_usd > 0.0 &&
+         risk_fraction > 0.0 &&
+         min_volume > 0.0 &&
+         max_volume > 0.0 &&
+         volume_step > 0.0 &&
+         volume_digits >= 0)
+      {
+         double stop_distance_ticks = stop_distance_price / tick_size;
+         double loss_usd_per_lot = stop_distance_ticks * tick_value_usd_per_lot;
+
+         if(loss_usd_per_lot > 0.0)
+         {
+            raw_lots = risk_usd / loss_usd_per_lot;
+            lots = ComputeH024LotSize(
+               account_balance_usd,
+               risk_fraction,
+               entry_price,
+               stop_price,
+               tick_size,
+               tick_value_usd_per_lot,
+               volume_step,
+               min_volume,
+               max_volume,
+               volume_digits
+            );
+         }
+      }
+   }
+
+   return StringFormat(
+      "%s,%s,%s,%s,%s,%s,%s,%s,%.10f,%.10f,%.10f,%.10f,%.10f,%.2f,%.8f,%.2f,%.10f,%.10f,%.10f,%.10f,%.10f,%d,%s",
+      timestamp,
+      H024_INTENDED_ACTION_LOG_SCHEMA_VERSION,
+      ea_version,
+      symbol,
+      normalized_symbol,
+      timeframe,
+      decision,
+      direction,
+      entry_price,
+      stop_price,
+      stop_distance_price,
+      tick_size,
+      tick_value_usd_per_lot,
+      account_balance_usd,
+      risk_fraction,
+      risk_usd,
+      raw_lots,
+      lots,
+      min_volume,
+      max_volume,
+      volume_step,
+      volume_digits,
+      reason
+   );
+}
