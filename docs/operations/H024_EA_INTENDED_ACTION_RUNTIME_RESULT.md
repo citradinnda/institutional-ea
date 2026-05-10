@@ -221,7 +221,6 @@ This does not approve demo trading, live trading, Phase 4, order sending, order 
 Remaining gate before any execution work:
 
 Real-current-market log-only WOULD_OPEN observation, or an explicit decision that historical log-only replay is sufficient for the pre-execution logging gate.
-rn
 ## Gate Decision After Historical Replay
 
 Decision: PASS for the pre-execution runtime intended-action WOULD_OPEN logging gate.
