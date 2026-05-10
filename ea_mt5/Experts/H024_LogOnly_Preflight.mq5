@@ -14,6 +14,29 @@ input int    InpTimerSeconds = 1;
 
 int g_file_handle = INVALID_HANDLE;
 
+int H024VolumeDigits(const double volume_step);
+string BuildH024IntendedActionLogHeader();
+string BuildH024IntendedActionLogRow(
+   const string timestamp,
+   const string ea_version,
+   const string symbol,
+   const string normalized_symbol,
+   const string timeframe,
+   const string decision,
+   const string direction,
+   const double entry_price,
+   const double stop_price,
+   const double tick_size,
+   const double tick_value_usd_per_lot,
+   const double account_balance_usd,
+   const double risk_fraction,
+   const double min_volume,
+   const double max_volume,
+   const double volume_step,
+   const int volume_digits,
+   const string reason
+);
+
 string BoolText(const bool value)
 {
    return value ? "true" : "false";
