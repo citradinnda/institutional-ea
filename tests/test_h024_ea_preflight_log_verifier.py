@@ -270,6 +270,96 @@ def test_verify_h024_ea_preflight_log_rejects_unconstrained_would_open_intent_ro
     assert any("WOULD_OPEN intent rows must be log-only" in item for item in result.violations)
 
 
+
+def test_verify_h024_ea_preflight_log_accepts_constrained_short_would_open_intent_rows(tmp_path: Path) -> None:
+    path = tmp_path / "h024_ea_log_only_preflight.csv"
+    write_log(
+        path,
+        [
+            valid_row(symbol="USDJPYm"),
+            valid_row(
+                event="INTENT",
+                symbol="XAUUSDm",
+                detail=(
+                    "WOULD_OPEN:side=short;closed_h4_time=2026.05.08 16:00:00;"
+                    "source=H024_STATE_OBSERVATION;mode=log_only_no_execution"
+                ),
+            ),
+        ],
+    )
+
+    result = verify_h024_ea_preflight_log(path)
+
+    assert result.passed
+    assert result.violations == []
+
+
+def test_verify_h024_ea_preflight_log_rejects_would_open_without_side(tmp_path: Path) -> None:
+    path = tmp_path / "h024_ea_log_only_preflight.csv"
+    write_log(
+        path,
+        [
+            valid_row(symbol="USDJPYm"),
+            valid_row(
+                event="INTENT",
+                symbol="USDJPYm",
+                detail=(
+                    "WOULD_OPEN:closed_h4_time=2026.05.08 16:00:00;"
+                    "source=H024_STATE_OBSERVATION;mode=log_only_no_execution"
+                ),
+            ),
+            valid_row(symbol="XAUUSDm"),
+        ],
+    )
+
+    result = verify_h024_ea_preflight_log(path)
+
+    assert not result.passed
+    assert any("WOULD_OPEN intent rows must include side=long or side=short" in item for item in result.violations)
+
+
+def test_verify_h024_ea_preflight_log_rejects_unblocked_would_open(tmp_path: Path) -> None:
+    path = tmp_path / "h024_ea_log_only_preflight.csv"
+    write_log(
+        path,
+        [
+            valid_row(symbol="USDJPYm"),
+            valid_row(
+                event="INTENT",
+                symbol="USDJPYm",
+                kill_switch="false",
+                detail=(
+                    "WOULD_OPEN:side=long;closed_h4_time=2026.05.08 16:00:00;"
+                    "source=H024_STATE_OBSERVATION;mode=log_only_no_execution"
+                ),
+            ),
+            valid_row(symbol="XAUUSDm"),
+        ],
+    )
+
+    result = verify_h024_ea_preflight_log(path)
+
+    assert not result.passed
+    assert any("WOULD_OPEN intent rows require kill_switch_blocked=true" in item for item in result.violations)
+    assert any("kill_switch_blocked must be true" in item for item in result.violations)
+
+
+def test_verify_h024_ea_preflight_log_rejects_blocked_intent_rows(tmp_path: Path) -> None:
+    path = tmp_path / "h024_ea_log_only_preflight.csv"
+    write_log(
+        path,
+        [
+            valid_row(symbol="USDJPYm"),
+            valid_row(event="INTENT", symbol="USDJPYm", detail="BLOCKED:strategy_conflict_log_only"),
+            valid_row(symbol="XAUUSDm"),
+        ],
+    )
+
+    result = verify_h024_ea_preflight_log(path)
+
+    assert not result.passed
+    assert any("EA runtime preflight may only emit NO_ACTION or constrained WOULD_OPEN intent rows" in item for item in result.violations)
+
 def test_verify_h024_ea_preflight_log_rejects_unknown_intent_action(tmp_path: Path) -> None:
     path = tmp_path / "h024_ea_log_only_preflight.csv"
     write_log(
