@@ -222,3 +222,31 @@ Remaining gate before any execution work:
 
 Real-current-market log-only WOULD_OPEN observation, or an explicit decision that historical log-only replay is sufficient for the pre-execution logging gate.
 rn
+## Gate Decision After Historical Replay
+
+Decision: PASS for the pre-execution runtime intended-action WOULD_OPEN logging gate.
+
+Rationale:
+
+- The EA emitted parseable H024_INTENDED_ACTION_ROW records in MT5 log-only runtime output.
+- The strict runtime summary gate with --require-would-open passed on controlled historical replay.
+- Observed historical replay WOULD_OPEN rows: 37 total.
+  - USDJPYm: 18 WOULD_OPEN rows.
+  - XAUUSDm: 19 WOULD_OPEN rows.
+- Repeated rows are expected because the timer emits repeatedly while the EA is attached.
+
+Scope:
+
+- This proves the runtime WOULD_OPEN log path under controlled historical log-only replay.
+- This does not prove real-current-market signal occurrence.
+- This does not approve demo trading.
+- This does not approve live trading.
+- This does not approve Phase 4.
+- This does not approve OrderSend, OrderCheck, CTrade, MqlTradeRequest, or any execution adapter.
+
+Authorized next work:
+
+- Non-execution safety preparation only.
+- Execution boundary checklist/specification.
+- Dry-run reconciliation design without MT5 trade APIs.
+- Static guards preventing replay-only controls from leaking into future execution mode.
