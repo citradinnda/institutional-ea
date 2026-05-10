@@ -1,131 +1,135 @@
 # H024 EA Intended-Action Runtime Result
 
-## Verdict
+Research only. No demo/live/Phase 4 approval.
 
-PASS.
+## Status
 
-The H024 log-only EA emitted runtime intended-action rows from MT5, and the updated preflight verifier accepted the collected runtime CSV with zero violations.
+H024 runtime intended-action logging is working in the log-only EA.
 
-This result is research/pre-deployment only.
+The collected runtime CSVs prove that:
 
-No demo deployment approval.
-No live trading approval.
-No Phase 4 execution approval.
+- `H024_INTENDED_ACTION_HEADER` is emitted at runtime.
+- `H024_INTENDED_ACTION_ROW` is emitted at runtime.
+- Rows are parseable by the runtime preflight verifier.
+- Rows are parseable by the intended-action summary checker.
+- Symbol normalization works:
+  - `USDJPYm` -> `USDJPY`
+  - `XAUUSDm` -> `XAUUSD`
+- Current observed runtime decisions are still `NO_ACTION` only.
+- Runtime `WOULD_OPEN` has not yet been observed under current real-market log-only runtime conditions.
 
-## Runtime Collection Context
+This result does not approve demo trading, live trading, Phase 4, order sending, chart automation, GUI automation, or an execution adapter.
 
-Collection mode:
+## Latest Observation
 
-- Manual EA attach/remove only.
+Date: 2026-05-10
+
+Collection type:
+
+- Manual EA attach/remove.
+- Log-only runtime collection.
 - No chart attach/detach automation.
 - No GUI automation.
 - No order-send capability.
 - No execution adapter.
-- Log-only preflight mode.
 
-Collected CSV:
+Runtime CSV:
 
 ```text
 reports\h024_ea_log_only_preflight.csv
 
-The reports directory remains local/untracked and must not be committed.
-
-Runtime Verification Result
-
-Verifier command:
-
-python scripts\verify_h024_ea_preflight_log.py reports\h024_ea_log_only_preflight.csv
-
-Observed result:
+Verifier result:
 
 H024 log-only EA runtime preflight verification
 ========================================================================
 Research only. No demo/live/Phase 4 approval.
 
-Rows: 144
+Rows: 198
 Violations: 0
 
 Verdict: PASS
-Intended-Action Runtime Rows
 
-The runtime CSV included the new intended-action events:
+Intended-action summary:
 
-H024_INTENDED_ACTION_HEADER
-H024_INTENDED_ACTION_ROW
+H024 intended-action runtime summary
+========================================================================
+Research only. No demo/live/Phase 4 approval.
 
-The intended-action rows used the frozen intended-action schema:
+CSV: reports\h024_ea_log_only_preflight.csv
+Total rows: 198
+Intended-action header rows: 2
+Intended-action data rows: 32
 
-h024_intended_action_log_v1
+USDJPYm:
+  headers: 1
+  rows: 16
+  normalized: USDJPY
+  WOULD_OPEN: 0
+  BLOCKED: 0
+  NO_ACTION: 16
 
-Observed normalized symbols included:
+XAUUSDm:
+  headers: 1
+  rows: 16
+  normalized: XAUUSD
+  WOULD_OPEN: 0
+  BLOCKED: 0
+  NO_ACTION: 16
 
-XAUUSDm -> XAUUSD
-USDJPYm -> USDJPY
+Verdict: PASS
 
-Observed decisions in this collection were:
+Interpretation:
 
-NO_ACTION
+Runtime intended-action emission is confirmed again.
+Verifier acceptance is confirmed again.
+Summary checker acceptance is confirmed again.
+This collection still does not satisfy the future controlled log-only WOULD_OPEN observation gate.
+Previous Observation
 
-This proves runtime intended-action emission exists and is parseable.
+Earlier runtime collection:
 
-It does not prove live signal WOULD_OPEN behavior under current market conditions.
-It does not test order placement, rejection behavior, requotes, slippage, position checks, or broker execution.
+Rows: 144
+Violations: 0
+Verdict: PASS
 
-Code/Test Result
+Earlier intended-action summary:
 
-Commit preserving verifier support:
+Total rows: 144
+Intended-action header rows: 2
+Intended-action data rows: 23
 
-2ea2995 Accept H024 intended action runtime preflight rows
+USDJPYm:
+  headers: 1
+  rows: 11
+  normalized: USDJPY
+  WOULD_OPEN: 0
+  BLOCKED: 0
+  NO_ACTION: 11
 
-Focused intended-action/verifier tests:
+XAUUSDm:
+  headers: 1
+  rows: 12
+  normalized: XAUUSD
+  WOULD_OPEN: 0
+  BLOCKED: 0
+  NO_ACTION: 12
 
-48 passed in 1.12s
+Verdict: PASS
+Remaining Gate
 
-Full suite:
+The next execution-safety gate remains:
 
-890 passed in 30.59s
+Controlled log-only WOULD_OPEN observation
 
-Current test anchor after this result:
+Pass criteria for that gate should include:
 
-890 passed
+Runtime CSV verifier passes with zero violations.
+Intended-action summary checker passes.
+At least one valid WOULD_OPEN row is observed for an expected symbol.
+The row uses schema h024_intended_action_log_v1.
+The row has a valid normalized symbol.
+The row has a valid direction.
+The row has parseable numeric fields.
+The EA remains log-only and contains no order-send path.
 
-If future full-test count drops below 890 without intentional test removal, treat it as a regression.
-
-What Changed
-
-Updated:
-
-scripts\verify_h024_ea_preflight_log.py
-tests\test_h024_ea_preflight_log_verifier.py
-
-The verifier now accepts and validates:
-
-H024_INTENDED_ACTION_HEADER
-H024_INTENDED_ACTION_ROW
-
-It validates intended-action payload shape and key contract fields instead of treating these events as unexpected.
-
-Deployment Boundary
-
-Still not approved:
-
-Demo trading
-Live trading
-Phase 4 execution
-Execution adapter
-OrderSend / OrderSendAsync / OrderCheck
-CTrade
-MqlTradeRequest / MqlTradeResult
-PositionOpen / PositionClose / PositionModify
-Chart attach/detach automation
-GUI automation
-Recommended Next Gate
-
-The next safe gate is not execution.
-
-Recommended next work:
-
-Add an explicit runtime intended-action summary/checker that reports counts by symbol and decision from collected CSVs.
-Preserve whether runtime contains HEADER/ROW for each expected symbol.
-Keep it log-only.
-Do not move to execution adapter until runtime WOULD_OPEN intended-action behavior is observed and reviewed under controlled log-only conditions.
+Until that happens, H024 remains pre-deployment research only.
