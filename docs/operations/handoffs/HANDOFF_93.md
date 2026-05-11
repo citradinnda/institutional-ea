@@ -801,3 +801,365 @@ git status
 git log --oneline -8
 
 Then paste the full output.
+
+---
+
+# HANDOFF_93 Supplemental Appendix — Missing Context Filled In
+
+This appendix expands HANDOFF_93 so it is not merely safe-continuation self-contained, but also operationally self-contained.
+
+## A. H020 / H024 Sizing Boundary
+
+H024 uses H020 sizing.
+
+Important H020 behaviors that must not be bypassed:
+
+- Computes explicit pre-trade lot intents.
+- Suppresses flat signals.
+- Suppresses invalid stop geometry.
+- Suppresses stop distances below one spread.
+- Computes risk-based lots.
+- Applies per-trade gross notional caps.
+- Applies portfolio gross notional scaling.
+- Rounds lots down to broker lot step.
+- Suppresses lots below broker minimum lot.
+- Preserves final signed risk fraction from final executable lots.
+
+Do not bypass H020 sizing.
+
+Do not reconstruct lots manually inside an execution adapter.
+
+Do not allow adapter code to reinterpret signal sizing, stop geometry, volume step, minimum lot, maximum lot, or risk fraction.
+
+The adapter layer should consume already-verified intent artifacts and refuse/transport according to authority gates. It should not become a second sizing engine.
+
+## B. EA Current Facts
+
+EA source:
+
+- `ea_mt5\Experts\H024_LogOnly_Preflight.mq5`
+
+Runtime schema:
+
+- `h024_ea_log_only_preflight_v2`
+
+EA input version:
+
+- `InpEaVersion = "0.6"`
+
+Intended-action schema:
+
+- `h024_intended_action_log_v1`
+
+Core replay input:
+
+- `InpH024ClosedShift = 1`
+
+Replay cap:
+
+- `1 <= effective closed shift <= 240`
+
+Sweep mode inputs:
+
+- `InpH024ReplaySweepEnabled = false`
+- `InpH024ReplaySweepStartShift = 1`
+- `InpH024ReplaySweepEndShift = 1`
+- `InpH024ReplaySweepMaxRows = 20`
+
+Sweep markers:
+
+- `H024_REPLAY_SWEEP`
+- `H024_REPLAY_SWEEP_SHIFT`
+- `H024_REPLAY_SWEEP_DONE`
+
+Synthetic balance diagnostic inputs:
+
+- `InpH024SyntheticBalanceEnabled = false`
+- `InpH024SyntheticBalance = 0.0`
+
+Synthetic diagnostic behavior:
+
+- Default off.
+- Only affects intended-action sizing balance.
+- Does not alter account_balance/equity fields in normal preflight columns.
+- Appends explicit reason suffix when enabled:
+  - `balance_source=synthetic_research_only`
+  - `synthetic_balance=...`
+  - `real_account_balance=...`
+- It is log-only and research-only.
+- It is not real account evidence.
+- It is not demo/live/Phase 4 approval.
+
+## C. Full Review/Approval Artifact Chain And Local Report Outputs
+
+Reports are local and intentionally untracked.
+
+Do not commit `reports/`.
+
+Current standard-demo report lineage:
+
+1. Runtime CSV
+
+- `reports\h024_ea_log_only_preflight.csv`
+- Rows: 229
+- Violations: 0
+- Runtime verifier: PASS
+
+2. Dry-run reconciliation
+
+- Input: `reports\h024_ea_log_only_preflight.csv`
+- Output: `reports\h024_standard_demo_dry_run_requests.jsonl`
+- Rows: 229
+- Intended-action rows: 6
+- WOULD_OPEN rows: 1
+- Dry-run requests: 1
+- Skipped non-request rows: 5
+- Verdict: PASS
+
+3. Demo-order plan
+
+- Input: `reports\h024_standard_demo_dry_run_requests.jsonl`
+- Output: `reports\h024_standard_demo_demo_order_plans.jsonl`
+- Plans: 1
+- Violations: 0
+- Verdict: PASS
+
+4. Broker metadata preflight
+
+- Input: `reports\h024_standard_demo_demo_order_plans.jsonl`
+- Metadata: `reports\h024_standard_demo_broker_metadata_snapshot.json`
+- Output: `reports\h024_standard_demo_broker_metadata_preflight.jsonl`
+- Preflight records: 1
+- Violations: 0
+- Verdict: PASS
+
+5. Order-intent simulation
+
+- Input: `reports\h024_standard_demo_broker_metadata_preflight.jsonl`
+- Output: `reports\h024_standard_demo_order_intent_simulation.jsonl`
+- Order-intent simulation records: 1
+- Violations: 0
+- Builder verdict: PASS
+- Independent verifier verdict: PASS
+
+6. Manual approval checkpoint
+
+- Input: `reports\h024_standard_demo_order_intent_simulation.jsonl`
+- Output: `reports\h024_standard_demo_manual_approval_checkpoint.jsonl`
+- Manual approval checkpoint records: 1
+- Violations: 0
+- Approval status: `PENDING_MANUAL_APPROVAL`
+- Manual approval granted: false
+- Execution approved: false
+- Verdict: PASS
+
+7. Demo execution adapter design
+
+- Input: `reports\h024_standard_demo_manual_approval_checkpoint.jsonl`
+- Output: `reports\h024_standard_demo_demo_execution_adapter_design.jsonl`
+- Design status: `DESIGN_SPEC_ONLY_NOT_IMPLEMENTED`
+- Adapter implementation approved: false at that stage
+- Demo order placement approved: false
+- Live order placement approved: false
+- Execution approved: false
+- Verdict: PASS
+
+8. Phase 4 readiness review
+
+- Output: `reports\h024_standard_demo_phase4_readiness_review.jsonl`
+- Review request status: `READY_FOR_PHASE4_REVIEW_REQUEST`
+- Phase 4 approved: false at that stage
+- Demo order placement approved: false
+- Live order placement approved: false
+- Execution approved: false
+- Verdict: PASS
+
+9. Execution safety-controls design
+
+- Output: `reports\h024_standard_demo_execution_safety_controls_design.jsonl`
+- Design status: `SAFETY_CONTROLS_DESIGN_SPEC_ONLY_NOT_IMPLEMENTED`
+- Phase 4 approved: false at that stage
+- Demo order placement approved: false
+- Live order placement approved: false
+- Execution approved: false
+- Verdict: PASS
+
+10. Default blocked safety preflight
+
+- Output:
+  - `reports\h024_standard_demo_execution_safety_controls_default_blocked_preflight.jsonl`
+  - `reports\h024_standard_demo_execution_safety_controls_default_blocked_audit.jsonl`
+- Control decision: `BLOCK`
+- Blocked reason: `missing_kill_switch_state`
+- Execution approved: false
+- Verdict: PASS
+
+11. Operator control-state snapshot
+
+- Outputs:
+  - `reports\h024_standard_demo_operator_control_state_snapshot.json`
+  - `reports\h024_standard_demo_kill_switch_state_snapshot.json`
+  - `reports\h024_standard_demo_idempotency_ledger_snapshot.json`
+- Snapshot status: `ALLOW_STATE_REVIEW_ONLY_NOT_EXECUTION_APPROVAL`
+- Stable intent id:
+  - `af20bcb4a54f6b51aafadeb15a65320bf9c448dbae20cf33066da3cd5adb4363`
+- Phase 4 approved: false at that stage
+- Demo order placement approved: false
+- Live order placement approved: false
+- Execution approved: false
+- Verdict: PASS
+
+12. Explicit allow-state safety preflight
+
+- Inputs:
+  - `reports\h024_standard_demo_kill_switch_state_snapshot.json`
+  - `reports\h024_standard_demo_idempotency_ledger_snapshot.json`
+- Outputs:
+  - `reports\h024_standard_demo_execution_safety_controls_allow_state_preflight.jsonl`
+  - `reports\h024_standard_demo_execution_safety_controls_allow_state_audit.jsonl`
+- Control decision: `PASS_REVIEW_ONLY_NOT_EXECUTION_APPROVAL`
+- Blocked reasons: 0
+- Execution approved: false
+- Verdict: PASS
+
+13. Phase 4 review packet
+
+- Output:
+  - `reports\h024_standard_demo_phase4_review_packet.jsonl`
+- Schema:
+  - `h024_phase4_review_packet_v1`
+- Kind:
+  - `PHASE4_REVIEW_PACKET_REVIEW_ONLY`
+- Status:
+  - `READY_FOR_HUMAN_PHASE4_REVIEW`
+- Phase 4 approved: false at that stage
+- Demo order placement approved: false
+- Live order placement approved: false
+- Execution adapter approved: false
+- Execution approved: false
+- Verdict: PASS
+
+14. Phase 4 human decision
+
+- Output:
+  - `reports\h024_standard_demo_phase4_human_decision.jsonl`
+- Schema:
+  - `h024_phase4_human_decision_v1`
+- Decision:
+  - `APPROVE_PHASE4_NO_EXECUTION`
+- Status:
+  - `PHASE4_APPROVED_NO_EXECUTION_AUTHORITY`
+- Phase 4 approved: true
+- Demo order placement approved: false
+- Live order placement approved: false
+- Execution adapter implementation approved: false
+- Execution adapter approved: false
+- Execution approved: false
+- Verdict: PASS
+
+15. Demo adapter implementation approval
+
+- Output:
+  - `reports\h024_standard_demo_demo_adapter_implementation_approval.jsonl`
+- Schema:
+  - `h024_demo_adapter_implementation_approval_v1`
+- Decision:
+  - `APPROVE_DEMO_ADAPTER_IMPLEMENTATION_NO_ORDER_PLACEMENT`
+- Status:
+  - `DEMO_ADAPTER_IMPLEMENTATION_APPROVED_NO_ORDER_AUTHORITY`
+- Phase 4 approved: true
+- Demo execution adapter implementation approved: true
+- Execution adapter implementation approved: true
+- Execution adapter approved: false
+- Demo order placement approved: false
+- Live order placement approved: false
+- Execution approved: false
+- Verdict: PASS
+
+16. Fail-closed demo execution adapter skeleton
+
+- Output:
+  - `reports\h024_standard_demo_demo_execution_adapter_skeleton.jsonl`
+- Schema:
+  - `h024_demo_execution_adapter_skeleton_v1`
+- Kind:
+  - `DEMO_EXECUTION_ADAPTER_SKELETON_FAIL_CLOSED`
+- Status:
+  - `DEMO_EXECUTION_ADAPTER_SKELETON_IMPLEMENTED_FAIL_CLOSED`
+- Decision:
+  - `REFUSE_DISPATCH_NO_ORDER_AUTHORITY`
+- Refusal reasons:
+  - `execution_adapter_use_not_approved`
+  - `demo_order_placement_not_approved`
+  - `execution_not_approved`
+- Dispatch attempted: false
+- Terminal mutated: false
+- Broker state mutated: false
+- Verdict: PASS
+
+## D. Exact Current Truth Table
+
+As of commit `03a2dd3` and handoff commit `8a9a881`:
+
+- Phase 4 approved: true
+- Demo adapter implementation approved: true
+- Demo execution adapter skeleton implemented: true
+- Execution adapter use approved: false
+- MT5 import/use for execution approved: false
+- Broker request construction approved: false
+- Terminal mutation approved: false
+- Demo order placement approved: false
+- Live order placement approved: false
+- Execution approved: false
+
+Do not collapse these states.
+
+The project is in Phase 4, but still in fail-closed non-execution implementation.
+
+## E. What The Next AI Should Not Do Next
+
+Do not immediately implement:
+
+- `MetaTrader5` import
+- `OrderSend`
+- `OrderCheck`
+- `MqlTradeRequest`
+- broker request construction
+- terminal mutation
+- order placement
+- demo-order approval
+- live-order approval
+
+Do not ask to “just try one demo order” yet.
+
+The next correct step is still pure Python:
+
+- demo adapter intent-ingestion/refusal audit
+- real intent context ingestion
+- no broker request
+- no dispatch
+- no mutation
+
+## F. Best Next Artifact
+
+Recommended next schema:
+
+- `h024_demo_adapter_intent_refusal_audit_v1`
+
+Recommended kind:
+
+- `DEMO_ADAPTER_INTENT_REFUSAL_AUDIT`
+
+Recommended status:
+
+- `ADAPTER_INTENT_INGESTED_REFUSED_NO_ORDER_AUTHORITY`
+
+Recommended decision:
+
+- `REFUSE_DISPATCH_NO_ORDER_AUTHORITY`
+
+Purpose:
+
+Prove the adapter skeleton can ingest the real standard-demo H024 order-intent context and still refuse dispatch.
+
+This closes the gap between a generic fail-closed skeleton and a skeleton evaluated against the actual H024 demo intent evidence.
