@@ -35,12 +35,18 @@ DEFAULT_ADAPTER_BOUNDARY_TARGETS = (
     "scripts/verify_h024_broker_request_preview_construction_approval_jsonl.py",
     "scripts/build_h024_broker_request_preview_envelope_jsonl.py",
     "scripts/verify_h024_broker_request_preview_envelope_jsonl.py",
-'quantcore/execution/h024_broker_request_draft_construction_approval.py'
-'quantcore/execution/h024_broker_request_draft_envelope.py'
-'scripts/build_h024_broker_request_draft_construction_approval_jsonl.py'
-'scripts/verify_h024_broker_request_draft_construction_approval_jsonl.py'
-'scripts/build_h024_broker_request_draft_envelope_jsonl.py'
-'scripts/verify_h024_broker_request_draft_envelope_jsonl.py'
+'quantcore/execution/h024_broker_request_draft_construction_approval.py',
+'quantcore/execution/h024_broker_request_draft_envelope.py',
+'scripts/build_h024_broker_request_draft_construction_approval_jsonl.py',
+'scripts/verify_h024_broker_request_draft_construction_approval_jsonl.py',
+'scripts/build_h024_broker_request_draft_envelope_jsonl.py',
+'scripts/verify_h024_broker_request_draft_envelope_jsonl.py',
+'quantcore/execution/h024_broker_request_draft_review_human_decision.py',
+'quantcore/execution/h024_mt5_request_shape_design_review_packet.py',
+'scripts/build_h024_broker_request_draft_review_human_decision_jsonl.py',
+'scripts/verify_h024_broker_request_draft_review_human_decision_jsonl.py',
+'scripts/build_h024_mt5_request_shape_design_review_packet_jsonl.py',
+'scripts/verify_h024_mt5_request_shape_design_review_packet_jsonl.py',
 )
 
 PYTHON_PROHIBITED_IMPORT_ROOTS = frozenset({"MetaTrader5"})
