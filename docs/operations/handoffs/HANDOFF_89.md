@@ -6,7 +6,7 @@ This document is intended to be fully self-contained. A new AI should be able to
 
 ## 0. One-Sentence State
 
-H024 remains research-only and is not demo/live/Phase 4/execution approved, but it now has a clean standard-demo 10000 USD runtime replay-sweep WOULD_OPEN on XAUUSDm, verified dry-run request reconciliation, verified dry-run request JSONL audit, a reusable JSONL verifier, and a documented Phase 4 readiness gate.
+H024 remains research-only/log-only and is not demo-order/live/Phase 4/execution approved, but it now has a clean Exness standard demo 10000 USD runtime replay-sweep WOULD_OPEN on XAUUSDm, verified dry-run request reconciliation, verified dry-run request JSONL audit, a reusable JSONL verifier, and a documented Phase 4 readiness gate.
 
 ## 1. Project Identity
 
@@ -43,7 +43,7 @@ Correct direct answer if asked whether we are near Phase 4:
 - No, H024 is not Phase 4-approved yet.
 - The next approved work is pure design-contract code only, not execution code.
 
-## 2. Human Preference
+## 2. Human Preference And Morale Context
 
 The user is tired of ceremony and wants practical progress.
 
@@ -59,9 +59,28 @@ Going forward:
 - For real-data diagnostics, get explicit authorization or make a clear safety-bound decision.
 - Never soften deployment boundaries because H024 is promising.
 
+Important git workflow preference:
+
+- The user explicitly asked why we were not doing git operations in one block.
+- Going forward, bundle stage → diff → status → commit → push → verify in one PowerShell block unless there is a real reason not to.
+
 Important frustration:
 
-A previous patch attempt went wrong because tests were committed without implementation. The user noticed repeated failures and challenged whether errors were being read. Inspect source before patching. Do not blindly repeat failing scripts.
+- A previous replay-sweep patch attempt went wrong because tests were committed without implementation.
+- The user noticed repeated failures and explicitly challenged whether errors were being read.
+- Be careful. Inspect actual source before patching. Do not blindly repeat failing patch scripts.
+
+Important morale context:
+
+- The user is excited by progress but emotionally worried that after a lot of work the EA may still fail.
+- Reassure honestly, not by promising profitability.
+- The correct motivational framing is:
+  - The strategy edge is still unproven in deployment.
+  - The runtime plumbing is now meaningfully proven.
+  - The safety discipline is strong.
+  - If H024 fails, the pipeline and infrastructure remain valuable and reusable for H025/H026.
+- A useful phrase:
+  - “A normal trader is trying to be right. You are building a system that can survive being wrong.”
 
 ## 3. Environment
 
@@ -149,6 +168,8 @@ Recent important commits:
 - `e67ef47 Document H024 synthetic balance replay sweep result`
 - `f622eb9 Add handoff document #88`
 - `fb95bd9 Add H024 synthetic balance diagnostic`
+- `fc5918c Document H024 replay sweep runtime result`
+- `ff9f500 Allow H024 replay sweep runtime markers`
 
 ## 5. Non-Negotiable Safety Boundary
 
@@ -735,7 +756,35 @@ e181513 Document H024 Phase 4 readiness gate
 
 No full suite was needed for the docs-only Phase 4 readiness gate commit.
 
-13. Known Pitfalls
+13. Phase 4 Distance Calibration
+
+If the user asks how close we are:
+
+Phase 4 readiness review: around 70% there
+Demo-only execution adapter design: around 40% there
+Actual demo order placement approval: around 20–25% there
+Live trading approval: 0%
+
+Do not present these as formal metrics. They are a practical calibration.
+
+Why we are closer:
+
+Real 10000 USD standard demo account produced a runtime WOULD_OPEN.
+Runtime verifier passed.
+Dry-run reconciliation passed.
+JSONL request audit passed.
+Reusable JSONL verifier exists.
+Phase 4 readiness gate exists.
+
+Why we are not done:
+
+No demo-only execution adapter design spec yet.
+No pure Python demo-order-plan contract yet.
+No broker metadata preflight design yet.
+No dry-run-to-order simulation yet.
+No manual approval checkpoint yet.
+No execution code is approved.
+14. Known Pitfalls
 
 MetaEditor may return code 1 even when compile succeeds.
 
@@ -757,7 +806,7 @@ Do not add execution code yet.
 
 Do not add a demo execution adapter before the Phase 4 readiness gate design steps are completed.
 
-14. Recommended Next Engineering Step
+15. Recommended Next Engineering Step
 
 Next approved work:
 
@@ -799,7 +848,7 @@ preserves source reason
 preserves source timestamp
 emits an internal proposed demo-order plan
 contains no MT5 side effects
-15. Exact Commands For Current Verification
+16. Exact Commands For Current Verification
 
 Repo state:
 
@@ -852,7 +901,7 @@ python -m pytest -q
 Latest anchor:
 
 970 passed in 17.77s
-16. Immediate First Action For Next AI
+17. Immediate First Action For Next AI
 
 Ask the user to run:
 
@@ -870,7 +919,7 @@ Latest commit: Add handoff document #89
 
 Then proceed with the pure Python demo-order-plan contract only.
 
-17. Exact First Response The Next AI Should Give
+18. Exact First Response The Next AI Should Give
 
 Understood. Continuing from HANDOFF_89.
 
