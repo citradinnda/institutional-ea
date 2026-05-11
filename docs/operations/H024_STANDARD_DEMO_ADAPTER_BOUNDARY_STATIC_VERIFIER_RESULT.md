@@ -107,3 +107,12 @@ The verifier fails if the adapter implementation surface contains executable imp
 This gate prevents the fail-closed demo adapter implementation surface from quietly drifting into execution-capable code before an explicit approval gate exists.
 
 It is a static boundary proof only. It is not adapter-use approval and not order-placement approval.
+## No-op transport contract surface update
+
+The adapter boundary static verifier now includes the pure-Python no-op transport contract implementation surface:
+
+- `quantcore/execution/h024_demo_adapter_noop_transport_contract.py`
+- `scripts/build_h024_demo_adapter_noop_transport_contract_jsonl.py`
+- `scripts/verify_h024_demo_adapter_noop_transport_contract_jsonl.py`
+
+This preserves the same boundary: no broker request construction, no MT5 execution request construction, no dispatch, no terminal mutation, no broker mutation, no demo order placement, no live order placement, and no execution approval.
