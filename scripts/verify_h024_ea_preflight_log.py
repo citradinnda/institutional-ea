@@ -179,6 +179,18 @@ def _validate_intended_action_payload(index: int, event: str, row: dict, violati
     if not fields.get("reason"):
         violations.append(f"row {index}: intended-action reason must be non-empty")
 
+    reason = fields.get("reason", "")
+    if "balance_source=synthetic_research_only" in reason:
+        missing_fragments = [
+            fragment
+            for fragment in ("synthetic_balance=", "real_account_balance=")
+            if fragment not in reason
+        ]
+        if missing_fragments:
+            violations.append(
+                f"row {index}: synthetic balance intended-action reason missing required fragments {missing_fragments}"
+            )
+
 ALLOWED_INTENT_ACTIONS = {"NO_ACTION", "BLOCKED", "WOULD_OPEN"}
 DEFAULT_ALLOWED_SYMBOLS = ("USDJPYm", "XAUUSDm")
 CENT_ACCOUNT_ALLOWED_SYMBOLS = ("USDJPYc", "XAUUSDc")
