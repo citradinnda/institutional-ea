@@ -21,6 +21,9 @@ DEFAULT_ADAPTER_BOUNDARY_TARGETS = (
     "quantcore/execution/h024_demo_adapter_noop_transport_contract.py",
     "scripts/build_h024_demo_adapter_noop_transport_contract_jsonl.py",
     "scripts/verify_h024_demo_adapter_noop_transport_contract_jsonl.py",
+    "quantcore/execution/h024_demo_adapter_noop_use_approval.py",
+    "scripts/build_h024_demo_adapter_noop_use_approval_jsonl.py",
+    "scripts/verify_h024_demo_adapter_noop_use_approval_jsonl.py",
 )
 
 PYTHON_PROHIBITED_IMPORT_ROOTS = frozenset({"MetaTrader5"})

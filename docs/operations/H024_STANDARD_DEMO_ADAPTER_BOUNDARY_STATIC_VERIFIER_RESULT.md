@@ -116,3 +116,13 @@ The adapter boundary static verifier now includes the pure-Python no-op transpor
 - `scripts/verify_h024_demo_adapter_noop_transport_contract_jsonl.py`
 
 This preserves the same boundary: no broker request construction, no MT5 execution request construction, no dispatch, no terminal mutation, no broker mutation, no demo order placement, no live order placement, and no execution approval.
+
+## No-op adapter-use approval surface update
+
+The adapter boundary static verifier now includes the pure-Python no-op adapter-use approval implementation surface:
+
+- `quantcore/execution/h024_demo_adapter_noop_use_approval.py`
+- `scripts/build_h024_demo_adapter_noop_use_approval_jsonl.py`
+- `scripts/verify_h024_demo_adapter_noop_use_approval_jsonl.py`
+
+This preserves the same boundary: no broker request construction, no MT5 execution request construction, no dispatch, no terminal mutation, no broker mutation, no demo order placement, no live order placement, and no execution approval.
