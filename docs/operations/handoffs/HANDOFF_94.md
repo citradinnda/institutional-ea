@@ -1,4 +1,4 @@
-# HANDOFF_94 — H024 Phase 4 Demo Adapter Readiness Human Decision Complete
+# HANDOFF_94 â€” H024 Phase 4 Demo Adapter Readiness Human Decision Complete
 
 If any older handoff conflicts with this one, this handoff wins.
 
@@ -12,7 +12,7 @@ Latest pushed commit:
 
 - `1cb692d Add H024 Phase 4 demo adapter readiness human decision`
 
-## 1. Current Status — Say This Directly If Asked
+## 1. Current Status â€” Say This Directly If Asked
 
 H024 has officially left Phase 3 and is in Phase 4 governance.
 
@@ -44,7 +44,7 @@ A human decision artifact now approves adapter-readiness review only.
 
 That human decision does not approve adapter use, broker requests, demo orders, live orders, or execution.
 
-Correct short answer if asked “what changed since HANDOFF_93?”:
+Correct short answer if asked â€œwhat changed since HANDOFF_93?â€:
 
 - We implemented and verified the real-intent refusal audit.
 - We implemented and fixed the adapter boundary static verifier.
@@ -104,7 +104,7 @@ Important preference:
 
 Important git workflow preference:
 
-- Bundle stage → diff/check → status → commit → push → verify in one PowerShell block unless there is a real reason not to.
+- Bundle stage â†’ diff/check â†’ status â†’ commit â†’ push â†’ verify in one PowerShell block unless there is a real reason not to.
 - Use boring single-line `git add -- "file1" "file2" ...`.
 - Avoid fragile multiline `git add` with backticks.
 - Do not commit `reports/`.
@@ -116,7 +116,7 @@ Important morale framing:
 - The safety discipline is strong.
 - If H024 fails, the pipeline and infrastructure remain valuable and reusable for H025/H026.
 - Useful phrase:
-  - “A normal trader is trying to be right. You are building a system that can survive being wrong.”
+  - â€œA normal trader is trying to be right. You are building a system that can survive being wrong.â€
 
 ## 4. Environment
 
@@ -948,4 +948,633 @@ cd C:\Users\equin\Documents\institutional-ea
 git status
 git log --oneline -8
 
+Then paste the full output.rnrn---rnrn# HANDOFF_94 Supplemental Appendix — Deep Self-Contained Continuation Context
+
+This appendix intentionally repeats and expands context so the next AI can continue without opening older handoffs.
+
+If this appendix conflicts with any earlier section of HANDOFF_94 or any older handoff, this appendix wins.
+
+## A. Exact State As Of The Handoff Expansion
+
+Canonical handoff path:
+
+- `docs\operations\handoffs\HANDOFF_94.md`
+
+As of this handoff expansion, the project is on:
+
+- Branch: `main`
+- Expected remote: `origin/main`
+- Expected working tree after commit: clean except untracked `reports/`
+- Latest code commit before HANDOFF_94: `1cb692d Add H024 Phase 4 demo adapter readiness human decision`
+- Initial HANDOFF_94 commit: `b2b8d06 Add handoff document #94`
+- This expansion should be committed as:
+  - `Expand handoff document #94`
+
+The latest validated project state before HANDOFF_94 was:
+
+- Focused human-decision tests: `10 passed`
+- Readiness packet verifier: PASS
+- Readiness human-decision builder: PASS
+- Readiness human-decision verifier: PASS
+- Full test suite: `1142 passed in 21.77s`
+- Static EA verifier: PASS
+- Git push: PASS
+
+Current high-level truth:
+
+- H024 is Phase 4-approved.
+- H024 is demo-adapter implementation-approved.
+- H024 has adapter-readiness review approval.
+- H024 does not have adapter-use approval.
+- H024 does not have broker-request approval.
+- H024 does not have MT5 execution approval.
+- H024 does not have terminal-mutation approval.
+- H024 does not have demo-order-placement approval.
+- H024 does not have live-order-placement approval.
+- H024 does not have execution approval.
+
+The project is therefore in:
+
+- Phase 4 governance.
+- Pure-Python fail-closed implementation/readiness work.
+- No broker/terminal mutation.
+
+## B. The Mental Model The Next AI Must Preserve
+
+Do not collapse these concepts:
+
+1. Strategy evidence
+   - Backtest/runtime/reconciliation/order-intent evidence.
+   - `WOULD_OPEN` means evidence only.
+   - It is never permission to trade.
+
+2. Governance approval
+   - Human decisions and review packets.
+   - Phase 4 approval exists.
+   - Adapter-readiness review approval exists.
+   - Execution approval does not exist.
+
+3. Pure-Python implementation scaffolding
+   - Adapter skeletons.
+   - Refusal audits.
+   - No-op contracts.
+   - Static verifiers.
+   - These are allowed only while fail-closed.
+
+4. Broker/terminal mutation
+   - MT5 import for execution.
+   - Broker request construction.
+   - `OrderSend`, `OrderCheck`, `MqlTradeRequest`.
+   - Demo/live orders.
+   - This remains forbidden.
+
+Every new gate should answer:
+
+- What exactly does this prove?
+- What exactly does it not prove?
+- Which approvals remain false?
+- Can any code path mutate broker or terminal state?
+- Did we prove refusal under real standard-demo evidence?
+
+## C. Full Local Artifact Lineage
+
+`reports/` is intentionally untracked. Do not commit it.
+
+### 1. Runtime CSV
+
+- `reports\h024_ea_log_only_preflight.csv`
+- Rows: 229
+- Violations: 0
+- Runtime verifier: PASS
+- Broker/company: `Exness Technologies Ltd`
+- Server: `Exness-MT5Trial6`
+- Currency: `USD`
+- Balance: `10000.00`
+- Equity: `10000.00`
+- Leverage: `2000`
+
+Unique real demo-balance WOULD_OPEN row:
+
+- runtime timestamp: `2026.05.11 07:45:49`
+- symbol: `XAUUSDm`
+- normalized symbol: `XAUUSD`
+- timeframe: `H4`
+- action: `WOULD_OPEN`
+- side: `short`
+- closed H4 time: `2026.03.18 08:00:00`
+- entry: `4930.0410000000`
+- stop: `5019.0680000000`
+- stop distance: `89.0270000000`
+- tick size: `0.0010000000`
+- tick value USD per lot: `0.1000000000`
+- account balance USD: `10000.00`
+- risk fraction: `0.01000000`
+- risk USD: `100.00`
+- raw lots: `0.0112325474`
+- final lots: `0.0100000000`
+- min volume: `0.0100000000`
+- max volume: `200.0000000000`
+- volume step: `0.0100000000`
+- volume digits: `2`
+
+This row is not trade permission.
+
+### 2. Dry-run reconciliation
+
+- Input: `reports\h024_ea_log_only_preflight.csv`
+- Output: `reports\h024_standard_demo_dry_run_requests.jsonl`
+- Rows: 229
+- Intended-action rows: 6
+- WOULD_OPEN rows: 1
+- Dry-run requests: 1
+- Skipped non-request rows: 5
+- Verdict: PASS
+
+### 3. Demo-order plan
+
+- Output: `reports\h024_standard_demo_demo_order_plans.jsonl`
+- Plans: 1
+- Violations: 0
+- Verdict: PASS
+
+This is still not order approval.
+
+### 4. Broker metadata preflight
+
+- Metadata: `reports\h024_standard_demo_broker_metadata_snapshot.json`
+- Output: `reports\h024_standard_demo_broker_metadata_preflight.jsonl`
+- Preflight records: 1
+- Violations: 0
+- Verdict: PASS
+
+### 5. Order-intent simulation
+
+- Output: `reports\h024_standard_demo_order_intent_simulation.jsonl`
+- Order-intent simulation records: 1
+- Violations: 0
+- Builder verdict: PASS
+- Independent verifier verdict: PASS
+
+This simulates intent only. It does not construct an MT5 request.
+
+### 6. Manual approval checkpoint
+
+- Output: `reports\h024_standard_demo_manual_approval_checkpoint.jsonl`
+- Manual approval checkpoint records: 1
+- Violations: 0
+- Approval status: `PENDING_MANUAL_APPROVAL`
+- Manual approval granted: false
+- Execution approved: false
+- Verdict: PASS
+
+### 7. Demo execution adapter design
+
+- Output: `reports\h024_standard_demo_demo_execution_adapter_design.jsonl`
+- Design status: `DESIGN_SPEC_ONLY_NOT_IMPLEMENTED`
+- Adapter implementation approved: false at that stage
+- Demo order placement approved: false
+- Live order placement approved: false
+- Execution approved: false
+- Verdict: PASS
+
+### 8. Phase 4 readiness review
+
+- Output: `reports\h024_standard_demo_phase4_readiness_review.jsonl`
+- Review request status: `READY_FOR_PHASE4_REVIEW_REQUEST`
+- Phase 4 approved: false at that stage
+- Demo order placement approved: false
+- Live order placement approved: false
+- Execution approved: false
+- Verdict: PASS
+
+### 9. Execution safety-controls design
+
+- Output: `reports\h024_standard_demo_execution_safety_controls_design.jsonl`
+- Design status: `SAFETY_CONTROLS_DESIGN_SPEC_ONLY_NOT_IMPLEMENTED`
+- Execution approved: false
+- Verdict: PASS
+
+### 10. Default blocked safety preflight
+
+- Outputs:
+  - `reports\h024_standard_demo_execution_safety_controls_default_blocked_preflight.jsonl`
+  - `reports\h024_standard_demo_execution_safety_controls_default_blocked_audit.jsonl`
+- Control decision: `BLOCK`
+- Blocked reason: `missing_kill_switch_state`
+- Execution approved: false
+- Verdict: PASS
+
+### 11. Operator control-state snapshot
+
+- Outputs:
+  - `reports\h024_standard_demo_operator_control_state_snapshot.json`
+  - `reports\h024_standard_demo_kill_switch_state_snapshot.json`
+  - `reports\h024_standard_demo_idempotency_ledger_snapshot.json`
+- Snapshot status: `ALLOW_STATE_REVIEW_ONLY_NOT_EXECUTION_APPROVAL`
+- Stable intent id:
+  - `af20bcb4a54f6b51aafadeb15a65320bf9c448dbae20cf33066da3cd5adb4363`
+- Execution approved: false
+- Verdict: PASS
+
+### 12. Explicit allow-state safety preflight
+
+- Outputs:
+  - `reports\h024_standard_demo_execution_safety_controls_allow_state_preflight.jsonl`
+  - `reports\h024_standard_demo_execution_safety_controls_allow_state_audit.jsonl`
+- Control decision: `PASS_REVIEW_ONLY_NOT_EXECUTION_APPROVAL`
+- Blocked reasons: 0
+- Execution approved: false
+- Verdict: PASS
+
+This is review-only. It is not order approval.
+
+### 13. Phase 4 review packet
+
+- Output: `reports\h024_standard_demo_phase4_review_packet.jsonl`
+- Schema: `h024_phase4_review_packet_v1`
+- Kind: `PHASE4_REVIEW_PACKET_REVIEW_ONLY`
+- Status: `READY_FOR_HUMAN_PHASE4_REVIEW`
+- Execution adapter approved: false
+- Execution approved: false
+- Verdict: PASS
+
+### 14. Phase 4 human decision
+
+- Output: `reports\h024_standard_demo_phase4_human_decision.jsonl`
+- Schema: `h024_phase4_human_decision_v1`
+- Decision: `APPROVE_PHASE4_NO_EXECUTION`
+- Status: `PHASE4_APPROVED_NO_EXECUTION_AUTHORITY`
+- Phase 4 approved: true
+- Execution adapter implementation approved: false at that stage
+- Execution adapter approved: false
+- Execution approved: false
+- Verdict: PASS
+
+This is when H024 officially left Phase 3. It did not approve execution.
+
+### 15. Demo adapter implementation approval
+
+- Output: `reports\h024_standard_demo_demo_adapter_implementation_approval.jsonl`
+- Schema: `h024_demo_adapter_implementation_approval_v1`
+- Decision: `APPROVE_DEMO_ADAPTER_IMPLEMENTATION_NO_ORDER_PLACEMENT`
+- Status: `DEMO_ADAPTER_IMPLEMENTATION_APPROVED_NO_ORDER_AUTHORITY`
+- Phase 4 approved: true
+- Demo execution adapter implementation approved: true
+- Execution adapter implementation approved: true
+- Execution adapter approved: false
+- Demo order placement approved: false
+- Live order placement approved: false
+- Execution approved: false
+- Verdict: PASS
+
+This permits pure-Python implementation work only.
+
+### 16. Fail-closed demo execution adapter skeleton
+
+- Output: `reports\h024_standard_demo_demo_execution_adapter_skeleton.jsonl`
+- Schema: `h024_demo_execution_adapter_skeleton_v1`
+- Kind: `DEMO_EXECUTION_ADAPTER_SKELETON_FAIL_CLOSED`
+- Status: `DEMO_EXECUTION_ADAPTER_SKELETON_IMPLEMENTED_FAIL_CLOSED`
+- Decision: `REFUSE_DISPATCH_NO_ORDER_AUTHORITY`
+- Refusal reasons:
+  - `execution_adapter_use_not_approved`
+  - `demo_order_placement_not_approved`
+  - `execution_not_approved`
+- Dispatch attempted: false
+- Terminal mutated: false
+- Broker state mutated: false
+- Verdict: PASS by verifier
+
+### 17. Demo adapter intent-ingestion/refusal audit
+
+- Output: `reports\h024_standard_demo_demo_adapter_intent_refusal_audit.jsonl`
+- Schema: `h024_demo_adapter_intent_refusal_audit_v1`
+- Kind: `DEMO_ADAPTER_INTENT_REFUSAL_AUDIT`
+- Status: `ADAPTER_INTENT_INGESTED_REFUSED_NO_ORDER_AUTHORITY`
+- Decision: `REFUSE_DISPATCH_NO_ORDER_AUTHORITY`
+- Purpose:
+  - Proves the adapter path can ingest the real standard-demo H024 order-intent context and still refuse dispatch.
+- Required false states:
+  - broker request constructed false
+  - MT5 request constructed false
+  - order payload constructed false
+  - dispatch attempted false
+  - terminal mutated false
+  - broker state mutated false
+- Verdict: PASS
+
+### 18. Demo adapter boundary static verifier
+
+- Output: `reports\h024_standard_demo_demo_adapter_boundary_static_verifier.jsonl`
+- Schema: `h024_demo_adapter_boundary_static_verifier_v1`
+- Kind: `DEMO_ADAPTER_BOUNDARY_STATIC_VERIFIER`
+- Status: `ADAPTER_IMPLEMENTATION_BOUNDARY_STATIC_VERIFIED`
+- Decision: `ALLOW_IMPLEMENTATION_SURFACE_REVIEW_ONLY_NO_EXECUTION`
+- Scanned adapter-boundary files: 6
+- Prohibited findings: 0
+- Violations: 0
+- Verdict: PASS
+
+Important:
+
+- Python files are scanned with Python AST parsing.
+- MQL files are scanned as text.
+- Do not regress to raw text scanning for Python files.
+
+### 19. Phase 4 demo adapter readiness packet
+
+- Output: `reports\h024_standard_demo_phase4_demo_adapter_readiness_packet.jsonl`
+- Schema: `h024_phase4_demo_adapter_readiness_packet_v1`
+- Kind: `PHASE4_DEMO_ADAPTER_READINESS_PACKET_REVIEW_ONLY`
+- Status: `READY_FOR_HUMAN_ADAPTER_READINESS_REVIEW_NO_EXECUTION`
+- Decision: `REVIEW_ONLY_NO_EXECUTION_AUTHORITY`
+- Upstream artifacts summarized: 3
+- Violations: 0
+- Verdict: PASS
+
+Aggregates:
+
+- Fail-closed skeleton.
+- Real-intent refusal audit.
+- Boundary static verifier.
+
+This is review-only.
+
+### 20. Phase 4 demo adapter readiness human decision
+
+- Output: `reports\h024_standard_demo_phase4_demo_adapter_readiness_human_decision.jsonl`
+- Schema: `h024_phase4_demo_adapter_readiness_human_decision_v1`
+- Kind: `PHASE4_DEMO_ADAPTER_READINESS_HUMAN_DECISION`
+- Status: `ADAPTER_READINESS_REVIEW_APPROVED_NO_EXECUTION_AUTHORITY`
+- Decision: `APPROVE_ADAPTER_READINESS_REVIEW_NO_EXECUTION`
+- Violations: 0
+- Verdict: PASS
+
+This approves adapter-readiness review only.
+
+It does not approve:
+
+- adapter use
+- broker request construction
+- MT5 execution
+- terminal mutation
+- demo order placement
+- live order placement
+- execution
+
+## D. Exact Approval Truth Table
+
+As of HANDOFF_94:
+
+| State | Value |
+|---|---:|
+| Phase 4 approved | true |
+| Demo adapter implementation approved | true |
+| Execution adapter implementation approved | true |
+| Fail-closed skeleton implemented | true |
+| Real-intent refusal audit passed | true |
+| Adapter boundary static verifier passed | true |
+| Phase 4 demo adapter readiness packet passed | true |
+| Adapter-readiness review human decision approved | true |
+| Execution adapter use approved | false |
+| Execution adapter approved as transport | false |
+| Broker request construction approved | false |
+| MT5 import/use for execution approved | false |
+| Terminal mutation approved | false |
+| Broker mutation approved | false |
+| Demo order placement approved | false |
+| Live order placement approved | false |
+| Execution approved | false |
+
+Never collapse these states.
+
+The system is safer and more mature than before, but still non-executing.
+
+## E. Exact Forbidden Surface
+
+Until a later explicit approval gate says otherwise, do not add or call:
+
+Python:
+
+- `import MetaTrader5`
+- `from MetaTrader5 import ...`
+- `mt5.initialize`
+- `mt5.login`
+- `mt5.shutdown`
+- `mt5.order_send`
+- `mt5.order_check`
+- direct `order_send`
+- direct `order_check`
+- any broker API call
+- any terminal mutation path
+
+MQL:
+
+- `OrderSend`
+- `OrderSendAsync`
+- `OrderCheck`
+- `CTrade`
+- `#include <Trade...>`
+- `MqlTradeRequest`
+- `MqlTradeResult`
+- `PositionOpen`
+- `PositionClose`
+- `PositionModify`
+- `BuyStop`
+- `SellStop`
+- `BuyLimit`
+- `SellLimit`
+- `BuyStopLimit`
+- `SellStopLimit`
+
+Operationally forbidden:
+
+- chart attach/detach automation
+- GUI automation
+- live-terminal mutation
+- demo order placement
+- live order placement
+- broker request construction
+- MT5 execution adapter that can place an order
+- anything that mutates broker or terminal state
+
+## F. Current Safe Engineering Direction
+
+The next good engineering step is not demo-order approval.
+
+The next good step is a pure-Python no-op transport contract gate.
+
+Why:
+
+- The skeleton proves generic fail-closed dispatch refusal.
+- The real-intent refusal audit proves real H024 intent can be ingested and refused.
+- The readiness packet and human decision prove the review evidence is accepted.
+- A no-op transport contract is the next adapter layer, still fail-closed.
+- It can define transport semantics before any real transport exists.
+- It can prove that even with adapter-readiness review approval, adapter use remains false.
+
+Suggested next artifact:
+
+- Module:
+  - `quantcore\execution\h024_demo_adapter_noop_transport_contract.py`
+- Builder:
+  - `scripts\build_h024_demo_adapter_noop_transport_contract_jsonl.py`
+- Verifier:
+  - `scripts\verify_h024_demo_adapter_noop_transport_contract_jsonl.py`
+- Tests:
+  - `tests\test_h024_demo_adapter_noop_transport_contract.py`
+- Docs:
+  - `docs\operations\H024_STANDARD_DEMO_ADAPTER_NOOP_TRANSPORT_CONTRACT_RESULT.md`
+
+Suggested input artifacts:
+
+- `reports\h024_standard_demo_phase4_demo_adapter_readiness_human_decision.jsonl`
+- `reports\h024_standard_demo_demo_adapter_intent_refusal_audit.jsonl`
+- `reports\h024_standard_demo_demo_adapter_boundary_static_verifier.jsonl`
+
+Suggested schema:
+
+- `h024_demo_adapter_noop_transport_contract_v1`
+
+Suggested kind:
+
+- `DEMO_ADAPTER_NOOP_TRANSPORT_CONTRACT`
+
+Suggested status:
+
+- `NOOP_TRANSPORT_CONTRACT_READY_REFUSES_EXECUTION`
+
+Suggested decision:
+
+- `REFUSE_TRANSPORT_NO_ADAPTER_USE_AUTHORITY`
+
+Required output true states:
+
+- `phase4_approved=true`
+- `demo_execution_adapter_implementation_approved=true`
+- `execution_adapter_implementation_approved=true`
+- `adapter_readiness_review_approved=true`
+- `intent_context_available=true`
+- `noop_transport_contract_defined=true`
+
+Required output false states:
+
+- `execution_adapter_use_approved=false`
+- `execution_adapter_approved=false`
+- `broker_request_approved=false`
+- `mt5_execution_approved=false`
+- `terminal_mutation_approved=false`
+- `demo_order_placement_approved=false`
+- `live_order_placement_approved=false`
+- `execution_approved=false`
+- `broker_request_constructed=false`
+- `mt5_request_constructed=false`
+- `order_payload_constructed=false`
+- `transport_dispatch_attempted=false`
+- `dispatch_attempted=false`
+- `terminal_mutated=false`
+- `broker_state_mutated=false`
+
+Expected refusal reasons:
+
+- `execution_adapter_use_not_approved`
+- `demo_order_placement_not_approved`
+- `execution_not_approved`
+
+The no-op transport contract should consume the already-verified intent context. It must not reinterpret sizing and must not construct any request payload.
+
+## G. Static Verifier Must Be Updated With New Adapter Surface
+
+If the no-op transport contract is added, also update:
+
+- `quantcore\execution\h024_demo_adapter_boundary_static_verifier.py`
+- `tests\test_h024_demo_adapter_boundary_static_verifier.py`
+- `docs\operations\H024_STANDARD_DEMO_ADAPTER_BOUNDARY_STATIC_VERIFIER_RESULT.md`
+
+Add new default scan targets:
+
+- `quantcore/execution/h024_demo_adapter_noop_transport_contract.py`
+- `scripts/build_h024_demo_adapter_noop_transport_contract_jsonl.py`
+- `scripts/verify_h024_demo_adapter_noop_transport_contract_jsonl.py`
+
+Then rebuild and verify:
+
+- `reports\h024_standard_demo_demo_adapter_boundary_static_verifier.jsonl`
+
+Expected:
+
+- Prohibited findings: 0
+- Violations: 0
+- Verdict: PASS
+
+## H. Tests Required For The Next Gate
+
+For the no-op transport contract, include tests that prove:
+
+1. It builds a PASS record from valid readiness human decision plus intent refusal audit.
+2. It refuses transport because adapter use is not approved.
+3. It fails if adapter-use approval is unexpectedly true.
+4. It fails if demo-order approval is unexpectedly true.
+5. It fails if execution approval is unexpectedly true.
+6. It fails if broker request constructed is true.
+7. It fails if MT5 request constructed is true.
+8. It fails if dispatch attempted is true.
+9. It fails if terminal/broker mutation is true.
+10. It fails if required refusal reasons are missing.
+11. It verifies allowed demo server.
+12. It round-trips JSONL.
+
+Also run the full suite because this is code.
+
+## I. Exact First Message The Next AI Should Send
+
+The next AI should say:
+
+```text
+Understood. Continuing from HANDOFF_94.
+
+I understand:
+
+H024 is Phase 4-approved and demo-adapter implementation/readiness-review approved.
+H024 is still not execution-approved, not demo-order approved, not live-order approved, not adapter-use approved, and not broker-request approved.
+A pure-Python fail-closed demo execution adapter skeleton exists.
+A real standard-demo adapter intent-ingestion/refusal audit exists and passes.
+An adapter boundary static verifier exists, was fixed to use Python AST scanning, and passes with zero prohibited findings.
+A Phase 4 demo adapter readiness packet exists and passes.
+A human decision artifact approves adapter-readiness review only with APPROVE_ADAPTER_READINESS_REVIEW_NO_EXECUTION.
+Latest validation anchor is 1142 tests passed plus static EA verifier PASS.
+Latest pushed code commit before the handoff was 1cb692d Add H024 Phase 4 demo adapter readiness human decision.
+The canonical handoff file is docs\operations\handoffs\HANDOFF_94.md.
+The next safe engineering step is a pure-Python demo adapter no-op transport contract gate requiring the readiness human decision, while still refusing transport because adapter use, broker requests, demo orders, live orders, and execution are not approved.
+
+Please run:
+
+cd C:\Users\equin\Documents\institutional-ea
+.\.venv\Scripts\Activate.ps1
+git status
+git log --oneline -8
+
 Then paste the full output.
+J. Do Not Let The Next AI Do These Things
+
+Do not immediately implement:
+
+MetaTrader5 import
+actual transport to MT5
+broker request construction
+demo order request construction
+OrderSend
+OrderCheck
+MqlTradeRequest
+order placement
+terminal mutation
+GUI automation
+chart attach automation
+live trading path
+demo-order approval
+
+Do not ask the user to “try one demo order.”
+
+Do not treat adapter-readiness review approval as adapter-use approval.
+
+The next step is still pure Python and fail-closed.rn
