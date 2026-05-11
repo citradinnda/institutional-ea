@@ -1,4 +1,4 @@
-﻿"""Verify H024 proposed demo-order plan JSONL.
+"""Verify H024 proposed demo-order plan JSONL.
 
 Research-only verifier for internal review artifacts. This verifies that the
 plan JSONL remains a proposed plan and does not contain execution result fields.
@@ -69,7 +69,7 @@ REQUIRED_FIELDS: tuple[str, ...] = (
 
 
 def iter_jsonl_objects(path: Path) -> Iterable[tuple[int, dict[str, Any]]]:
-    with path.open("r", encoding="utf-8") as handle:
+    with path.open("r", encoding="utf-8-sig") as handle:
         for line_number, raw_line in enumerate(handle, start=1):
             stripped = raw_line.strip()
             if not stripped:

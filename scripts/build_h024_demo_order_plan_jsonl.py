@@ -1,4 +1,4 @@
-﻿"""Build H024 proposed demo-order plan JSONL from dry-run request JSONL.
+"""Build H024 proposed demo-order plan JSONL from dry-run request JSONL.
 
 Research-only boundary:
 - no MetaTrader 5 import
@@ -26,7 +26,7 @@ from quantcore.execution.h024_demo_order_plan import (
 
 
 def iter_jsonl_objects(path: Path) -> Iterable[tuple[int, dict[str, Any]]]:
-    with path.open("r", encoding="utf-8") as handle:
+    with path.open("r", encoding="utf-8-sig") as handle:
         for line_number, raw_line in enumerate(handle, start=1):
             stripped = raw_line.strip()
             if not stripped:

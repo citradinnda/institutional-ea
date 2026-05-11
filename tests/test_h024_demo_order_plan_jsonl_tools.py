@@ -1,4 +1,4 @@
-﻿import json
+import json
 import subprocess
 import sys
 from pathlib import Path
@@ -243,3 +243,21 @@ def test_verifier_rejects_invalid_stop_geometry(tmp_path):
     combined = result.stdout + result.stderr
     assert result.returncode == 1
     assert "SELL stop_loss must be above entry" in combined
+
+
+def test_plan_jsonl_verifier_accepts_utf8_bom(tmp_path):
+    plan_jsonl = tmp_path / "plans.jsonl"
+    payload = json.dumps(valid_plan(), sort_keys=True) + "\n"
+    plan_jsonl.write_bytes(("\ufeff" + payload).encode("utf-8"))
+
+    result = run_cli(
+        [
+            VERIFY_SCRIPT,
+            plan_jsonl,
+            "--allowed-demo-server",
+            "Exness-MT5Trial6",
+            "--require-plan",
+        ]
+    )
+
+    assert result.returncode == 0, result.stdout + result.stderr
