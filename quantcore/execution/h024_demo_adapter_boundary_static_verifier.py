@@ -65,6 +65,12 @@ DEFAULT_ADAPTER_BOUNDARY_TARGETS = (
 'scripts/verify_h024_demo_order_canary_readiness_human_decision_jsonl.py',
 'scripts/build_h024_demo_order_canary_hard_controls_preflight_packet_jsonl.py',
 'scripts/verify_h024_demo_order_canary_hard_controls_preflight_packet_jsonl.py',
+'quantcore/execution/h024_demo_order_canary_human_approval.py',
+'quantcore/execution/h024_final_pre_dispatch_audit_packet.py',
+'scripts/build_h024_demo_order_canary_human_approval_jsonl.py',
+'scripts/verify_h024_demo_order_canary_human_approval_jsonl.py',
+'scripts/build_h024_final_pre_dispatch_audit_packet_jsonl.py',
+'scripts/verify_h024_final_pre_dispatch_audit_packet_jsonl.py',
 )
 
 PYTHON_PROHIBITED_IMPORT_ROOTS = frozenset({"MetaTrader5"})
