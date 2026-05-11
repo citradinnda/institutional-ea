@@ -30,6 +30,11 @@ DEFAULT_ADAPTER_BOUNDARY_TARGETS = (
     "quantcore/execution/h024_broker_request_construction_readiness_packet.py",
     "scripts/build_h024_broker_request_construction_readiness_packet_jsonl.py",
     "scripts/verify_h024_broker_request_construction_readiness_packet_jsonl.py",
+    "quantcore/execution/h024_broker_request_preview_envelope.py",
+    "scripts/build_h024_broker_request_preview_construction_approval_jsonl.py",
+    "scripts/verify_h024_broker_request_preview_construction_approval_jsonl.py",
+    "scripts/build_h024_broker_request_preview_envelope_jsonl.py",
+    "scripts/verify_h024_broker_request_preview_envelope_jsonl.py",
 )
 
 PYTHON_PROHIBITED_IMPORT_ROOTS = frozenset({"MetaTrader5"})

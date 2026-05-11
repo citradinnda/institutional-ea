@@ -146,3 +146,15 @@ The adapter boundary static verifier now includes the pure-Python broker-request
 - `scripts/verify_h024_broker_request_construction_readiness_packet_jsonl.py`
 
 This preserves the same boundary: no broker request construction, no MT5 execution request construction, no dispatch, no terminal mutation, no broker mutation, no demo order placement, no live order placement, and no execution approval.
+
+## Broker-request preview envelope surface update
+
+The adapter boundary static verifier now includes the pure-Python broker-request preview envelope implementation surface:
+
+- `quantcore/execution/h024_broker_request_preview_envelope.py`
+- `scripts/build_h024_broker_request_preview_construction_approval_jsonl.py`
+- `scripts/verify_h024_broker_request_preview_construction_approval_jsonl.py`
+- `scripts/build_h024_broker_request_preview_envelope_jsonl.py`
+- `scripts/verify_h024_broker_request_preview_envelope_jsonl.py`
+
+This preserves the same boundary: no broker request construction, no MT5 execution request construction, no dispatch, no terminal mutation, no broker mutation, no demo order placement, no live order placement, and no execution approval.
