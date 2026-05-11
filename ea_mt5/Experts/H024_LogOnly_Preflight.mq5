@@ -16,6 +16,8 @@ input bool   InpH024ReplaySweepEnabled = false;
 input int    InpH024ReplaySweepStartShift = 1;
 input int    InpH024ReplaySweepEndShift = 1;
 input int    InpH024ReplaySweepMaxRows = 20;
+input bool   InpH024SyntheticBalanceEnabled = false;
+input double InpH024SyntheticBalance = 0.0;
 
 int g_file_handle = INVALID_HANDLE;
 int g_h024_replay_sweep_override_shift = 0;
@@ -92,6 +94,37 @@ int H024ReplaySweepMaxRows()
       return 240;
    }
    return InpH024ReplaySweepMaxRows;
+}
+
+double H024SizingAccountBalance()
+{
+   if(InpH024SyntheticBalanceEnabled)
+   {
+      if(InpH024SyntheticBalance > 0.0)
+      {
+         return InpH024SyntheticBalance;
+      }
+      return 0.0;
+   }
+   return AccountInfoDouble(ACCOUNT_BALANCE);
+}
+
+string H024SyntheticBalanceReasonSuffix()
+{
+   if(!InpH024SyntheticBalanceEnabled)
+   {
+      return "";
+   }
+   return StringFormat(
+      ";balance_source=synthetic_research_only;synthetic_balance=%.2f;real_account_balance=%.2f",
+      H024SizingAccountBalance(),
+      AccountInfoDouble(ACCOUNT_BALANCE)
+   );
+}
+
+string H024AppendSyntheticBalanceReason(const string reason)
+{
+   return reason + H024SyntheticBalanceReasonSuffix();
 }
 
 string BoolText(const bool value)
@@ -464,7 +497,7 @@ string BuildH024IntendedActionLogRow(
       max_volume,
       volume_step,
       volume_digits,
-      reason
+      H024AppendSyntheticBalanceReason(reason)
    );
 }
 
@@ -591,6 +624,7 @@ void WriteH024IntendedActionRuntimeRow()
    const string intent_detail = H024StrategyIntentDetail();
    const string decision = H024DecisionFromIntentDetail(intent_detail);
    const string direction = H024DirectionFromIntentDetail(intent_detail);
+   const double sizing_account_balance = H024SizingAccountBalance();
 
    const double tick_size = SymbolInfoDouble(_Symbol, SYMBOL_TRADE_TICK_SIZE);
    const double tick_value = SymbolInfoDouble(_Symbol, SYMBOL_TRADE_TICK_VALUE);
@@ -614,7 +648,7 @@ void WriteH024IntendedActionRuntimeRow()
       else
       {
          const double preview_lots = ComputeH024LotSize(
-            AccountInfoDouble(ACCOUNT_BALANCE),
+            sizing_account_balance,
             InpRiskFraction,
             entry_price,
             stop_price,
@@ -646,7 +680,7 @@ void WriteH024IntendedActionRuntimeRow()
       stop_price,
       tick_size,
       tick_value,
-      AccountInfoDouble(ACCOUNT_BALANCE),
+      sizing_account_balance,
       InpRiskFraction,
       min_volume,
       max_volume,
