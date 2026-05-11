@@ -76,12 +76,22 @@ The verifier requires:
 - `terminal_mutated=false`
 - `broker_state_mutated=false`
 
-## Prohibited static surface
+## Static scanner behavior
 
-The verifier fails if the adapter implementation surface contains prohibited execution imports, execution symbols, or execution calls including:
+Python targets are scanned with Python AST parsing.
+
+That means comments, docstrings, and refusal strings may safely mention prohibited execution concepts while still proving that executable Python syntax does not import or call execution surfaces.
+
+MQL targets are scanned as text, because execution symbols such as `OrderSend` and `MqlTradeRequest` are directly meaningful in MQL source.
+
+## Prohibited executable surface
+
+The verifier fails if the adapter implementation surface contains executable imports, symbols, or calls including:
 
 - Python `MetaTrader5` imports
+- Python `mt5.initialize`, `mt5.login`, or `mt5.shutdown`
 - Python `mt5.order_send` / `mt5.order_check` style calls
+- Python direct `order_send` / `order_check` calls
 - MQL5 `OrderSend`
 - MQL5 `OrderSendAsync`
 - MQL5 `OrderCheck`

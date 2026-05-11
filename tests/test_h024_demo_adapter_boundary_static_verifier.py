@@ -37,6 +37,22 @@ def test_clean_pure_python_adapter_surface_passes(tmp_path) -> None:
     assert verify_static_verifier_records([record], require_pass=True) == []
 
 
+def test_python_strings_and_comments_do_not_fail_static_boundary(tmp_path) -> None:
+    target = tmp_path / "adapter.py"
+    target.write_text(
+        '"""Refuse OrderSend, OrderCheck, MqlTradeRequest, and MetaTrader5 execution."""\n'
+        "# Never call mt5.order_send from this adapter.\n"
+        'REFUSAL_REASON = "no broker_request or mt5_request may be constructed"\n'
+        "dispatch_attempted = False\n",
+        encoding="utf-8",
+    )
+
+    record = build_static_verifier_record([target], root=tmp_path)
+
+    assert record["verdict"] == "PASS"
+    assert record["prohibited_finding_count"] == 0
+
+
 def test_detects_metatrader5_import(tmp_path) -> None:
     target = tmp_path / "bad_adapter.py"
     target.write_text("import MetaTrader5 as mt5\n", encoding="utf-8")
@@ -48,6 +64,16 @@ def test_detects_metatrader5_import(tmp_path) -> None:
     assert "metatrader5_import" in record["violations"][0]
 
 
+def test_detects_metatrader5_from_import(tmp_path) -> None:
+    target = tmp_path / "bad_adapter.py"
+    target.write_text("from MetaTrader5 import order_send\n", encoding="utf-8")
+
+    record = build_static_verifier_record([target], root=tmp_path)
+
+    assert record["verdict"] == "FAIL"
+    assert any("metatrader5_import" in violation for violation in record["violations"])
+
+
 def test_detects_python_mt5_order_send_call(tmp_path) -> None:
     target = tmp_path / "bad_adapter.py"
     target.write_text("result = mt5.order_send(payload)\n", encoding="utf-8")
@@ -55,7 +81,27 @@ def test_detects_python_mt5_order_send_call(tmp_path) -> None:
     record = build_static_verifier_record([target], root=tmp_path)
 
     assert record["verdict"] == "FAIL"
-    assert any("python_mt5_execution_call" in violation for violation in record["violations"])
+    assert any("python_execution_attr_call" in violation for violation in record["violations"])
+
+
+def test_detects_python_direct_order_send_call(tmp_path) -> None:
+    target = tmp_path / "bad_adapter.py"
+    target.write_text("result = order_send(payload)\n", encoding="utf-8")
+
+    record = build_static_verifier_record([target], root=tmp_path)
+
+    assert record["verdict"] == "FAIL"
+    assert any("python_execution_direct_call" in violation for violation in record["violations"])
+
+
+def test_detects_python_mt5_session_call(tmp_path) -> None:
+    target = tmp_path / "bad_adapter.py"
+    target.write_text("ok = mt5.initialize()\n", encoding="utf-8")
+
+    record = build_static_verifier_record([target], root=tmp_path)
+
+    assert record["verdict"] == "FAIL"
+    assert any("python_mt5_session_call" in violation for violation in record["violations"])
 
 
 def test_detects_mql_order_send_symbol(tmp_path) -> None:

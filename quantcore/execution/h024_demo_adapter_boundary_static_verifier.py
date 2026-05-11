@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import ast
 import json
 import re
 from pathlib import Path
@@ -19,11 +20,46 @@ DEFAULT_ADAPTER_BOUNDARY_TARGETS = (
     "scripts/verify_h024_demo_adapter_intent_refusal_audit_jsonl.py",
 )
 
-PROHIBITED_PATTERNS: tuple[tuple[str, str], ...] = (
-    ("metatrader5_import", r"^\s*(?:import\s+MetaTrader5\b|from\s+MetaTrader5\b)"),
-    ("python_mt5_execution_call", r"\bmt5\s*\.\s*(?:initialize|login|shutdown|order_send|order_check)\b"),
-    ("python_order_send_call", r"\border_send\s*\("),
-    ("python_order_check_call", r"\border_check\s*\("),
+PYTHON_PROHIBITED_IMPORT_ROOTS = frozenset({"MetaTrader5"})
+
+PYTHON_PROHIBITED_ATTR_CALLS = frozenset(
+    {
+        "order_send",
+        "order_check",
+    }
+)
+
+PYTHON_PROHIBITED_MT5_SESSION_ATTR_CALLS = frozenset(
+    {
+        "initialize",
+        "login",
+        "shutdown",
+    }
+)
+
+PYTHON_PROHIBITED_DIRECT_CALLS = frozenset(
+    {
+        "order_send",
+        "order_check",
+        "OrderSend",
+        "OrderSendAsync",
+        "OrderCheck",
+        "CTrade",
+        "MqlTradeRequest",
+        "MqlTradeResult",
+        "PositionOpen",
+        "PositionClose",
+        "PositionModify",
+        "BuyStop",
+        "SellStop",
+        "BuyLimit",
+        "SellLimit",
+        "BuyStopLimit",
+        "SellStopLimit",
+    }
+)
+
+MQL_PROHIBITED_TEXT_PATTERNS: tuple[tuple[str, str], ...] = (
     ("mql_trade_include", r"#\s*include\s*<\s*Trade(?:/|\\|\.|>)"),
     (
         "mql_execution_symbol",
@@ -87,35 +123,171 @@ def _display_path(path: Path, root: Path) -> str:
         return path.as_posix()
 
 
-def _line_excerpt(line: str, limit: int = 160) -> str:
-    normalized = line.strip()
+def _line_excerpt(lines: Sequence[str], line_number: int | None, limit: int = 160) -> str:
+    if line_number is None or line_number < 1 or line_number > len(lines):
+        return ""
+    normalized = lines[line_number - 1].strip()
     if len(normalized) <= limit:
         return normalized
     return normalized[: limit - 3] + "..."
 
 
-def _scan_text_for_prohibited_patterns(text: str, *, path: str) -> list[dict[str, Any]]:
+def _finding(
+    *,
+    path: str,
+    line: int | None,
+    pattern_id: str,
+    matched_text: str,
+    lines: Sequence[str],
+) -> dict[str, Any]:
+    return {
+        "path": path,
+        "line": line,
+        "pattern_id": pattern_id,
+        "matched_text": matched_text,
+        "line_excerpt": _line_excerpt(lines, line),
+    }
+
+
+def _root_name(node: ast.AST) -> str | None:
+    current = node
+    while isinstance(current, ast.Attribute):
+        current = current.value
+    if isinstance(current, ast.Name):
+        return current.id
+    return None
+
+
+def _call_name(node: ast.AST) -> str:
+    try:
+        return ast.unparse(node)
+    except Exception:
+        return node.__class__.__name__
+
+
+def _scan_python_ast_for_prohibited_patterns(text: str, *, path: str) -> list[dict[str, Any]]:
+    lines = text.splitlines()
+    findings: list[dict[str, Any]] = []
+
+    try:
+        tree = ast.parse(text)
+    except SyntaxError as exc:
+        findings.append(
+            _finding(
+                path=path,
+                line=exc.lineno,
+                pattern_id="python_syntax_error",
+                matched_text=exc.msg,
+                lines=lines,
+            )
+        )
+        return findings
+
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Import):
+            for alias in node.names:
+                root = alias.name.split(".", 1)[0]
+                if root in PYTHON_PROHIBITED_IMPORT_ROOTS:
+                    findings.append(
+                        _finding(
+                            path=path,
+                            line=node.lineno,
+                            pattern_id="metatrader5_import",
+                            matched_text=alias.name,
+                            lines=lines,
+                        )
+                    )
+
+        elif isinstance(node, ast.ImportFrom):
+            module = node.module or ""
+            root = module.split(".", 1)[0]
+            if root in PYTHON_PROHIBITED_IMPORT_ROOTS:
+                findings.append(
+                    _finding(
+                        path=path,
+                        line=node.lineno,
+                        pattern_id="metatrader5_import",
+                        matched_text=module,
+                        lines=lines,
+                    )
+                )
+
+        elif isinstance(node, ast.Call):
+            func = node.func
+
+            if isinstance(func, ast.Attribute):
+                attr = func.attr
+                root = _root_name(func.value)
+                if attr in PYTHON_PROHIBITED_ATTR_CALLS:
+                    findings.append(
+                        _finding(
+                            path=path,
+                            line=node.lineno,
+                            pattern_id="python_execution_attr_call",
+                            matched_text=_call_name(func),
+                            lines=lines,
+                        )
+                    )
+                elif (
+                    attr in PYTHON_PROHIBITED_MT5_SESSION_ATTR_CALLS
+                    and root in {"mt5", "MetaTrader5"}
+                ):
+                    findings.append(
+                        _finding(
+                            path=path,
+                            line=node.lineno,
+                            pattern_id="python_mt5_session_call",
+                            matched_text=_call_name(func),
+                            lines=lines,
+                        )
+                    )
+
+            elif isinstance(func, ast.Name) and func.id in PYTHON_PROHIBITED_DIRECT_CALLS:
+                findings.append(
+                    _finding(
+                        path=path,
+                        line=node.lineno,
+                        pattern_id="python_execution_direct_call",
+                        matched_text=func.id,
+                        lines=lines,
+                    )
+                )
+
+    return findings
+
+
+def _scan_mql_text_for_prohibited_patterns(text: str, *, path: str) -> list[dict[str, Any]]:
+    lines = text.splitlines()
     findings: list[dict[str, Any]] = []
     compiled = [
         (pattern_id, re.compile(pattern, flags=re.IGNORECASE | re.MULTILINE))
-        for pattern_id, pattern in PROHIBITED_PATTERNS
+        for pattern_id, pattern in MQL_PROHIBITED_TEXT_PATTERNS
     ]
 
-    for line_number, line in enumerate(text.splitlines(), start=1):
+    for line_number, line in enumerate(lines, start=1):
         for pattern_id, pattern in compiled:
             match = pattern.search(line)
             if match:
                 findings.append(
-                    {
-                        "path": path,
-                        "line": line_number,
-                        "pattern_id": pattern_id,
-                        "matched_text": match.group(0),
-                        "line_excerpt": _line_excerpt(line),
-                    }
+                    _finding(
+                        path=path,
+                        line=line_number,
+                        pattern_id=pattern_id,
+                        matched_text=match.group(0),
+                        lines=lines,
+                    )
                 )
 
     return findings
+
+
+def _scan_text_for_prohibited_patterns(text: str, *, path: str) -> list[dict[str, Any]]:
+    suffix = Path(path).suffix.lower()
+    if suffix == ".py":
+        return _scan_python_ast_for_prohibited_patterns(text, path=path)
+    if suffix in {".mq5", ".mqh", ".mq4"}:
+        return _scan_mql_text_for_prohibited_patterns(text, path=path)
+    return []
 
 
 def scan_adapter_boundary_targets(
