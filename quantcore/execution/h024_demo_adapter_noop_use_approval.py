@@ -51,6 +51,21 @@ REQUIRED_FALSE_FLAGS = (
     "broker_state_mutated",
 )
 
+REQUIRED_TRUE_SCOPE_FLAGS = (
+    "may_invoke_noop_transport_contract",
+)
+
+REQUIRED_FALSE_SCOPE_FLAGS = (
+    "may_construct_broker_request",
+    "may_construct_mt5_request",
+    "may_construct_order_payload",
+    "may_dispatch_transport",
+    "may_mutate_terminal",
+    "may_mutate_broker_state",
+    "may_place_demo_order",
+    "may_place_live_order",
+)
+
 
 @dataclass(frozen=True)
 class VerificationResult:
@@ -267,8 +282,15 @@ def verify_noop_use_approval_record(
     approved_scope = record.get("approved_scope")
     if not isinstance(approved_scope, dict):
         violations.append("approved_scope block missing")
-    elif approved_scope.get("scope") != "pure_python_noop_adapter_use_only":
-        violations.append("scope must be pure_python_noop_adapter_use_only")
+    else:
+        if approved_scope.get("scope") != "pure_python_noop_adapter_use_only":
+            violations.append("scope must be pure_python_noop_adapter_use_only")
+        for key in REQUIRED_TRUE_SCOPE_FLAGS:
+            if approved_scope.get(key) is not True:
+                violations.append(f"{key} must be true")
+        for key in REQUIRED_FALSE_SCOPE_FLAGS:
+            if approved_scope.get(key) is not False:
+                violations.append(f"{key} must be false")
 
     upstream = record.get("upstream_artifacts")
     if not isinstance(upstream, dict):
