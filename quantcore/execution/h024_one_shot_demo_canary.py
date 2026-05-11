@@ -20,6 +20,7 @@ FINAL_AUDIT_DECISION = "COMPLETE_FINAL_INERT_PRE_DISPATCH_AUDIT_FOR_ONE_DEMO_CAN
 ACKNOWLEDGEMENT_TEXT = "I_ACCEPT_EXACTLY_ONE_H024_STANDARD_DEMO_CANARY_ORDER"
 CANARY_COMMENT = "H024_ONE_SHOT_DEMO_CANARY"
 CANARY_MAGIC = 240024
+TRADE_RETCODE_CLIENT_DISABLES_AT = 10027
 
 
 class CanaryExecutionRefusal(RuntimeError):
@@ -193,16 +194,34 @@ def load_ledger(path: Path) -> list[dict[str, Any]]:
     return records
 
 
+def _ledger_record_is_known_no_fill_refusal(record: dict[str, Any]) -> bool:
+    send_result = record.get("order_send_result")
+    if not isinstance(send_result, dict):
+        return False
+    return send_result.get("retcode") == TRADE_RETCODE_CLIENT_DISABLES_AT
+
+
 def ensure_no_prior_canary(ledger_path: Path, config: OneShotDemoCanaryConfig) -> None:
     for record in load_ledger(ledger_path):
-        if (
+        if not (
             record.get("strategy") == "H024"
             and record.get("canary_comment") == CANARY_COMMENT
             and record.get("symbol") == config.symbol
             and record.get("allowed_demo_server") == config.allowed_demo_server
-            and record.get("attempt_stage") in {"sent", "send_attempted", "send_succeeded"}
         ):
-            raise CanaryExecutionRefusal("idempotency_ledger_already_contains_prior_canary_attempt")
+            continue
+
+        stage = record.get("attempt_stage")
+        if stage == "send_succeeded":
+            raise CanaryExecutionRefusal("idempotency_ledger_already_contains_prior_successful_canary")
+
+        if stage in {"send_refused_no_fill_client_autotrading_disabled", "send_attempted"}:
+            if _ledger_record_is_known_no_fill_refusal(record):
+                continue
+            raise CanaryExecutionRefusal("idempotency_ledger_contains_prior_unknown_send_attempt")
+
+        if stage in {"sent", "send_attempted_unknown_result", "order_check_failed"}:
+            raise CanaryExecutionRefusal("idempotency_ledger_contains_prior_blocking_attempt")
 
 
 def validate_terminal_environment(terminal: TerminalTransport, config: OneShotDemoCanaryConfig) -> list[str]:
@@ -347,9 +366,40 @@ def execute_one_shot_demo_canary(
     send_result = terminal.order_send(request)
     send_dict = object_to_dict(send_result)
     send_retcode = send_dict.get("retcode")
+
+    if send_retcode == getattr(terminal, "TRADE_RETCODE_DONE", None):
+        record = {
+            "strategy": "H024",
+            "attempt_stage": "send_succeeded",
+            "canary_comment": CANARY_COMMENT,
+            "allowed_demo_server": config.allowed_demo_server,
+            "symbol": config.symbol,
+            "request": request,
+            "order_check_result": check_dict,
+            "order_send_result": send_dict,
+            "generated_at_utc": utc_now_iso(),
+        }
+        append_jsonl_record(ledger_path, record)
+        return record
+
+    if send_retcode == TRADE_RETCODE_CLIENT_DISABLES_AT:
+        record = {
+            "strategy": "H024",
+            "attempt_stage": "send_refused_no_fill_client_autotrading_disabled",
+            "canary_comment": CANARY_COMMENT,
+            "allowed_demo_server": config.allowed_demo_server,
+            "symbol": config.symbol,
+            "request": request,
+            "order_check_result": check_dict,
+            "order_send_result": send_dict,
+            "generated_at_utc": utc_now_iso(),
+        }
+        append_jsonl_record(ledger_path, record)
+        raise CanaryExecutionRefusal("order_send_failed_retcode_10027_client_autotrading_disabled_no_fill")
+
     record = {
         "strategy": "H024",
-        "attempt_stage": "send_attempted",
+        "attempt_stage": "send_attempted_unknown_result",
         "canary_comment": CANARY_COMMENT,
         "allowed_demo_server": config.allowed_demo_server,
         "symbol": config.symbol,
@@ -359,14 +409,7 @@ def execute_one_shot_demo_canary(
         "generated_at_utc": utc_now_iso(),
     }
     append_jsonl_record(ledger_path, record)
-
-    if send_retcode != getattr(terminal, "TRADE_RETCODE_DONE", None):
-        raise CanaryExecutionRefusal(f"order_send_failed_retcode_{send_retcode}")
-
-    return {
-        **record,
-        "attempt_stage": "send_succeeded",
-    }
+    raise CanaryExecutionRefusal(f"order_send_failed_retcode_{send_retcode}")
 
 
 __all__ = [

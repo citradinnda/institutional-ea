@@ -152,7 +152,7 @@ def test_send_writes_ledger_and_blocks_second_attempt(tmp_path: Path):
     assert len(terminal.sent_requests) == 1
     assert ledger.exists()
 
-    with pytest.raises(CanaryExecutionRefusal, match="idempotency_ledger_already_contains_prior_canary_attempt"):
+    with pytest.raises(CanaryExecutionRefusal, match="idempotency_ledger_already_contains_prior_successful_canary"):
         execute_one_shot_demo_canary(
             terminal=terminal,
             final_audit_packet=final_audit_packet(),
@@ -193,3 +193,61 @@ def test_order_check_failure_records_attempt_and_refuses_send(tmp_path: Path):
     text = ledger.read_text(encoding="utf-8")
     assert "order_check_failed" in text
     assert terminal.sent_requests == []
+
+def test_autotrading_disabled_no_fill_allows_retry(tmp_path: Path):
+    terminal = FakeTerminal()
+    terminal.send_retcode = 10027
+    ledger = tmp_path / "ledger.jsonl"
+    config = OneShotDemoCanaryConfig(send=True, acknowledgement=ACKNOWLEDGEMENT_TEXT)
+
+    with pytest.raises(CanaryExecutionRefusal, match="order_send_failed_retcode_10027_client_autotrading_disabled_no_fill"):
+        execute_one_shot_demo_canary(
+            terminal=terminal,
+            final_audit_packet=final_audit_packet(),
+            ledger_path=ledger,
+            config=config,
+        )
+
+    assert ledger.exists()
+    first_text = ledger.read_text(encoding="utf-8")
+    assert "send_refused_no_fill_client_autotrading_disabled" in first_text
+    assert "\"retcode\":10027" in first_text
+
+    terminal.send_retcode = terminal.TRADE_RETCODE_DONE
+    result = execute_one_shot_demo_canary(
+        terminal=terminal,
+        final_audit_packet=final_audit_packet(),
+        ledger_path=ledger,
+        config=config,
+    )
+
+    assert result["attempt_stage"] == "send_succeeded"
+    assert len(terminal.sent_requests) == 2
+
+
+def test_legacy_10027_send_attempted_ledger_allows_retry(tmp_path: Path):
+    ledger = tmp_path / "ledger.jsonl"
+    ledger.write_text(
+        (
+            "{"
+            "\"strategy\":\"H024\","
+            "\"attempt_stage\":\"send_attempted\","
+            "\"canary_comment\":\"H024_ONE_SHOT_DEMO_CANARY\","
+            "\"allowed_demo_server\":\"Exness-MT5Trial6\","
+            "\"symbol\":\"XAUUSDm\","
+            "\"order_send_result\":{\"retcode\":10027}"
+            "}\n"
+        ),
+        encoding="utf-8",
+    )
+
+    terminal = FakeTerminal()
+    config = OneShotDemoCanaryConfig(send=True, acknowledgement=ACKNOWLEDGEMENT_TEXT)
+    result = execute_one_shot_demo_canary(
+        terminal=terminal,
+        final_audit_packet=final_audit_packet(),
+        ledger_path=ledger,
+        config=config,
+    )
+
+    assert result["attempt_stage"] == "send_succeeded"
