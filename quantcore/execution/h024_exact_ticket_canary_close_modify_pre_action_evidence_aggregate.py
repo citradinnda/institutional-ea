@@ -126,10 +126,15 @@ def _immediate_values(record: Mapping[str, Any], aliases: Sequence[str]) -> list
 
 
 
+
 def _coerce_observed_value(value: Any) -> Any:
     if isinstance(value, Mapping) and "observed" in value:
         return value.get("observed")
     return value
+
+
+def _unwrapped_values(record: Mapping[str, Any], aliases: Sequence[str]) -> list[Any]:
+    return [_coerce_observed_value(value) for value in _values(record, aliases)]
 
 def _walk_mappings(value: Any, path: tuple[str, ...] = ()) -> Iterable[tuple[tuple[str, ...], Mapping[str, Any]]]:
     if isinstance(value, Mapping):
@@ -328,22 +333,34 @@ def _validate_identity(record: Mapping[str, Any], context: str, *, require_all: 
 
 
 
+
 def _record_has_exact_canary_observed_true(record: Mapping[str, Any]) -> bool:
-    for path, mapping in _walk_mappings(record):
-        path_text = ".".join(str(part).lower() for part in path)
-        if path and "canary" not in path_text:
-            continue
+    explicit_values: list[Any] = []
+    state_values: list[Any] = []
+
+    for _path, mapping in _walk_mappings(record):
         for key, value in mapping.items():
-            if _norm(key) in {"exactcanaryobserved", "canaryobserved"}:
-                observed = _coerce_observed_value(value)
-                if observed is True:
-                    return True
-                if isinstance(observed, str) and observed.strip().lower() == "true":
-                    return True
-    return False
+            normalized = _norm(key)
+            observed = _coerce_observed_value(value)
+            if normalized in {"exactcanaryobserved", "canaryobserved"}:
+                explicit_values.append(observed)
+            elif normalized in {"exactcanarystate", "canarystate"}:
+                state_values.append(observed)
+
+    for value in explicit_values:
+        as_bool = _as_bool(value)
+        if as_bool is False:
+            return False
+    for value in explicit_values:
+        as_bool = _as_bool(value)
+        if as_bool is True:
+            return True
+
+    return EXPECTED_CANARY_STATE in state_values
 
 def _packet_type_matches(actual: Any, expected: str) -> bool:
     return actual == expected or (isinstance(actual, str) and expected.lower() in actual.lower())
+
 
 
 
@@ -352,23 +369,14 @@ def _decision_values(record: Mapping[str, Any], key: str) -> list[Any]:
     wanted = {_norm(alias) for alias in aliases}
     values: list[Any] = []
 
-    for path, mapping in _walk_mappings(record):
-        path_text = ".".join(str(part).lower() for part in path)
-        relevant = (
-            not path
-            or "decision" in path_text
-            or "operator_intent" in path_text
-            or "human_decision" in path_text
-            or "checks" in path_text
-        )
-        if not relevant:
-            continue
-
+    for _path, mapping in _walk_mappings(record):
         for child_key, child_value in mapping.items():
             if _norm(child_key) in wanted:
-                values.append(_coerce_observed_value(child_value))
+                coerced = _coerce_observed_value(child_value)
+                if coerced is not None:
+                    values.append(coerced)
 
-    return [value for value in values if value is not None]
+    return values
 
 def _validate_decision_values(record: Mapping[str, Any], context: str) -> list[str]:
     violations: list[str] = []
@@ -377,6 +385,7 @@ def _validate_decision_values(record: Mapping[str, Any], context: str) -> list[s
             if value not in {EXPECTED_DECISION_STATUS, EXPECTED_REQUESTED_ACTION}:
                 violations.append(f"{context}: {key} is not non-authorizing: {value!r}")
     return violations
+
 
 
 def _validate_upstream(
@@ -398,12 +407,16 @@ def _validate_upstream(
         identity=extract_identity(record),
     )
     violations: list[str] = []
+
     if record.get("strategy") not in (STRATEGY, None):
         violations.append(f"{key}: wrong strategy {record.get('strategy')!r}")
+
     if not _packet_type_matches(record.get("packet_type"), UPSTREAM_PACKET_TYPES[key]):
         violations.append(f"{key}: wrong packet_type {record.get('packet_type')!r}; expected {UPSTREAM_PACKET_TYPES[key]}")
+
     if record.get("verdict") != PASS_VERDICT:
         violations.append(f"{key}: upstream verdict is not PASS")
+
     embedded = record.get("violations")
     summary["embedded_violation_count"] = len(embedded or []) if isinstance(embedded, list) else 0
     if embedded not in (None, []):
@@ -427,23 +440,25 @@ def _validate_upstream(
     violations.extend(_validate_decision_values(record, key))
 
     if key in {"unified_runtime_supervision", "exact_ticket_governance"}:
-        canary_state = _first(record, ("exact_canary_state", "canary_state"))
-        canary_observed = _as_bool(_first(record, ("exact_canary_observed", "canary_observed")))
+        canary_states = _unwrapped_values(record, ("exact_canary_state", "canary_state"))
+        canary_state = canary_states[0] if canary_states else None
+        canary_observed = _record_has_exact_canary_observed_true(record)
         summary["exact_canary_state"] = canary_state
         summary["exact_canary_observed"] = canary_observed
-        if canary_state != EXPECTED_CANARY_STATE:
+        if EXPECTED_CANARY_STATE not in canary_states:
             violations.append(f"{key}: exact canary state is not {EXPECTED_CANARY_STATE}")
         if canary_observed is not True:
             violations.append(f"{key}: exact canary observed is not true")
 
     if key == "decision_artifact":
-        if EXPECTED_DECISION_STATUS not in _decision_values(record, "decision_status"):
+        decision_status_values = _decision_values(record, "decision_status")
+        requested_action_values = _decision_values(record, "requested_action")
+        if EXPECTED_DECISION_STATUS not in decision_status_values:
             violations.append(f"{key}: missing required decision_status {EXPECTED_DECISION_STATUS}")
-        if EXPECTED_REQUESTED_ACTION not in _decision_values(record, "requested_action"):
+        if EXPECTED_REQUESTED_ACTION not in requested_action_values:
             violations.append(f"{key}: missing required requested_action {EXPECTED_REQUESTED_ACTION}")
 
     return summary, violations
-
 
 def build_pre_action_evidence_aggregate_record(
     upstream_records: Mapping[str, Mapping[str, Any] | None],

@@ -57,3 +57,7 @@ The aggregate validates exact canary identity only from relevant canary, H024 po
 ## Fix-forward validation note
 
 The aggregate validates exact canary identity only from exact-canary, H024 position, governance, decision-artifact, and exact-ticket contexts. Runtime tick/spread expected symbol coverage can legitimately include USDJPYm and must not be interpreted as a XAUUSDm canary identity mismatch. Decision-artifact check-field wrappers using expected/observed/passed are interpreted through their observed value. This preserves fail-closed identity validation while avoiding false mismatches from unrelated read-only market-data evidence.
+
+## Real upstream validation path
+
+The aggregate validates real upstream packet shape by reading exact canary observation from either exact_canary_observed/canary_observed true or exact_canary_state/canary_state equal to OBSERVED_EXACT_KNOWN_CANARY. Explicit false exact_canary_observed still fails closed. Decision status and requested action are discovered by normalized key across the decision-artifact packet, including nested check-field wrappers, and wrappers are interpreted through their observed value. This remains read-only and non-authorizing.

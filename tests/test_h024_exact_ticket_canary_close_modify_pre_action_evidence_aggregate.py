@@ -397,3 +397,54 @@ def test_unified_supervision_nested_exact_canary_observed_true_is_accepted() -> 
 
     assert record["verdict"] == PASS_VERDICT
     assert validate_aggregate_record(record) == []
+
+def test_real_shape_decision_status_and_requested_action_are_found_deep() -> None:
+    decision = _base_upstream("decision_artifact")
+    decision.pop("decision_status", None)
+    decision.pop("requested_action", None)
+    decision["checks"] = {
+        "operator_intent": {
+            "fields": {
+                "decision_status": {
+                    "expected": "NO_CLOSE_MODIFY_REQUESTED_SPECIFICATION_ONLY",
+                    "observed": "NO_CLOSE_MODIFY_REQUESTED_SPECIFICATION_ONLY",
+                    "passed": True,
+                },
+                "requested_action": {
+                    "expected": "NO_CLOSE_MODIFY_REQUESTED_SPECIFICATION_ONLY",
+                    "observed": "NO_CLOSE_MODIFY_REQUESTED_SPECIFICATION_ONLY",
+                    "passed": True,
+                },
+            }
+        }
+    }
+
+    record = build_pre_action_evidence_aggregate_record(
+        _upstreams(decision_artifact=decision),
+        observed_at_utc=NOW,
+        user_reported_position_open_over_three_bars=True,
+    )
+
+    assert record["verdict"] == PASS_VERDICT
+    assert validate_aggregate_record(record) == []
+
+
+def test_real_shape_exact_canary_state_accepts_observed_exact_known_canary() -> None:
+    unified = _base_upstream("unified_runtime_supervision")
+    unified.pop("exact_canary_observed", None)
+    unified["runtime_safety_aggregate"] = {
+        "record": {
+            "supervision": {
+                "exact_canary_state": "OBSERVED_EXACT_KNOWN_CANARY",
+            }
+        }
+    }
+
+    record = build_pre_action_evidence_aggregate_record(
+        _upstreams(unified_runtime_supervision=unified),
+        observed_at_utc=NOW,
+        user_reported_position_open_over_three_bars=True,
+    )
+
+    assert record["verdict"] == PASS_VERDICT
+    assert validate_aggregate_record(record) == []
