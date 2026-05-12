@@ -1284,3 +1284,43 @@ Do not build a live broker request.
 Do not build an executable trade request dictionary.
 
 Do not run a trading loop.
+
+Important operator preference / project direction:
+
+The user is tired of endless governance-only milestones. Do not keep inventing more governance, preview, simulator, or abstract schema layers unless they directly unlock deployment progress.
+
+Current honest project status:
+- Safety/governance architecture is strong.
+- Read-only supervision is mature enough to move toward VPS observer deployment.
+- Actual live automated trading is still blocked and must remain blocked for now.
+- The next useful phase is operationalization, not another abstract approval artifact.
+
+Priority now:
+1. Get the system running as a read-only VPS observer.
+2. Produce repeatable scheduled report generation.
+3. Produce an operator runbook with exact commands.
+4. Verify logs/reports paths, environment assumptions, Python venv, MT5 availability, and fail-closed behavior.
+5. Make it easy to run continuously without trading.
+6. Only after read-only VPS observer mode is stable should the project move toward execution-path rehearsal.
+
+Do not say “deployment” if you only mean another governance document.
+Deployment now means:
+- VPS-compatible read-only runner
+- scheduled packet generation
+- black-swan guard included
+- no-mutation gate included
+- health/status output
+- clear operator commands
+- no order_check
+- no order_send
+- no symbol_select
+- no broker mutation
+- no trading loop that can place orders
+- reports/ remains untracked
+
+The user wants real progress toward automation. Respect that by building operational read-only infrastructure next, not another theoretical schema unless it is strictly necessary for the VPS observer runner.
+
+Hard boundary:
+No live trading yet. No close/modify. No executable trade request. No broker mutation. But stop over-rotating into endless governance. Build the read-only VPS observer deployment readiness and runner path next.
+
+The user wants operational read-only VPS automation now, not another never-ending governance ladder. Preserve safety, but build something runnable.
