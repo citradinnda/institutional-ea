@@ -1,4 +1,4 @@
-﻿[CmdletBinding()]
+[CmdletBinding()]
 param(
     [string]$Root = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path,
     [string]$TaskName = "H024 Read Only VPS Observer",
@@ -486,9 +486,7 @@ $packet = [pscustomobject]@{
     symbol_select_authorized = $false
     scheduled_cadence_summary_authorizes_trading = $false
 }
-
-$packet | ConvertTo-Json -Depth 100 | Set-Content -LiteralPath $outputJsonPath -Encoding UTF8
-
+[System.IO.File]::WriteAllText($outputJsonPath, (($packet | ConvertTo-Json -Depth 100) + [Environment]::NewLine), [System.Text.UTF8Encoding]::new($false))
 $textLines = @(
     "H024 read-only VPS observer scheduled cadence summary verdict: $($packet.verdict)",
     "Operator state: $($packet.operator_state)",
@@ -516,9 +514,7 @@ if ($violations.Count -gt 0) {
         $textLines += "- $($violation.code): $($violation.message)"
     }
 }
-
-$textLines | Set-Content -LiteralPath $outputTextPath -Encoding UTF8
-
+[System.IO.File]::WriteAllText($outputTextPath, (($textLines -join [Environment]::NewLine) + [Environment]::NewLine), [System.Text.UTF8Encoding]::new($false))
 Write-Host "H024 read-only VPS observer scheduled cadence summary verdict: $($packet.verdict)"
 Write-Host "Operator state: $($packet.operator_state)"
 Write-Host "Violations: $($violations.Count)"
