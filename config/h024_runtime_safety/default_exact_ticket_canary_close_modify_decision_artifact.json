@@ -1,0 +1,58 @@
+{
+  "schema_version": 1,
+  "strategy": "H024",
+  "artifact_type": "h024_exact_ticket_canary_close_modify_decision_artifact",
+  "decision_id": "DEFAULT-NON-AUTHORIZING-EXACT-TICKET-CLOSE-MODIFY-DECISION-ARTIFACT",
+  "decision_timestamp_utc": "__OBSERVED_AT_UTC__",
+  "expires_at_utc": "__EXPIRES_AT_UTC__",
+  "decision_status": "NO_CLOSE_MODIFY_REQUESTED_SPECIFICATION_ONLY",
+  "exact_canary": {
+    "server": "Exness-MT5Trial6",
+    "account_currency": "USD",
+    "runtime_symbol": "XAUUSDm",
+    "model_symbol": "XAUUSD",
+    "side": "sell",
+    "mt5_position_type": 1,
+    "volume": 0.01,
+    "magic": 240024,
+    "ticket": 4413054432,
+    "identifier": 4413054432,
+    "entry_deal": 3788869526
+  },
+  "operator_intent": {
+    "requested_action": "NO_CLOSE_MODIFY_REQUESTED_SPECIFICATION_ONLY",
+    "intent_scope": "READ_ONLY_GOVERNANCE_REVIEW_ONLY",
+    "intent_is_explicit": true,
+    "intent_is_ambiguous": false,
+    "immediate_action_requested": false,
+    "reason": "Default non-authorizing artifact for schema validation only."
+  },
+  "operator_attestation": {
+    "operator_id": "DEFAULT_NON_AUTHORIZING_ARTIFACT",
+    "attested_at_utc": "__OBSERVED_AT_UTC__",
+    "attests_exact_ticket_identity_reviewed": true,
+    "attests_read_only_review_only": true,
+    "attests_no_broker_mutation_authorized": true,
+    "attests_no_order_check_authorized": true,
+    "attests_no_order_send_authorized": true,
+    "attests_no_entry_authorized": true,
+    "attests_no_close_modify_authorized": true,
+    "attests_no_xauusd_order_authorized": true,
+    "attests_no_usdjpy_order_authorized": true,
+    "attests_no_trading_loop_authorized": true,
+    "attests_no_automatic_execution_authorized": true,
+    "attestation_text": "This artifact is for read-only decision-schema validation only and authorizes no broker mutation."
+  },
+  "effective_new_entries_blocked": true,
+  "authorizations": {
+    "broker_mutation_authorized": false,
+    "order_check_authorized": false,
+    "order_send_authorized": false,
+    "entry_authorized": false,
+    "close_modify_authorized": false,
+    "xauusd_order_authorized": false,
+    "usdjpy_order_authorized": false,
+    "trading_loop_authorized": false,
+    "automatic_execution_authorized": false
+  }
+}
