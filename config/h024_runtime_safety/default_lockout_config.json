@@ -1,0 +1,38 @@
+{
+  "schema_version": "1.0",
+  "strategy": "H024",
+  "config_type": "h024_runtime_safety_lockout_config",
+  "description": "Default read-only H024 runtime safety lockout configuration. This config authorizes no broker mutation and no trading loop.",
+  "fail_closed_on_missing_config": true,
+  "fail_closed_on_missing_lockout_file": true,
+  "fail_closed_on_malformed_lockout_file": true,
+  "fail_closed_on_unexpected_symbol": true,
+  "model_symbols": ["XAUUSD", "USDJPY"],
+  "runtime_symbols": {
+    "XAUUSD": "XAUUSDm",
+    "USDJPY": "USDJPYm"
+  },
+  "required_lockouts": [
+    "global_no_new_entry",
+    "manual_override_lockout",
+    "xauusd_no_new_entry",
+    "usdjpy_no_new_entry"
+  ],
+  "lockout_state_files": {
+    "global_no_new_entry": "config/h024_runtime_safety/lockouts/global_no_new_entry.json",
+    "manual_override_lockout": "config/h024_runtime_safety/lockouts/manual_override_lockout.json",
+    "xauusd_no_new_entry": "config/h024_runtime_safety/lockouts/xauusd_no_new_entry.json",
+    "usdjpy_no_new_entry": "config/h024_runtime_safety/lockouts/usdjpy_no_new_entry.json"
+  },
+  "authorizations": {
+    "broker_mutation_authorized": false,
+    "order_check_authorized": false,
+    "order_send_authorized": false,
+    "entry_authorized": false,
+    "close_modify_authorized": false,
+    "xauusd_order_authorized": false,
+    "usdjpy_order_authorized": false,
+    "trading_loop_authorized": false,
+    "automatic_execution_authorized": false
+  }
+}
