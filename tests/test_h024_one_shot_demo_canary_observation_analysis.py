@@ -256,4 +256,3 @@ def test_observation_analysis_requires_mark_to_market_for_open_state(tmp_path: P
     assert any("open monitor state must expose a current price" in violation for violation in record["violations"])
     assert any("open monitor state must expose floating P/L" in violation for violation in record["violations"])
     assert any("open monitor state must expose swap" in violation for violation in record["violations"])
-
