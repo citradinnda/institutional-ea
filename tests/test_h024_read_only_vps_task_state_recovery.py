@@ -346,3 +346,10 @@ def test_runbook_preserves_operational_not_trading_language() -> None:
     assert "recovery drill preview" in text.lower()
     assert "PASS does not authorize trading or close/modify" in text
     assert "reports/" in text
+
+def test_recovery_drill_preview_accepts_healthcheck_checked_at_utc_alias():
+    script = Path("scripts/run_h024_read_only_vps_recovery_drill_preview.ps1").read_text(encoding="utf-8")
+    assert "checked_at_utc" in script
+    assert "generated_at_utc" in script
+    assert script.index("checked_at_utc") >= 0
+

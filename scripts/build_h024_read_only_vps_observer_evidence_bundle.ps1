@@ -58,7 +58,7 @@ function Get-TimestampValue {
         return $null
     }
     return Get-ObjectValue -Object $Object -Names @(
-        "generated_at_utc",
+        "generated_at_utc", "checked_at_utc",
         "observed_at_utc",
         "created_at_utc",
         "evaluated_at_utc",

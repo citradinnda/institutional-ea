@@ -157,7 +157,7 @@ function Read-EvidencePacket {
     $operatorState = Get-PropertyValue $packet @("operator_state","operatorState")
     $violationsValue = Get-PropertyValue $packet @("violations","Violations")
     $timestamp = Get-PropertyValue $packet @(
-        "generated_at_utc",
+        "generated_at_utc", "checked_at_utc",
         "observed_at_utc",
         "created_at_utc",
         "evaluated_at_utc",

@@ -250,3 +250,10 @@ def test_evidence_bundle_fails_closed_on_missing_task_state_packet(tmp_path):
     assert any("observer task-state packet missing" in violation for violation in payload["violations"])
     assert payload["safety"]["trading_authorized"] is False
     assert payload["safety"]["broker_mutation_authorized"] is False
+
+def test_evidence_bundle_accepts_healthcheck_checked_at_utc_alias():
+    script = Path("scripts/build_h024_read_only_vps_observer_evidence_bundle.ps1").read_text(encoding="utf-8")
+    assert "checked_at_utc" in script
+    assert "generated_at_utc" in script
+    assert script.index("checked_at_utc") >= 0
+
