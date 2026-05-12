@@ -54,3 +54,6 @@ python scripts\verify_h024_exact_ticket_canary_close_modify_pre_action_evidence_
 
 The aggregate validates exact canary identity only from relevant canary, H024 position, governance, decision, and expected identity contexts. It must not treat unrelated runtime market-data symbols, such as USDJPYm tick/spread evidence, as canary identity mismatches. USDJPY H024 exposure/order evidence remains unsafe and must fail closed through the upstream exposure/inventory and aggregate checks.
 
+## Fix-forward validation note
+
+The aggregate validates exact canary identity only from exact-canary, H024 position, governance, decision-artifact, and exact-ticket contexts. Runtime tick/spread expected symbol coverage can legitimately include USDJPYm and must not be interpreted as a XAUUSDm canary identity mismatch. Decision-artifact check-field wrappers using expected/observed/passed are interpreted through their observed value. This preserves fail-closed identity validation while avoiding false mismatches from unrelated read-only market-data evidence.

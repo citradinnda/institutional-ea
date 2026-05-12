@@ -338,3 +338,62 @@ def test_noisy_runtime_market_data_symbol_does_not_create_identity_mismatch() ->
     assert record["verdict"] == PASS_VERDICT
     assert validate_aggregate_record(record) == []
 
+def test_decision_artifact_check_field_observed_values_are_unwrapped() -> None:
+    decision = _base_upstream("decision_artifact")
+    decision["checks"] = {
+        "exact_canary_identity": {
+            "fields": {
+                "ticket": {"expected": 4413054432, "observed": 4413054432, "passed": True},
+                "identifier": {"expected": 4413054432, "observed": 4413054432, "passed": True},
+                "runtime_symbol": {"expected": "XAUUSDm", "observed": "XAUUSDm", "passed": True},
+                "model_symbol": {"expected": "XAUUSD", "observed": "XAUUSD", "passed": True},
+                "side": {"expected": "sell", "observed": "sell", "passed": True},
+                "mt5_position_type": {"expected": 1, "observed": 1, "passed": True},
+                "volume": {"expected": 0.01, "observed": 0.01, "passed": True},
+                "magic": {"expected": 240024, "observed": 240024, "passed": True},
+            }
+        },
+        "operator_intent": {
+            "decision_status": {
+                "expected": "NO_CLOSE_MODIFY_REQUESTED_SPECIFICATION_ONLY",
+                "observed": "NO_CLOSE_MODIFY_REQUESTED_SPECIFICATION_ONLY",
+                "passed": True,
+            },
+            "requested_action": {
+                "expected": "NO_CLOSE_MODIFY_REQUESTED_SPECIFICATION_ONLY",
+                "observed": "NO_CLOSE_MODIFY_REQUESTED_SPECIFICATION_ONLY",
+                "passed": True,
+            },
+        },
+    }
+
+    record = build_pre_action_evidence_aggregate_record(
+        _upstreams(decision_artifact=decision),
+        observed_at_utc=NOW,
+        user_reported_position_open_over_three_bars=True,
+    )
+
+    assert record["verdict"] == PASS_VERDICT
+    assert validate_aggregate_record(record) == []
+
+
+def test_unified_supervision_nested_exact_canary_observed_true_is_accepted() -> None:
+    unified = _base_upstream("unified_runtime_supervision")
+    unified.pop("exact_canary_observed", None)
+    unified["runtime_safety_aggregate"] = {
+        "record": {
+            "canary_summary": {
+                "exact_canary_observed": True,
+                "exact_canary_state": "OBSERVED_EXACT_KNOWN_CANARY",
+            }
+        }
+    }
+
+    record = build_pre_action_evidence_aggregate_record(
+        _upstreams(unified_runtime_supervision=unified),
+        observed_at_utc=NOW,
+        user_reported_position_open_over_three_bars=True,
+    )
+
+    assert record["verdict"] == PASS_VERDICT
+    assert validate_aggregate_record(record) == []

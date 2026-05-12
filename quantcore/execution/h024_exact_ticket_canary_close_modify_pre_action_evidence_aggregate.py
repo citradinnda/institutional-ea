@@ -125,6 +125,12 @@ def _immediate_values(record: Mapping[str, Any], aliases: Sequence[str]) -> list
     return values
 
 
+
+def _coerce_observed_value(value: Any) -> Any:
+    if isinstance(value, Mapping) and "observed" in value:
+        return value.get("observed")
+    return value
+
 def _walk_mappings(value: Any, path: tuple[str, ...] = ()) -> Iterable[tuple[tuple[str, ...], Mapping[str, Any]]]:
     if isinstance(value, Mapping):
         yield path, value
@@ -135,14 +141,15 @@ def _walk_mappings(value: Any, path: tuple[str, ...] = ()) -> Iterable[tuple[tup
             yield from _walk_mappings(child, (*path, str(index)))
 
 
+
 def _identity_candidate_from_mapping(record: Mapping[str, Any]) -> dict[str, list[Any]]:
     candidate: dict[str, list[Any]] = {}
     for field, aliases in IDENTITY_ALIASES.items():
-        values = _immediate_values(record, aliases)
+        values = [_coerce_observed_value(value) for value in _immediate_values(record, aliases)]
+        values = [value for value in values if value is not None]
         if values:
             candidate[field] = values
     return candidate
-
 
 def _candidate_has_expected_canary_anchor(candidate: Mapping[str, Sequence[Any]]) -> bool:
     for field, expected in EXPECTED_IDENTITY.items():
@@ -159,16 +166,45 @@ def _candidate_has_expected_canary_anchor(candidate: Mapping[str, Sequence[Any]]
     return False
 
 
+
 def _identity_candidate_is_relevant(path: tuple[str, ...], candidate: Mapping[str, Sequence[Any]]) -> bool:
     if not candidate:
         return False
-    path_text = ".".join(path).lower()
-    if any(token in path_text for token in ("canary", "position", "decision", "expected", "governance")):
+
+    lowered = tuple(str(part).lower() for part in path)
+    path_text = ".".join(lowered)
+
+    # Tick/spread expected symbol maps legitimately contain both XAUUSD and USDJPY.
+    # They are market-data coverage evidence, not canary identity evidence.
+    if "symbols" in lowered and (
+        "tick_spread" in path_text
+        or "tick_spread_record" in path_text
+        or "market_data" in path_text
+        or "runtime_tick_spread_safety_supervisor" in path_text
+    ):
+        return False
+
+    # Any explicit exact-canary or H024 position context is identity evidence.
+    if any(
+        token in path_text
+        for token in (
+            "exact_canary",
+            "known_canary",
+            "canary_identity",
+            "exact_ticket",
+            "h024_position",
+            "position",
+            "decision_artifact",
+            "governance",
+        )
+    ):
         return True
+
+    # Ticket, identifier, and magic are sufficiently specific anchors for the exact canary.
     if any(field in candidate for field in ("ticket", "identifier", "magic")):
         return True
-    return _candidate_has_expected_canary_anchor(candidate)
 
+    return False
 
 def _identity_candidates(record: Mapping[str, Any]) -> Iterable[tuple[tuple[str, ...], dict[str, list[Any]]]]:
     for path, mapping in _walk_mappings(record):
@@ -291,27 +327,48 @@ def _validate_identity(record: Mapping[str, Any], context: str, *, require_all: 
     return violations
 
 
+
+def _record_has_exact_canary_observed_true(record: Mapping[str, Any]) -> bool:
+    for path, mapping in _walk_mappings(record):
+        path_text = ".".join(str(part).lower() for part in path)
+        if path and "canary" not in path_text:
+            continue
+        for key, value in mapping.items():
+            if _norm(key) in {"exactcanaryobserved", "canaryobserved"}:
+                observed = _coerce_observed_value(value)
+                if observed is True:
+                    return True
+                if isinstance(observed, str) and observed.strip().lower() == "true":
+                    return True
+    return False
+
 def _packet_type_matches(actual: Any, expected: str) -> bool:
     return actual == expected or (isinstance(actual, str) and expected.lower() in actual.lower())
 
 
+
 def _decision_values(record: Mapping[str, Any], key: str) -> list[Any]:
     aliases = (key, key.replace("_", " "), key.replace("_", "-"))
+    wanted = {_norm(alias) for alias in aliases}
     values: list[Any] = []
-    values.extend(_immediate_values(record, aliases))
-    for container_key in (
-        "decision",
-        "operator_intent",
-        "operator_decision",
-        "human_decision_artifact",
-        "decision_artifact",
-        "expected",
-    ):
-        container = record.get(container_key)
-        if isinstance(container, Mapping):
-            values.extend(_immediate_values(container, aliases))
-    return values
 
+    for path, mapping in _walk_mappings(record):
+        path_text = ".".join(str(part).lower() for part in path)
+        relevant = (
+            not path
+            or "decision" in path_text
+            or "operator_intent" in path_text
+            or "human_decision" in path_text
+            or "checks" in path_text
+        )
+        if not relevant:
+            continue
+
+        for child_key, child_value in mapping.items():
+            if _norm(child_key) in wanted:
+                values.append(_coerce_observed_value(child_value))
+
+    return [value for value in values if value is not None]
 
 def _validate_decision_values(record: Mapping[str, Any], context: str) -> list[str]:
     violations: list[str] = []
