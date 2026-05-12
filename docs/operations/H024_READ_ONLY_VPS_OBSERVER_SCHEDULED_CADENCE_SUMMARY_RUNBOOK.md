@@ -1,4 +1,4 @@
-﻿# H024 Read-Only VPS Observer Scheduled Cadence Summary Runbook
+# H024 Read-Only VPS Observer Scheduled Cadence Summary Runbook
 
 This runbook is for the local Windows read-only observer path. The historical file names still use `vps`, but the current target is the user's local Windows machine, Windows Task Scheduler, local MT5, local PowerShell, local Python, and local `reports/`.
 
@@ -80,3 +80,10 @@ python -m pytest `
   tests\test_h024_read_only_vps_observer_continuity_summary.py `
   tests\test_h024_read_only_vps_observer_scheduled_cadence_summary.py
 
+## Latest Cadence Segment Rule
+
+The summary scores the latest contiguous cadence-compatible log segment, not every historical log in the runtime log directory.
+
+This is intentional. Older manual wrapper runs, old startup gaps, and historical interruptions should not contaminate the current scheduled-cadence proof window. The latest segment must still satisfy run count, span, freshness, and gap requirements.
+
+The script remains read-only and non-authorizing.

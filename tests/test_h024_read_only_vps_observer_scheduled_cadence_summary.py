@@ -1,4 +1,4 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 import json
 import os
@@ -228,3 +228,34 @@ def test_scheduled_cadence_summary_fails_closed_on_unsafe_true_flag(tmp_path: Pa
 
     assert packet["verdict"] == "FAIL_CLOSED"
     assert "evidence_bundle_unsafe_true_flag" in _violation_codes(packet)
+
+def test_scheduled_cadence_summary_uses_latest_cadence_segment_despite_older_noise(tmp_path: Path) -> None:
+    _make_fixture(
+        tmp_path,
+        run_offsets_minutes=[
+            170,
+            123,
+            70,
+            69,
+            59,
+            54,
+            49,
+            44,
+            39,
+            34,
+            29,
+            24,
+            19,
+            14,
+            9,
+            4,
+        ],
+    )
+    packet = _run_builder(tmp_path, success=True)
+
+    assert packet["verdict"] == "PASS"
+    assert packet["raw_observed_run_count"] == 16
+    assert packet["observed_run_count"] >= 4
+    assert packet["min_observed_gap_minutes"] >= 3
+    assert packet["max_observed_gap_minutes"] <= 10
+    assert packet["scheduled_cadence_summary_authorizes_trading"] is False

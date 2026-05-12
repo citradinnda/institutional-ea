@@ -381,11 +381,79 @@ else {
     $lastRunTimestampUtc = Get-EvidenceTimestampUtc -Object $lastRunSummary
 }
 
-$logObservations = @(Get-LogRunObservations -LogsDir $logsDir)
+$allLogObservations = @(Get-LogRunObservations -LogsDir $logsDir)
+$allRunTimes = @($allLogObservations | ForEach-Object { $_.observed_run_at_utc })
+
+$latestAnyRunUtc = $null
+$rawGapMinutes = @()
+$rawMinGapMinutes = $null
+$rawMaxGapMinutes = $null
+
+if ($allRunTimes.Count -gt 0) {
+    $latestAnyRunUtc = $allRunTimes[$allRunTimes.Count - 1]
+    $latestAnyAgeMinutes = ($nowUtc - $latestAnyRunUtc).TotalMinutes
+
+    if ($latestAnyAgeMinutes -lt -5) {
+        $violations += New-Violation -Code "scheduled_latest_run_from_future" -Severity "ERROR" -Message "Latest observed run timestamp is more than five minutes in the future."
+    }
+
+    if ($latestAnyAgeMinutes -gt $MaxLatestRunAgeMinutes) {
+        $violations += New-Violation -Code "scheduled_latest_run_stale" -Severity "ERROR" -Message "Latest observed scheduled run is stale."
+    }
+
+    if ($allRunTimes.Count -gt 1) {
+        for ($rawIndex = 1; $rawIndex -lt $allRunTimes.Count; $rawIndex += 1) {
+            $rawGapMinutes += ($allRunTimes[$rawIndex] - $allRunTimes[$rawIndex - 1]).TotalMinutes
+        }
+
+        if ($rawGapMinutes.Count -gt 0) {
+            $rawMinGapMinutes = ($rawGapMinutes | Measure-Object -Minimum).Minimum
+            $rawMaxGapMinutes = ($rawGapMinutes | Measure-Object -Maximum).Maximum
+        }
+    }
+}
+
+# Score the latest contiguous cadence-compatible segment instead of the entire
+# historical log directory. Older manual runs and old historical gaps must not
+# contaminate the current scheduled-cadence proof window.
+$logObservations = @()
+
+if ($allLogObservations.Count -gt 0) {
+    $descendingLogObservations = @($allLogObservations | Sort-Object observed_run_at_utc -Descending)
+    $selectedLogObservations = New-Object "System.Collections.Generic.List[object]"
+    $selectedLogObservations.Add($descendingLogObservations[0])
+
+    for ($logIndex = 1; $logIndex -lt $descendingLogObservations.Count; $logIndex += 1) {
+        $candidate = $descendingLogObservations[$logIndex]
+        $currentOldestSelected = $selectedLogObservations[$selectedLogObservations.Count - 1]
+        $candidateGapMinutes = ($currentOldestSelected.observed_run_at_utc - $candidate.observed_run_at_utc).TotalMinutes
+
+        if ($candidateGapMinutes -lt $MinInterRunGapMinutes) {
+            break
+        }
+
+        if ($candidateGapMinutes -gt $MaxAllowedGapMinutes) {
+            break
+        }
+
+        $selectedLogObservations.Add($candidate)
+    }
+
+    $logObservations = @($selectedLogObservations | Sort-Object observed_run_at_utc)
+}
+
 $runTimes = @($logObservations | ForEach-Object { $_.observed_run_at_utc })
 
 if ($runTimes.Count -lt $MinRunCount) {
-    $violations += New-Violation -Code "scheduled_log_count_insufficient" -Severity "ERROR" -Message "Observed scheduled log count is below MinRunCount."
+    $violations += New-Violation -Code "scheduled_log_count_insufficient" -Severity "ERROR" -Message "Latest cadence-compatible scheduled log segment is below MinRunCount."
+
+    if ($allRunTimes.Count -ge $MinRunCount) {
+        $violations += New-Violation -Code "scheduled_log_span_insufficient" -Severity "ERROR" -Message "Latest cadence-compatible scheduled log segment does not span the required cadence window."
+    }
+
+    if ($null -ne $rawMinGapMinutes -and $rawMinGapMinutes -lt $MinInterRunGapMinutes) {
+        $violations += New-Violation -Code "scheduled_log_clustered" -Severity "ERROR" -Message "Latest available scheduled logs are too tightly clustered to prove scheduler cadence."
+    }
 }
 
 $firstRunUtc = $null
@@ -398,15 +466,6 @@ $gapMinutes = @()
 if ($runTimes.Count -gt 0) {
     $firstRunUtc = $runTimes[0]
     $latestRunUtc = $runTimes[$runTimes.Count - 1]
-
-    $latestAgeMinutes = ($nowUtc - $latestRunUtc).TotalMinutes
-    if ($latestAgeMinutes -lt -5) {
-        $violations += New-Violation -Code "scheduled_latest_run_from_future" -Severity "ERROR" -Message "Latest observed run timestamp is more than five minutes in the future."
-    }
-
-    if ($latestAgeMinutes -gt $MaxLatestRunAgeMinutes) {
-        $violations += New-Violation -Code "scheduled_latest_run_stale" -Severity "ERROR" -Message "Latest observed scheduled run is stale."
-    }
 
     if ($runTimes.Count -gt 1) {
         $spanMinutes = ($latestRunUtc - $firstRunUtc).TotalMinutes
@@ -421,15 +480,15 @@ if ($runTimes.Count -gt 0) {
         }
 
         if ($spanMinutes -lt $MinCadenceWindowMinutes) {
-            $violations += New-Violation -Code "scheduled_log_span_insufficient" -Severity "ERROR" -Message "Observed scheduled logs do not span the required cadence window."
+            $violations += New-Violation -Code "scheduled_log_span_insufficient" -Severity "ERROR" -Message "Latest cadence-compatible scheduled log segment does not span the required cadence window."
         }
 
         if ($null -ne $maxGapMinutes -and $maxGapMinutes -gt $MaxAllowedGapMinutes) {
-            $violations += New-Violation -Code "scheduled_log_gap_too_large" -Severity "ERROR" -Message "Observed scheduled logs contain a gap larger than MaxAllowedGapMinutes."
+            $violations += New-Violation -Code "scheduled_log_gap_too_large" -Severity "ERROR" -Message "Latest cadence-compatible scheduled log segment contains a gap larger than MaxAllowedGapMinutes."
         }
 
         if ($null -ne $minGapMinutes -and $minGapMinutes -lt $MinInterRunGapMinutes) {
-            $violations += New-Violation -Code "scheduled_log_clustered" -Severity "ERROR" -Message "Observed scheduled logs are too tightly clustered to prove scheduler cadence."
+            $violations += New-Violation -Code "scheduled_log_clustered" -Severity "ERROR" -Message "Latest cadence-compatible scheduled log segment is too tightly clustered to prove scheduler cadence."
         }
     }
 }
@@ -455,6 +514,7 @@ $packet = [pscustomobject]@{
     last_run_summary_status = $lastRunStatus
     last_run_summary_exit_code = $lastRunExitCode
     last_run_summary_timestamp_utc = if ($null -ne $lastRunTimestampUtc) { $lastRunTimestampUtc.ToString("o") } else { $null }
+    raw_observed_run_count = $allRunTimes.Count
     observed_run_count = $runTimes.Count
     first_observed_run_at_utc = if ($null -ne $firstRunUtc) { $firstRunUtc.ToString("o") } else { $null }
     latest_observed_run_at_utc = if ($null -ne $latestRunUtc) { $latestRunUtc.ToString("o") } else { $null }
