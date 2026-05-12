@@ -1,4 +1,4 @@
-$ErrorActionPreference = "Stop"
+﻿$ErrorActionPreference = "Stop"
 
 $RepoRoot = Split-Path -Parent (Split-Path -Parent $MyInvocation.MyCommand.Path)
 Set-Location $RepoRoot
@@ -54,6 +54,51 @@ Run-Builder "runtime no-mutation safety gate" "scripts\build_h024_runtime_no_mut
 Write-Host "=== exact-ticket stack ==="
 Write-Host "Using existing exact-ticket governance/decision/evidence/preview reports as upstream evidence."
 Write-Host "The readiness aggregate and black-swan guard fail closed if those reports are missing, stale, malformed, fail-closed, or unsafe."
+
+
+Write-Host ""
+Write-Host "=== exact-ticket read-only evidence refresh ==="
+Write-Host "Refreshing exact-ticket close/modify upstream evidence before black-swan guard."
+Write-Host "This refresh is read-only and does not authorize trading, broker mutation, entries, close/modify, or live execution."
+
+if (-not (Get-Variable -Name RepoRoot -Scope Local -ErrorAction SilentlyContinue)) {
+    $RepoRoot = Split-Path -Parent $PSScriptRoot
+}
+
+if (-not (Get-Variable -Name Python -Scope Local -ErrorAction SilentlyContinue)) {
+    $Python = Join-Path $RepoRoot ".venv\Scripts\python.exe"
+}
+
+if (-not (Test-Path $Python)) {
+    throw "Missing Python interpreter for exact-ticket evidence refresh: $Python"
+}
+
+$ExactTicketReadOnlyEvidenceBuilders = @(
+    @{ Script = "scripts\build_h024_exact_ticket_canary_close_modify_governance_jsonl.py"; Arguments = @() },
+    @{ Script = "scripts\build_h024_exact_ticket_canary_close_modify_decision_artifact_jsonl.py"; Arguments = @() },
+    @{ Script = "scripts\build_h024_exact_ticket_canary_close_modify_pre_action_evidence_aggregate_jsonl.py"; Arguments = @("--position-open-over-three-bars") },
+    @{ Script = "scripts\build_h024_exact_ticket_canary_close_modify_bar_age_exit_condition_evidence_jsonl.py"; Arguments = @("--position-open-over-three-bars") },
+    @{ Script = "scripts\build_h024_exact_ticket_canary_close_modify_manual_approval_gate_preview_jsonl.py"; Arguments = @("--position-open-over-three-bars") },
+    @{ Script = "scripts\build_h024_exact_ticket_canary_close_modify_operator_decision_v2_preview_jsonl.py"; Arguments = @("--position-open-over-three-bars") },
+    @{ Script = "scripts\build_h024_exact_ticket_canary_close_modify_execution_readiness_dry_run_schema_preview_jsonl.py"; Arguments = @("--position-open-over-three-bars") }
+)
+
+foreach ($Builder in $ExactTicketReadOnlyEvidenceBuilders) {
+    $BuilderPath = Join-Path $RepoRoot $Builder.Script
+    if (-not (Test-Path $BuilderPath)) {
+        throw "Missing exact-ticket read-only evidence builder: $BuilderPath"
+    }
+
+    Write-Host ("Refreshing upstream evidence: {0}" -f $Builder.Script)
+    $ArgsList = @($Builder.Arguments)
+    & $Python $BuilderPath @ArgsList
+
+    if ($LASTEXITCODE -ne 0) {
+        throw ("Exact-ticket read-only evidence refresh failed for {0} with exit code {1}" -f $Builder.Script, $LASTEXITCODE)
+    }
+}
+
+Write-Host "Exact-ticket read-only evidence refresh complete. H024 remains read-only; no trading is authorized."
 
 Run-Builder "read-only black-swan guard" "scripts\build_h024_read_only_black_swan_guard_jsonl.py"
 Run-Native $Python "scripts\verify_h024_read_only_black_swan_guard_jsonl.py" "reports\h024_read_only_black_swan_guard.jsonl" "--require-pass"
