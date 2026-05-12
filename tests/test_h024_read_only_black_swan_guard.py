@@ -1,4 +1,4 @@
-﻿import json
+import json
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
 
@@ -54,6 +54,12 @@ def _write_jsonl(path: Path, record: dict):
     path.write_text(json.dumps(record, sort_keys=True) + "\n", encoding="utf-8")
 
 
+def _merge_defaults(defaults: dict, overrides: dict) -> dict:
+    merged = dict(defaults)
+    merged.update(overrides)
+    return merged
+
+
 def _write_all_upstream(tmp_path: Path, overrides_by_name=None):
     overrides_by_name = overrides_by_name or {}
     paths = {}
@@ -64,51 +70,71 @@ def _write_all_upstream(tmp_path: Path, overrides_by_name=None):
         if name == "runtime_heartbeat":
             record = _base_upstream_record(
                 name,
-                server="Exness-MT5Trial6",
-                currency="USD",
-                terminal_connected=True,
-                account_available=True,
-                **overrides,
+                **_merge_defaults(
+                    {
+                        "server": "Exness-MT5Trial6",
+                        "currency": "USD",
+                        "terminal_connected": True,
+                        "account_available": True,
+                    },
+                    overrides,
+                ),
             )
         elif name == "runtime_lockout_reader":
             record = _base_upstream_record(
                 name,
-                global_no_new_entry_lockout_active=False,
-                manual_override_lockout_active=False,
-                xauusd_no_new_entry_lockout_active=False,
-                usdjpy_no_new_entry_lockout_active=False,
-                **overrides,
+                **_merge_defaults(
+                    {
+                        "global_no_new_entry_lockout_active": False,
+                        "manual_override_lockout_active": False,
+                        "xauusd_no_new_entry_lockout_active": False,
+                        "usdjpy_no_new_entry_lockout_active": False,
+                    },
+                    overrides,
+                ),
             )
         elif name == "runtime_tick_spread":
             record = _base_upstream_record(
                 name,
-                runtime_symbol="XAUUSDm",
-                bid=4728.1,
-                ask=4728.4,
-                spread=0.3,
-                tick_time=_iso_now(),
-                **overrides,
+                **_merge_defaults(
+                    {
+                        "runtime_symbol": "XAUUSDm",
+                        "bid": 4728.1,
+                        "ask": 4728.4,
+                        "spread": 0.3,
+                        "tick_time": _iso_now(),
+                    },
+                    overrides,
+                ),
             )
         elif name == "runtime_account_risk_margin":
             record = _base_upstream_record(
                 name,
-                balance=10000.0,
-                equity=9990.0,
-                margin=50.0,
-                margin_free=9940.0,
-                margin_level=19980.0,
-                floating_pnl=-10.0,
-                **overrides,
+                **_merge_defaults(
+                    {
+                        "balance": 10000.0,
+                        "equity": 9990.0,
+                        "margin": 50.0,
+                        "margin_free": 9940.0,
+                        "margin_level": 19980.0,
+                        "floating_pnl": -10.0,
+                    },
+                    overrides,
+                ),
             )
         elif name == "runtime_exposure_inventory":
             record = _identity_record(
                 name,
-                canary_observed=True,
-                h024_position_count=1,
-                h024_order_count=0,
-                usdjpy_exposure_detected=False,
-                extra_h024_exposure_detected=False,
-                **overrides,
+                **_merge_defaults(
+                    {
+                        "canary_observed": True,
+                        "h024_position_count": 1,
+                        "h024_order_count": 0,
+                        "usdjpy_exposure_detected": False,
+                        "extra_h024_exposure_detected": False,
+                    },
+                    overrides,
+                ),
             )
         elif name in {
             "operator_decision_v2_preview",
@@ -121,13 +147,17 @@ def _write_all_upstream(tmp_path: Path, overrides_by_name=None):
         }:
             record = _identity_record(
                 name,
-                operator_decision_v2_preview_authorizes_action=False,
-                manual_approval_gate_preview_authorizes_action=False,
-                execution_readiness_dry_run_schema_preview_authorizes_execution=False,
-                live_broker_request_constructed=False,
-                executable_trade_request_constructed=False,
-                mt5_request_dictionary_constructed=False,
-                **overrides,
+                **_merge_defaults(
+                    {
+                        "operator_decision_v2_preview_authorizes_action": False,
+                        "manual_approval_gate_preview_authorizes_action": False,
+                        "execution_readiness_dry_run_schema_preview_authorizes_execution": False,
+                        "live_broker_request_constructed": False,
+                        "executable_trade_request_constructed": False,
+                        "mt5_request_dictionary_constructed": False,
+                    },
+                    overrides,
+                ),
             )
         else:
             record = _base_upstream_record(name, **overrides)
@@ -136,7 +166,6 @@ def _write_all_upstream(tmp_path: Path, overrides_by_name=None):
         paths[name] = path
 
     return paths
-
 
 def test_builds_pass_when_all_upstream_clear(tmp_path):
     paths = _write_all_upstream(tmp_path)

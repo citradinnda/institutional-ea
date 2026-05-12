@@ -1,4 +1,4 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 import argparse
 import json
@@ -28,6 +28,16 @@ DEFAULT_MAX_UPSTREAM_AGE_SECONDS = 3600
 DEFAULT_EXTREME_SPREAD_LIMIT = 1000.0
 DEFAULT_MIN_MARGIN_LEVEL = 100.0
 DEFAULT_MIN_EQUITY_TO_BALANCE_RATIO = 0.20
+
+TIMESTAMP_KEYS = (
+    "observed_at_utc",
+    "generated_at_utc",
+    "created_at_utc",
+    "evaluated_at_utc",
+    "built_at_utc",
+    "timestamp_utc",
+    "timestamp",
+)
 
 AUTHORIZATION_KEYS = (
     "broker_mutation_authorized",
@@ -203,6 +213,18 @@ def first_key_value(value: Any, keys: Iterable[str]) -> Any:
     return None
 
 
+def upstream_timestamp_value(record: Mapping[str, Any]) -> tuple[Any, str | None]:
+    for key in TIMESTAMP_KEYS:
+        if key in record:
+            return record.get(key), key
+
+    for key, item in iter_key_values(record):
+        if key in TIMESTAMP_KEYS:
+            return item, key
+
+    return None, None
+
+
 def has_key_value(value: Any, keys: Iterable[str], expected: Any) -> bool:
     wanted = set(keys)
     for key, item in iter_key_values(value):
@@ -312,7 +334,7 @@ def summarize_black_swan_inputs(name: str, record: Mapping[str, Any]) -> dict[st
         "verdict": record.get("verdict"),
         "operator_state": record.get("operator_state"),
         "operator_next_action": record.get("operator_next_action"),
-        "observed_at_utc": record.get("observed_at_utc"),
+        "observed_at_utc": upstream_timestamp_value(record)[0],
         "identity": summarize_identity(record),
     }
 
@@ -378,10 +400,10 @@ def validate_common_upstream_record(
     if embedded_violations:
         violations.append(f"{name}: upstream record has embedded violations")
 
-    observed_at_utc = record.get("observed_at_utc")
-    observed_at = parse_utc_datetime(observed_at_utc)
+    observed_at_raw, observed_at_key = upstream_timestamp_value(record)
+    observed_at = parse_utc_datetime(observed_at_raw)
     if observed_at is None:
-        violations.append(f"{name}: missing or malformed observed_at_utc")
+        violations.append(f"{name}: missing or malformed upstream timestamp")
     else:
         age_seconds = abs((now - observed_at).total_seconds())
         if age_seconds > max_age_seconds:
