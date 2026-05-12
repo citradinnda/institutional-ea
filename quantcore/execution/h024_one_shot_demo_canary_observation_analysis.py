@@ -87,6 +87,34 @@ def _first(record: dict[str, Any] | None, paths: list[tuple[str, ...]]) -> Any:
     return None
 
 
+def _find_key_recursive(value: Any, keys: set[str]) -> Any:
+    if isinstance(value, dict):
+        for key in keys:
+            if key in value and value[key] is not None:
+                return value[key]
+        for child in value.values():
+            found = _find_key_recursive(child, keys)
+            if found is not None:
+                return found
+    elif isinstance(value, list):
+        for child in value:
+            found = _find_key_recursive(child, keys)
+            if found is not None:
+                return found
+    return None
+
+
+def _first_with_recursive_fallback(
+    record: dict[str, Any] | None,
+    paths: list[tuple[str, ...]],
+    recursive_keys: set[str],
+) -> Any:
+    value = _first(record, paths)
+    if value is not None:
+        return value
+    return _find_key_recursive(record, recursive_keys)
+
+
 def _as_float(value: Any) -> float | None:
     if value is None:
         return None
@@ -268,9 +296,41 @@ def build_observation_analysis(
             ("summary", "ledger_successful_canary_records_found"),
         ],
     )
-    monitor_current_price = _first(monitor, [("current_price",), ("position", "price_current"), ("summary", "current_price")])
-    monitor_floating_pl = _first(monitor, [("floating_pl",), ("floating_p_l",), ("profit",), ("position", "profit"), ("summary", "floating_pl")])
-    monitor_swap = _first(monitor, [("swap",), ("position", "swap"), ("summary", "swap")])
+    monitor_current_price = _first_with_recursive_fallback(
+        monitor,
+        [("current_price",), ("position", "price_current"), ("summary", "current_price")],
+        {"current_price", "price_current"},
+    )
+    if monitor_current_price is None:
+        monitor_current_price = _first_with_recursive_fallback(
+            lifecycle_decision,
+            [("current_price",), ("position", "price_current"), ("summary", "current_price")],
+            {"current_price", "price_current"},
+        )
+
+    monitor_floating_pl = _first_with_recursive_fallback(
+        monitor,
+        [("floating_pl",), ("floating_p_l",), ("floating_pnl",), ("floating_profit",), ("profit",), ("position", "profit"), ("summary", "floating_pl")],
+        {"floating_pl", "floating_p_l", "floating_pnl", "floating_profit", "profit"},
+    )
+    if monitor_floating_pl is None:
+        monitor_floating_pl = _first_with_recursive_fallback(
+            lifecycle_decision,
+            [("floating_pl",), ("floating_p_l",), ("floating_pnl",), ("floating_profit",), ("profit",), ("position", "profit"), ("summary", "floating_pl")],
+            {"floating_pl", "floating_p_l", "floating_pnl", "floating_profit", "profit"},
+        )
+
+    monitor_swap = _first_with_recursive_fallback(
+        monitor,
+        [("swap",), ("position", "swap"), ("summary", "swap")],
+        {"swap"},
+    )
+    if monitor_swap is None:
+        monitor_swap = _first_with_recursive_fallback(
+            lifecycle_decision,
+            [("swap",), ("position", "swap"), ("summary", "swap")],
+            {"swap"},
+        )
 
     if monitor is not None:
         if monitor_verdict != "PASS":
@@ -283,6 +343,13 @@ def build_observation_analysis(
             violations.append(f"unexpected H024 pending order count must be 0, observed {monitor_pending_count!r}")
         if _as_int(monitor_ledger_success_count) not in {1, None}:
             violations.append(f"successful canary ledger count must be 1, observed {monitor_ledger_success_count!r}")
+        if monitor_state == "open":
+            if _as_float(monitor_current_price) is None:
+                violations.append("open monitor state must expose a current price")
+            if _as_float(monitor_floating_pl) is None:
+                violations.append("open monitor state must expose floating P/L")
+            if _as_float(monitor_swap) is None:
+                violations.append("open monitor state must expose swap")
 
     lifecycle_verdict = _first(lifecycle_decision, [("verdict",), ("summary", "verdict")])
     lifecycle_violations = _violation_count(lifecycle_decision)

@@ -212,3 +212,48 @@ def test_observation_analysis_module_is_local_file_analysis_only() -> None:
     assert "mt5." not in source
     assert ".order_check(" not in source
     assert ".order_send(" not in source
+
+def test_observation_analysis_finds_nested_mark_to_market_fields(tmp_path: Path) -> None:
+    paths = _write_sample_inputs(tmp_path)
+    monitor = _sample_monitor_record()
+    monitor.pop("current_price")
+    monitor.pop("floating_pl")
+    monitor.pop("swap")
+    monitor["position_snapshot"] = {
+        "position": {
+            "price_current": 4747.721,
+            "profit": -19.27,
+            "swap": 0.0,
+        }
+    }
+    _write_jsonl(paths["monitor_path"], [monitor])
+
+    record = build_observation_analysis(**paths, generated_at_utc="2026-05-12T00:00:00Z")
+
+    assert record["verdict"] == "PASS"
+    assert record["latest_mark_to_market"]["current_price"] == 4747.721
+    assert record["latest_mark_to_market"]["floating_pl"] == -19.27
+    assert record["latest_mark_to_market"]["swap"] == 0.0
+
+
+def test_observation_analysis_requires_mark_to_market_for_open_state(tmp_path: Path) -> None:
+    paths = _write_sample_inputs(tmp_path)
+    monitor = _sample_monitor_record()
+    monitor.pop("current_price")
+    monitor.pop("floating_pl")
+    monitor.pop("swap")
+    _write_jsonl(paths["monitor_path"], [monitor])
+
+    lifecycle = _sample_lifecycle_record()
+    lifecycle.pop("current_price")
+    lifecycle.pop("floating_pl")
+    lifecycle.pop("swap")
+    _write_jsonl(paths["lifecycle_decision_path"], [lifecycle])
+
+    record = build_observation_analysis(**paths, generated_at_utc="2026-05-12T00:00:00Z")
+
+    assert record["verdict"] == "FAIL"
+    assert any("open monitor state must expose a current price" in violation for violation in record["violations"])
+    assert any("open monitor state must expose floating P/L" in violation for violation in record["violations"])
+    assert any("open monitor state must expose swap" in violation for violation in record["violations"])
+
