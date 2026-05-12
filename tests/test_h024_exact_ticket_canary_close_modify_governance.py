@@ -325,3 +325,170 @@ def test_new_python_files_have_no_broker_mutation_call_sites():
                 isinstance(node, ast.ImportFrom)
                 and node.module == "MetaTrader5"
             ), f"{candidate} imports MetaTrader5"
+
+
+def test_runtime_report_shape_with_nested_observed_gate_fields_passes():
+    gate = _gate(
+        gate_opens_mutation_path=None,
+        future_broker_facing_code_must_check_gate=None,
+        usdjpy_order_blocked=True,
+        usdjpy_order_authorized=False,
+    )
+    gate["observed"] = {
+        "gate_opens_mutation_path": False,
+        "future_broker_facing_code_must_check_gate": True,
+        "unified_supervision_verdict": "PASS",
+    }
+    record = _build(gate=gate)
+    assert record["verdict"] == "PASS"
+    assert record["observed"]["gate_opens_mutation_path"] is False
+
+
+def test_external_upstream_records_can_supply_exact_canary_and_snapshots():
+    gate = _gate()
+    gate.pop("unified_supervision_record")
+    gate["observed"] = {
+        "gate_opens_mutation_path": False,
+        "future_broker_facing_code_must_check_gate": True,
+        "unified_supervision_verdict": "PASS",
+    }
+    record = build_governance_packet(
+        no_mutation_gate_record=gate,
+        human_decision_record=_decision(),
+        unified_supervision_record=_gate()["unified_supervision_record"],
+        observed_at_utc=NOW,
+        max_gate_age_seconds=3600,
+        max_snapshot_age_seconds=3600,
+    )
+    assert record["verdict"] == "PASS"
+    assert record["observed"]["exact_canary_state"] == "OBSERVED_EXACT_KNOWN_CANARY"
+
+
+def test_historical_gate_identity_shape_with_operator_contract_passes():
+    gate = _gate(packet_type="h024_runtime_no_mutation_safety_gate_contract_packet")
+    gate.pop("gate_opens_mutation_path")
+    gate.pop("future_broker_facing_code_must_check_gate")
+    gate["compatibility_flags"] = {
+        "current_gate_open_mutation_path": False,
+        "future_broker_adapter_must_check_safety_gate": True,
+    }
+    record = _build(gate=gate)
+    assert record["verdict"] == "PASS"
+    assert record["observed"]["gate_opens_mutation_path"] is False
+
+
+def test_unified_verdict_can_be_resolved_from_operator_next_action_shape():
+    gate = _gate()
+    gate.pop("unified_supervision_record")
+    gate["observed"] = {
+        "unified_operator_next_action": (
+            "READ_ONLY_CONTINUE_CANARY_AND_RUNTIME_SUPERVISION_NO_TRADING_AUTHORIZED"
+        ),
+    }
+    record = build_governance_packet(
+        no_mutation_gate_record=gate,
+        human_decision_record=_decision(),
+        unified_supervision_record=_gate()["unified_supervision_record"],
+        observed_at_utc=NOW,
+        max_gate_age_seconds=3600,
+        max_snapshot_age_seconds=3600,
+    )
+    assert record["verdict"] == "PASS"
+    assert record["observed"]["unified_supervision_verdict"] == "PASS"
+
+
+
+def test_runtime_canary_state_alias_from_exposure_report_passes():
+    gate = _gate()
+    gate.pop("unified_supervision_record")
+    gate["observed"] = {
+        "gate_opens_mutation_path": False,
+        "future_broker_facing_code_must_check_gate": True,
+        "unified_supervision_verdict": "PASS",
+    }
+    unified = {
+        "schema_version": "1.0",
+        "strategy": STRATEGY,
+        "packet_type": "h024_unified_read_only_post_canary_runtime_supervision",
+        "observed_at_utc": NOW,
+        "verdict": "PASS",
+        "violations": [],
+        "operator_next_action": (
+            "READ_ONLY_CONTINUE_CANARY_AND_RUNTIME_SUPERVISION_NO_TRADING_AUTHORIZED"
+        ),
+    }
+    exposure = {
+        "schema_version": "1.0",
+        "strategy": STRATEGY,
+        "packet_type": "h024_runtime_exposure_inventory_safety_supervisor",
+        "observed_at_utc": NOW,
+        "verdict": "PASS",
+        "violations": [],
+        "canary_state": "OBSERVED_EXACT_KNOWN_CANARY",
+        "h024_position_count": 1,
+        "h024_order_count": 0,
+        "h024_positions": [
+            {
+                "symbol": "XAUUSDm",
+                "ticket": 4413054432,
+                "identifier": 4413054432,
+                "magic": 240024,
+                "volume": 0.01,
+                "type": 1,
+            }
+        ],
+    }
+    account = {
+        "schema_version": "1.0",
+        "strategy": STRATEGY,
+        "packet_type": "h024_runtime_account_risk_margin_safety_supervisor",
+        "observed_at_utc": NOW,
+        "verdict": "PASS",
+        "violations": [],
+        "margin_level": 400000.0,
+        "canary_state": "OBSERVED_EXACT_KNOWN_CANARY",
+        "h024_position_count": 1,
+        "h024_order_count": 0,
+    }
+    tick = {
+        "schema_version": "1.0",
+        "strategy": STRATEGY,
+        "packet_type": "h024_runtime_tick_spread_safety_supervisor",
+        "observed_at_utc": NOW,
+        "verdict": "PASS",
+        "violations": [],
+        "spread_points": 308.0,
+        "tick_age_seconds": 0.2,
+    }
+
+    record = build_governance_packet(
+        no_mutation_gate_record=gate,
+        human_decision_record=_decision(),
+        unified_supervision_record=unified,
+        account_risk_margin_record=account,
+        exposure_inventory_record=exposure,
+        tick_spread_record=tick,
+        observed_at_utc=NOW,
+        max_gate_age_seconds=3600,
+        max_snapshot_age_seconds=3600,
+    )
+
+    assert record["verdict"] == "PASS"
+    assert record["observed"]["exact_canary_state"] == "OBSERVED_EXACT_KNOWN_CANARY"
+    assert record["observed"]["exact_canary_observed"] is True
+    assert all(record[key] is False for key in AUTHORIZATION_KEYS)
+
+
+def test_mismatched_canary_state_alias_still_fails_closed():
+    gate = _gate()
+    gate["unified_supervision_record"].pop("exact_canary_state")
+    gate["unified_supervision_record"].pop("exact_canary_observed")
+    exposure = gate["unified_supervision_record"]["runtime_aggregate_record"]["upstream"][1]
+    exposure.pop("exact_canary_state")
+    exposure.pop("exact_canary_observed")
+    exposure["canary_state"] = "NOT_OBSERVED"
+
+    record = _build(gate=gate)
+
+    assert record["verdict"] == "FAIL"
+    assert any("exact_known_canary_identity_match" in v for v in record["violations"])

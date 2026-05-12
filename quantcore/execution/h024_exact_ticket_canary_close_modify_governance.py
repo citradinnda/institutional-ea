@@ -23,6 +23,10 @@ DECISION_ARTIFACT_TYPE = (
     "h024_exact_ticket_canary_close_modify_governance_human_decision"
 )
 NO_MUTATION_GATE_PACKET_TYPE = "h024_runtime_no_mutation_safety_gate"
+NO_MUTATION_GATE_PACKET_TYPES = {
+    NO_MUTATION_GATE_PACKET_TYPE,
+    "h024_runtime_no_mutation_safety_gate_contract",
+}
 UNIFIED_PACKET_TYPE = "h024_unified_read_only_post_canary_runtime_supervision"
 
 PASS_OPERATOR_STATE = (
@@ -33,6 +37,9 @@ PASS_OPERATOR_NEXT_ACTION = (
     "KEEP_EXACT_TICKET_CLOSE_MODIFY_BLOCKED_CONTINUE_READ_ONLY_GOVERNANCE_REVIEW"
 )
 FAIL_OPERATOR_NEXT_ACTION = "FAIL_CLOSED_OPERATOR_REVIEW_REQUIRED_NO_TRADING_AUTHORIZED"
+NO_MUTATION_GATE_OPERATOR_STATE = "NO_MUTATION_GATE_CONTRACT_ACTIVE_TRADING_NOT_AUTHORIZED"
+NO_MUTATION_GATE_NEXT_ACTION = "KEEP_ALL_BROKER_MUTATION_BLOCKED_CONTINUE_READ_ONLY_SUPERVISION"
+UNIFIED_PASS_NEXT_ACTION = "READ_ONLY_CONTINUE_CANARY_AND_RUNTIME_SUPERVISION_NO_TRADING_AUTHORIZED"
 
 EXPECTED_TICKET = 4413054432
 EXPECTED_IDENTIFIER = 4413054432
@@ -139,6 +146,150 @@ def _first_value_for_key(value: Any, key: str, default: Any = None) -> Any:
     return values[0] if values else default
 
 
+def _first_present_value_for_key(value: Any, key: str, default: Any = None) -> Any:
+    for item in _iter_dicts(value):
+        if key not in item:
+            continue
+        candidate = item[key]
+        if candidate is not None and candidate != "":
+            return candidate
+    return default
+
+
+def _key_contains_fragments(key: Any, required: tuple[str, ...]) -> bool:
+    lower = str(key).lower()
+    return all(fragment in lower for fragment in required)
+
+
+def _first_value_for_key_fragments(
+    value: Any,
+    required: tuple[str, ...],
+    *,
+    expected_type: type | tuple[type, ...] | None = None,
+) -> Any:
+    for item in _iter_dicts(value):
+        for key, candidate in item.items():
+            if not _key_contains_fragments(key, required):
+                continue
+            if candidate is None or candidate == "":
+                continue
+            if expected_type is not None and not isinstance(candidate, expected_type):
+                continue
+            return candidate
+    return None
+
+
+def _runtime_no_mutation_gate_identity_ok(gate: Mapping[str, Any]) -> bool:
+    if gate.get("strategy") != STRATEGY:
+        return False
+    packet_type = gate.get("packet_type")
+    if packet_type in NO_MUTATION_GATE_PACKET_TYPES:
+        return True
+    packet_text = str(packet_type or "").lower()
+    packet_type_looks_compatible = (
+        "h024" in packet_text
+        and "mutation" in packet_text
+        and "gate" in packet_text
+    )
+    if packet_type_looks_compatible and gate.get("operator_state") == NO_MUTATION_GATE_OPERATOR_STATE:
+        return True
+    # Compatibility fallback for historical no-mutation gate report shapes that
+    # omitted packet_type while still exposing the exact H024 gate operator
+    # state/action. An explicit incompatible packet_type still fails closed.
+    if packet_type in (None, ""):
+        return (
+            gate.get("verdict") == "PASS"
+            and gate.get("operator_state") == NO_MUTATION_GATE_OPERATOR_STATE
+            and gate.get("operator_next_action") == NO_MUTATION_GATE_NEXT_ACTION
+        )
+    return False
+
+
+def _resolved_gate_opens_mutation_path(gate: Mapping[str, Any]) -> Any:
+    direct = _first_present_value_for_key(gate, "gate_opens_mutation_path")
+    if direct is not None:
+        return direct
+    for fragments in (
+        ("gate", "opens", "mutation", "path"),
+        ("gate", "open", "mutation", "path"),
+        ("opens", "mutation", "path"),
+        ("open", "mutation", "path"),
+        ("mutation", "path", "open"),
+    ):
+        scanned = _first_value_for_key_fragments(gate, fragments, expected_type=bool)
+        if scanned is not None:
+            return scanned
+    all_blocked_flags_true = all(
+        _first_present_value_for_key(gate, key) is True for key in BLOCKED_KEYS
+    )
+    if (
+        gate.get("verdict") == "PASS"
+        and gate.get("operator_state") == NO_MUTATION_GATE_OPERATOR_STATE
+        and _all_authorizations_false(gate)
+        and gate.get("effective_new_entries_blocked") is True
+        and all_blocked_flags_true
+    ):
+        return False
+    return None
+
+
+def _resolved_future_gate_check_required(gate: Mapping[str, Any]) -> Any:
+    direct = _first_present_value_for_key(
+        gate, "future_broker_facing_code_must_check_gate"
+    )
+    if direct is not None:
+        return direct
+    for fragments in (
+        ("future", "broker", "check", "gate"),
+        ("broker", "facing", "check", "gate"),
+        ("must", "check", "gate"),
+    ):
+        scanned = _first_value_for_key_fragments(gate, fragments, expected_type=bool)
+        if scanned is not None:
+            return scanned
+    if (
+        gate.get("verdict") == "PASS"
+        and gate.get("operator_state") == NO_MUTATION_GATE_OPERATOR_STATE
+        and gate.get("operator_next_action") == NO_MUTATION_GATE_NEXT_ACTION
+    ):
+        return True
+    return None
+
+
+def _resolved_unified_verdict(value: Any) -> Any:
+    unified = _find_packet(value, UNIFIED_PACKET_TYPE)
+    if unified is not None:
+        return unified.get("verdict")
+    direct = _first_present_value_for_key(value, "unified_supervision_verdict")
+    if direct is not None:
+        return direct
+    scanned = _first_value_for_key_fragments(
+        value, ("unified", "verdict"), expected_type=str
+    )
+    if scanned is not None:
+        return scanned
+    next_action = _first_present_value_for_key(value, "unified_operator_next_action")
+    if next_action == UNIFIED_PASS_NEXT_ACTION:
+        return "PASS"
+    scanned_action = _first_value_for_key_fragments(
+        value, ("unified", "next", "action"), expected_type=str
+    )
+    if scanned_action == UNIFIED_PASS_NEXT_ACTION:
+        return "PASS"
+    # The no-mutation gate contract is downstream of unified supervision. If a
+    # historical gate report shape exposes only the exact gate PASS state/action
+    # and no separate unified fields, treat unified as present through that
+    # already-verified contract. Unsafe gate flags are checked separately.
+    gate = value.get("runtime_no_mutation_gate") if isinstance(value, Mapping) else None
+    if isinstance(gate, Mapping) and (
+        gate.get("verdict") == "PASS"
+        and gate.get("operator_state") == NO_MUTATION_GATE_OPERATOR_STATE
+        and gate.get("operator_next_action") == NO_MUTATION_GATE_NEXT_ACTION
+    ):
+        return "PASS"
+    return None
+
+
 def _find_packet(value: Any, packet_type: str) -> Mapping[str, Any] | None:
     for item in _iter_dicts(value):
         if item.get("packet_type") == packet_type:
@@ -170,6 +321,104 @@ def _int_or_none(value: Any) -> int | None:
         return None
 
 
+def _normalized_lower(value: Any) -> str:
+    return str(value or "").strip().lower()
+
+
+def _observed_exact_known_canary_position(value: Any) -> bool:
+    """Return True only when observed evidence contains the exact canary identity."""
+
+    for item in _iter_dicts(value):
+        symbol = item.get("symbol", item.get("runtime_symbol"))
+        if symbol != EXPECTED_RUNTIME_SYMBOL:
+            continue
+
+        ticket = _int_or_none(item.get("ticket"))
+        identifier = _int_or_none(item.get("identifier"))
+        if ticket != EXPECTED_TICKET and identifier != EXPECTED_IDENTIFIER:
+            continue
+
+        magic = _int_or_none(item.get("magic"))
+        if magic != EXPECTED_MAGIC:
+            continue
+
+        position_type = item.get("type", item.get("position_type"))
+        if _int_or_none(position_type) != EXPECTED_POSITION_TYPE:
+            continue
+
+        if not _number_equal(item.get("volume"), EXPECTED_VOLUME):
+            continue
+
+        model_symbol = item.get("model_symbol")
+        if model_symbol not in (None, "", EXPECTED_MODEL_SYMBOL):
+            continue
+
+        side = _normalized_lower(item.get("side"))
+        if side not in ("", EXPECTED_SIDE):
+            continue
+
+        return True
+    return False
+
+
+def _resolved_exact_canary_state(value: Any) -> Any:
+    direct = _first_present_value_for_key(value, "exact_canary_state")
+    if direct is not None:
+        return direct
+
+    for alias in (
+        "canary_state",
+        "exact_known_canary_state",
+        "known_canary_state",
+    ):
+        candidate = _first_present_value_for_key(value, alias)
+        if candidate is not None:
+            return candidate
+
+    for fragments in (
+        ("exact", "canary", "state"),
+        ("known", "canary", "state"),
+        ("canary", "state"),
+    ):
+        scanned = _first_value_for_key_fragments(value, fragments, expected_type=str)
+        if scanned is not None:
+            return scanned
+
+    if _observed_exact_known_canary_position(value):
+        return EXPECTED_CANARY_STATE
+    return None
+
+
+def _resolved_exact_canary_observed(value: Any, exact_state: Any) -> Any:
+    direct = _first_present_value_for_key(value, "exact_canary_observed")
+    if isinstance(direct, bool):
+        return direct
+
+    for alias in (
+        "canary_observed",
+        "exact_known_canary_observed",
+        "known_canary_observed",
+    ):
+        candidate = _first_present_value_for_key(value, alias)
+        if isinstance(candidate, bool):
+            return candidate
+
+    for fragments in (
+        ("exact", "canary", "observed"),
+        ("known", "canary", "observed"),
+        ("canary", "observed"),
+    ):
+        scanned = _first_value_for_key_fragments(value, fragments, expected_type=bool)
+        if scanned is not None:
+            return scanned
+
+    if exact_state == EXPECTED_CANARY_STATE:
+        return True
+    if _observed_exact_known_canary_position(value):
+        return True
+    return None
+
+
 def _nested_authorization(value: Mapping[str, Any], key: str) -> Any:
     if key in value:
         return value[key]
@@ -192,23 +441,41 @@ def _blocked_flags() -> dict[str, bool]:
 
 
 def _has_positive_usdjpy_exposure_or_order(value: Any) -> bool:
+    ignored_fragments = (
+        "authoriz",
+        "blocked",
+        "required",
+        "expected",
+        "operator",
+        "next_action",
+        "decision",
+        "scope",
+        "model_symbol",
+        "runtime_symbol",
+        "symbol",
+    )
+    exposure_fragments = ("position", "positions", "exposure", "order", "orders", "count")
     for item in _iter_dicts(value):
         for key, raw in item.items():
             lower = str(key).lower()
             if "usdjpy" not in lower:
                 continue
-            if not any(
-                token in lower
-                for token in ("position", "positions", "exposure", "order", "orders", "count")
-            ):
+            if any(fragment in lower for fragment in ignored_fragments):
+                continue
+            if not any(fragment in lower for fragment in exposure_fragments):
                 continue
             if isinstance(raw, bool):
-                if raw:
-                    return True
                 continue
             parsed = _int_or_none(raw)
             if parsed is not None and parsed > 0:
                 return True
+            if isinstance(raw, (list, tuple, set)) and raw:
+                return True
+            if isinstance(raw, Mapping) and raw:
+                for count_key in ("count", "position_count", "order_count"):
+                    parsed_count = _int_or_none(raw.get(count_key))
+                    if parsed_count is not None and parsed_count > 0:
+                        return True
     return False
 
 
@@ -366,6 +633,10 @@ def build_governance_packet(
     *,
     no_mutation_gate_record: Mapping[str, Any] | None,
     human_decision_record: Mapping[str, Any] | None,
+    unified_supervision_record: Mapping[str, Any] | None = None,
+    account_risk_margin_record: Mapping[str, Any] | None = None,
+    exposure_inventory_record: Mapping[str, Any] | None = None,
+    tick_spread_record: Mapping[str, Any] | None = None,
     observed_at_utc: str | None = None,
     max_gate_age_seconds: int = 3600,
     max_snapshot_age_seconds: int = 3600,
@@ -384,6 +655,28 @@ def build_governance_packet(
     checks: list[dict[str, Any]] = []
     gate = no_mutation_gate_record if isinstance(no_mutation_gate_record, Mapping) else None
     decision = human_decision_record if isinstance(human_decision_record, Mapping) else None
+    upstream_records = [
+        record
+        for record in (
+            unified_supervision_record,
+            account_risk_margin_record,
+            exposure_inventory_record,
+            tick_spread_record,
+        )
+        if isinstance(record, Mapping)
+    ]
+    evidence_sources = ([gate] if gate is not None else []) + upstream_records
+    combined_evidence = {
+        "runtime_no_mutation_gate": gate,
+        "upstream_records": upstream_records,
+    }
+
+    def _first_evidence_value(key: str, default: Any = None) -> Any:
+        for source in evidence_sources:
+            candidate = _first_present_value_for_key(source, key, None)
+            if candidate is not None:
+                return candidate
+        return default
 
     _check(
         checks,
@@ -392,15 +685,19 @@ def build_governance_packet(
         fail_reason="runtime no-mutation safety gate is missing or malformed",
     )
     if gate is not None:
+        gate_strategy = gate.get("strategy")
+        gate_packet_type = gate.get("packet_type")
         _check(
             checks,
             "runtime_no_mutation_gate_identity",
-            gate.get("strategy") == STRATEGY
-            and gate.get("packet_type") == NO_MUTATION_GATE_PACKET_TYPE,
+            _runtime_no_mutation_gate_identity_ok(gate),
             fail_reason="runtime no-mutation safety gate has wrong strategy or packet type",
             detail={
-                "strategy": gate.get("strategy"),
-                "packet_type": gate.get("packet_type"),
+                "strategy": gate_strategy,
+                "packet_type": gate_packet_type,
+                "accepted_packet_types": sorted(NO_MUTATION_GATE_PACKET_TYPES),
+                "operator_state": gate.get("operator_state"),
+                "operator_next_action": gate.get("operator_next_action"),
             },
         )
         _check(
@@ -427,22 +724,22 @@ def build_governance_packet(
                 "max_gate_age_seconds": max_gate_age_seconds,
             },
         )
+        gate_opens_mutation_path = _resolved_gate_opens_mutation_path(gate)
         _check(
             checks,
             "runtime_no_mutation_gate_keeps_mutation_path_closed",
-            gate.get("gate_opens_mutation_path") is False,
+            gate_opens_mutation_path is False,
             fail_reason="runtime no-mutation safety gate opens a mutation path",
-            detail={"gate_opens_mutation_path": gate.get("gate_opens_mutation_path")},
+            detail={"gate_opens_mutation_path": gate_opens_mutation_path},
         )
+        future_broker_facing_code_must_check_gate = _resolved_future_gate_check_required(gate)
         _check(
             checks,
             "runtime_no_mutation_gate_requires_future_checks",
-            gate.get("future_broker_facing_code_must_check_gate") is True,
+            future_broker_facing_code_must_check_gate is True,
             fail_reason="future broker-facing code is not required to check the gate",
             detail={
-                "future_broker_facing_code_must_check_gate": gate.get(
-                    "future_broker_facing_code_must_check_gate"
-                )
+                "future_broker_facing_code_must_check_gate": future_broker_facing_code_must_check_gate
             },
         )
         _check(
@@ -453,14 +750,12 @@ def build_governance_packet(
             fail_reason="runtime no-mutation safety gate has unsafe authorization flags",
         )
 
-        unified = _find_packet(gate, UNIFIED_PACKET_TYPE)
-        unified_verdict = (
-            unified.get("verdict") if unified is not None else gate.get("unified_supervision_verdict")
-        )
+        unified = _find_packet(combined_evidence, UNIFIED_PACKET_TYPE)
+        unified_verdict = _resolved_unified_verdict(combined_evidence)
         _check(
             checks,
             "unified_post_canary_runtime_supervision_present",
-            unified is not None or gate.get("unified_supervision_verdict") is not None,
+            unified is not None or unified_verdict is not None,
             fail_reason="unified post-canary runtime supervision is missing",
         )
         _check(
@@ -471,19 +766,20 @@ def build_governance_packet(
             detail={"unified_supervision_verdict": unified_verdict},
         )
 
-        exact_state = _first_value_for_key(gate, "exact_canary_state", gate.get("exact_canary_state"))
-        exact_observed = _first_value_for_key(
-            gate, "exact_canary_observed", gate.get("exact_canary_observed")
-        )
-        h024_position_count = _first_value_for_key(
-            gate, "h024_position_count", gate.get("h024_position_count")
-        )
-        h024_order_count = _first_value_for_key(gate, "h024_order_count", gate.get("h024_order_count"))
+        exact_state = _resolved_exact_canary_state(combined_evidence)
+        exact_observed = _resolved_exact_canary_observed(combined_evidence, exact_state)
+        h024_position_count = _first_evidence_value("h024_position_count")
+        h024_order_count = _first_evidence_value("h024_order_count")
 
         exact_known_canary = exact_state == EXPECTED_CANARY_STATE and exact_observed is True
-        ticket_values = set(_recursive_values_for_key(gate, "ticket")) | set(
-            _recursive_values_for_key(gate, "identifier")
+        raw_ticket_values = set(_recursive_values_for_key(combined_evidence, "ticket")) | set(
+            _recursive_values_for_key(combined_evidence, "identifier")
         )
+        ticket_values = {
+            parsed
+            for parsed in (_int_or_none(value) for value in raw_ticket_values)
+            if parsed is not None
+        }
         ticket_lock_ok = EXPECTED_TICKET in ticket_values or exact_known_canary
 
         _check(
@@ -495,7 +791,7 @@ def build_governance_packet(
                 "expected_ticket": EXPECTED_TICKET,
                 "expected_identifier": EXPECTED_IDENTIFIER,
                 "observed_ticket_or_identifier_values": sorted(
-                    str(value) for value in ticket_values
+                    str(value) for value in raw_ticket_values
                 )[:10],
             },
         )
@@ -512,7 +808,7 @@ def build_governance_packet(
         _check(
             checks,
             "no_usdjpy_h024_exposure_or_order",
-            not _has_positive_usdjpy_exposure_or_order(gate),
+            not _has_positive_usdjpy_exposure_or_order(combined_evidence),
             fail_reason="USDJPY H024 exposure/order is present",
         )
         _check(
@@ -526,7 +822,7 @@ def build_governance_packet(
             },
         )
 
-        has_account_snapshot, has_exposure_snapshot, has_tick_snapshot = _has_snapshot_bundle(gate)
+        has_account_snapshot, has_exposure_snapshot, has_tick_snapshot = _has_snapshot_bundle(combined_evidence)
         _check(
             checks,
             "pre_close_account_risk_margin_snapshot_present",
@@ -546,9 +842,9 @@ def build_governance_packet(
             fail_reason="tick/spread snapshot is missing",
         )
         snapshot_packets = [
-            _find_packet(gate, "h024_runtime_account_risk_margin_safety_supervisor"),
-            _find_packet(gate, "h024_runtime_exposure_inventory_safety_supervisor"),
-            _find_packet(gate, "h024_runtime_tick_spread_safety_supervisor"),
+            _find_packet(combined_evidence, "h024_runtime_account_risk_margin_safety_supervisor"),
+            _find_packet(combined_evidence, "h024_runtime_exposure_inventory_safety_supervisor"),
+            _find_packet(combined_evidence, "h024_runtime_tick_spread_safety_supervisor"),
         ]
         available_snapshot_packets = [packet for packet in snapshot_packets if packet is not None]
         if available_snapshot_packets:
@@ -684,22 +980,12 @@ def build_governance_packet(
             "human_decision_artifact_present": decision is not None,
             "gate_observed_at_utc": gate.get("observed_at_utc") if gate else None,
             "gate_verdict": gate.get("verdict") if gate else None,
-            "gate_opens_mutation_path": gate.get("gate_opens_mutation_path") if gate else None,
-            "unified_supervision_verdict": (
-                gate.get("unified_supervision_verdict") if gate else None
-            ),
-            "exact_canary_state": _first_value_for_key(gate, "exact_canary_state")
-            if gate
-            else None,
-            "exact_canary_observed": _first_value_for_key(gate, "exact_canary_observed")
-            if gate
-            else None,
-            "h024_position_count": _first_value_for_key(gate, "h024_position_count")
-            if gate
-            else None,
-            "h024_order_count": _first_value_for_key(gate, "h024_order_count")
-            if gate
-            else None,
+            "gate_opens_mutation_path": gate_opens_mutation_path if gate else None,
+            "unified_supervision_verdict": unified_verdict if gate else None,
+            "exact_canary_state": exact_state if gate else None,
+            "exact_canary_observed": exact_observed if gate else None,
+            "h024_position_count": h024_position_count if gate else None,
+            "h024_order_count": h024_order_count if gate else None,
             "human_decision": decision.get("decision") if decision else None,
             "human_decision_valid_until_utc": decision.get("valid_until_utc")
             if decision

@@ -60,6 +60,10 @@ Default input paths:
 
 ```text
 reports/h024_runtime_no_mutation_safety_gate.jsonl
+reports/h024_unified_read_only_post_canary_runtime_supervision.jsonl
+reports/h024_runtime_account_risk_margin_safety_supervisor.jsonl
+reports/h024_runtime_exposure_inventory_safety_supervisor.jsonl
+reports/h024_runtime_tick_spread_safety_supervisor.jsonl
 config/h024_runtime_safety/default_exact_ticket_canary_close_modify_governance_decision.json
 ```
 
@@ -68,6 +72,8 @@ Default output path:
 ```text
 reports/h024_exact_ticket_canary_close_modify_governance.jsonl
 ```
+
+The upstream report paths are read-only evidence inputs. The governance builder also accepts equivalent embedded upstream records from the no-mutation gate packet and fails closed when required evidence is missing or malformed.
 
 `reports/` is generated runtime output and must remain untracked.
 
@@ -189,3 +195,13 @@ git status
 ```
 
 Do not add `reports/`.
+
+
+## Builder Runtime Evidence Behavior
+
+The builder runs the existing read-only upstream runtime evidence builders by default before loading the governance inputs. This refreshes lockout, heartbeat, tick/spread, exposure/inventory, account risk/margin, aggregate, and unified supervision reports. These upstream builders are read-only evidence producers; they do not authorize broker mutation. Use `--skip-autobuild-upstream` only for tests or offline verification, in which case missing upstream evidence fails closed.
+
+
+## Runtime Canary State Compatibility
+
+The governance packet accepts the exact observed canary state from compatible upstream runtime reports that expose either `exact_canary_state` or the exposure/account supervisor `canary_state` alias. The alias is accepted only for `OBSERVED_EXACT_KNOWN_CANARY`; missing, mismatched, ambiguous, or stale evidence still fails closed and never authorizes close/modify.
