@@ -7,13 +7,13 @@ from pathlib import Path
 
 import pytest
 
-from scripts.build_h026_h024_post_close_no_open_canary_state_jsonl import (
+from scripts.build_h024_post_close_no_open_canary_state_jsonl import (
     EXPECTED_DASHBOARD_WORDING,
     build_packet,
 )
 
 
-SCRIPT_PATH = Path("scripts/build_h026_h024_post_close_no_open_canary_state_jsonl.py")
+SCRIPT_PATH = Path("scripts/build_h024_post_close_no_open_canary_state_jsonl.py")
 
 
 def write_stage5(path: Path, **overrides: object) -> None:
@@ -28,6 +28,7 @@ def write_stage5(path: Path, **overrides: object) -> None:
         "h024_order_count": 0,
         "read_only_verification_only": True,
         "broker_mutation_authorized": False,
+        "trading_authorized": False,
         "history_deal_match_count": 2,
     }
     payload.update(overrides)
@@ -113,8 +114,8 @@ def test_fails_closed_when_stage5_report_is_malformed(tmp_path: Path) -> None:
 
 def test_cli_writes_jsonl_and_text_outputs(tmp_path: Path) -> None:
     stage5 = tmp_path / "stage5.jsonl"
-    output_jsonl = tmp_path / "h026.jsonl"
-    output_text = tmp_path / "h026.txt"
+    output_jsonl = tmp_path / "post_close.jsonl"
+    output_text = tmp_path / "post_close.txt"
     write_stage5(stage5)
 
     result = subprocess.run(
@@ -144,8 +145,8 @@ def test_cli_writes_jsonl_and_text_outputs(tmp_path: Path) -> None:
 
 def test_cli_returns_nonzero_for_unverified_stage5(tmp_path: Path) -> None:
     stage5 = tmp_path / "stage5.jsonl"
-    output_jsonl = tmp_path / "h026.jsonl"
-    output_text = tmp_path / "h026.txt"
+    output_jsonl = tmp_path / "post_close.jsonl"
+    output_text = tmp_path / "post_close.txt"
     write_stage5(stage5, verdict="FAIL_CLOSED")
 
     result = subprocess.run(
@@ -171,7 +172,7 @@ def test_cli_returns_nonzero_for_unverified_stage5(tmp_path: Path) -> None:
     assert packet["broker_mutation_authorized"] is False
 
 
-def test_h026_script_is_read_only_and_contains_no_broker_execution_api() -> None:
+def test_script_is_read_only_and_contains_no_broker_execution_api() -> None:
     source = SCRIPT_PATH.read_text(encoding="utf-8")
 
     forbidden_snippets = [

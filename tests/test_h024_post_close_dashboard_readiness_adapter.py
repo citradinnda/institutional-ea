@@ -7,19 +7,19 @@ from pathlib import Path
 
 import pytest
 
-from scripts.build_h027_h024_post_close_dashboard_readiness_adapter_jsonl import (
+from scripts.build_h024_post_close_dashboard_readiness_adapter_jsonl import (
     EXPECTED_WORDING,
     build_packet,
 )
 
 
-SCRIPT_PATH = Path("scripts/build_h027_h024_post_close_dashboard_readiness_adapter_jsonl.py")
+SCRIPT_PATH = Path("scripts/build_h024_post_close_dashboard_readiness_adapter_jsonl.py")
 
 
-def write_h026(path: Path, **overrides: object) -> None:
+def write_post_close(path: Path, **overrides: object) -> None:
     payload = {
         "verdict": "PASS",
-        "operator_state": "H026_H024_POST_CLOSE_NO_OPEN_CANARY_INTENTIONALLY_CLOSED_BY_H025",
+        "operator_state": "H024_POST_CLOSE_NO_OPEN_CANARY_INTENTIONALLY_CLOSED_BY_H025",
         "canary_absence_classification": "INTENTIONALLY_CLOSED_BY_H025",
         "dashboard_wording": EXPECTED_WORDING,
         "readiness_wording": EXPECTED_WORDING,
@@ -40,14 +40,14 @@ def write_h026(path: Path, **overrides: object) -> None:
     path.write_text(json.dumps(payload, sort_keys=True) + "\n", encoding="utf-8")
 
 
-def test_passes_when_h026_post_close_state_is_verified(tmp_path: Path) -> None:
-    h026 = tmp_path / "h026.jsonl"
-    write_h026(h026)
+def test_passes_when_post_close_state_is_verified(tmp_path: Path) -> None:
+    post_close = tmp_path / "post_close.jsonl"
+    write_post_close(post_close)
 
-    packet = build_packet(h026)
+    packet = build_packet(post_close)
 
     assert packet["verdict"] == "PASS"
-    assert packet["operator_state"] == "H027_H024_DASHBOARD_READINESS_ACCEPTS_H025_POST_CLOSE_NO_OPEN_CANARY"
+    assert packet["operator_state"] == "H024_DASHBOARD_READINESS_ACCEPTS_H025_POST_CLOSE_NO_OPEN_CANARY"
     assert packet["dashboard_state"] == EXPECTED_WORDING
     assert packet["readiness_state"] == EXPECTED_WORDING
     assert packet["h024_dashboard_compatible"] is True
@@ -65,27 +65,27 @@ def test_passes_when_h026_post_close_state_is_verified(tmp_path: Path) -> None:
 @pytest.mark.parametrize(
     ("override_key", "override_value", "expected_code"),
     [
-        ("verdict", "FAIL_CLOSED", "h026_verdict_not_pass"),
-        ("canary_absence_classification", "UNEXPECTED_MISSING_CANARY_OR_H026_UNVERIFIED", "h026_absence_not_intentionally_closed"),
+        ("verdict", "FAIL_CLOSED", "post_close_verdict_not_pass"),
+        ("canary_absence_classification", "UNEXPECTED_MISSING_CANARY_OR_POST_CLOSE_UNVERIFIED", "post_close_absence_not_intentionally_closed"),
         ("exact_ticket_open", True, "exact_ticket_open_not_false"),
         ("h024_position_count", 1, "h024_position_count_not_zero"),
         ("h024_order_count", 1, "h024_order_count_not_zero"),
-        ("trading_authorized", True, "h026_trading_authorized_not_false"),
-        ("broker_mutation_authorized", True, "h026_broker_mutation_authorized_not_false"),
+        ("trading_authorized", True, "post_close_trading_authorized_not_false"),
+        ("broker_mutation_authorized", True, "post_close_broker_mutation_authorized_not_false"),
         ("dashboard_wording", "OLD FAILURE WORDING", "dashboard_wording_unexpected"),
         ("readiness_wording", "OLD FAILURE WORDING", "readiness_wording_unexpected"),
     ],
 )
-def test_fails_closed_when_h026_is_not_safe_for_dashboard_readiness(
+def test_fails_closed_when_post_close_state_is_not_safe_for_dashboard_readiness(
     tmp_path: Path,
     override_key: str,
     override_value: object,
     expected_code: str,
 ) -> None:
-    h026 = tmp_path / "h026.jsonl"
-    write_h026(h026, **{override_key: override_value})
+    post_close = tmp_path / "post_close.jsonl"
+    write_post_close(post_close, **{override_key: override_value})
 
-    packet = build_packet(h026)
+    packet = build_packet(post_close)
 
     assert packet["verdict"] == "FAIL_CLOSED"
     assert packet["dashboard_state"] == "NO_OPEN_CANARY_UNVERIFIED"
@@ -97,46 +97,46 @@ def test_fails_closed_when_h026_is_not_safe_for_dashboard_readiness(
     assert any(v["code"] == expected_code for v in packet["violations"])
 
 
-def test_fails_closed_when_h026_report_is_missing(tmp_path: Path) -> None:
-    packet = build_packet(tmp_path / "missing_h026.jsonl")
+def test_fails_closed_when_post_close_report_is_missing(tmp_path: Path) -> None:
+    packet = build_packet(tmp_path / "missing_post_close.jsonl")
 
     assert packet["verdict"] == "FAIL_CLOSED"
-    assert packet["operator_state"] == "FAIL_CLOSED_H027_H026_POST_CLOSE_STATE_UNAVAILABLE"
+    assert packet["operator_state"] == "FAIL_CLOSED_H024_POST_CLOSE_STATE_UNAVAILABLE"
     assert packet["dashboard_state"] == "NO_OPEN_CANARY_UNVERIFIED"
     assert packet["readiness_state"] == "NO_OPEN_CANARY_UNVERIFIED"
     assert packet["h024_dashboard_compatible"] is False
     assert packet["h024_readiness_compatible"] is False
     assert packet["trading_authorized"] is False
     assert packet["broker_mutation_authorized"] is False
-    assert any(v["code"] == "h026_report_unreadable" for v in packet["violations"])
+    assert any(v["code"] == "post_close_report_unreadable" for v in packet["violations"])
 
 
-def test_fails_closed_when_h026_report_is_malformed(tmp_path: Path) -> None:
-    h026 = tmp_path / "h026.jsonl"
-    h026.write_text("{not json}\n", encoding="utf-8")
+def test_fails_closed_when_post_close_report_is_malformed(tmp_path: Path) -> None:
+    post_close = tmp_path / "post_close.jsonl"
+    post_close.write_text("{not json}\n", encoding="utf-8")
 
-    packet = build_packet(h026)
+    packet = build_packet(post_close)
 
     assert packet["verdict"] == "FAIL_CLOSED"
     assert packet["dashboard_state"] == "NO_OPEN_CANARY_UNVERIFIED"
     assert packet["readiness_state"] == "NO_OPEN_CANARY_UNVERIFIED"
     assert packet["trading_authorized"] is False
     assert packet["broker_mutation_authorized"] is False
-    assert any(v["code"] == "h026_report_unreadable" for v in packet["violations"])
+    assert any(v["code"] == "post_close_report_unreadable" for v in packet["violations"])
 
 
 def test_cli_writes_jsonl_and_text_outputs(tmp_path: Path) -> None:
-    h026 = tmp_path / "h026.jsonl"
-    output_jsonl = tmp_path / "h027.jsonl"
-    output_text = tmp_path / "h027.txt"
-    write_h026(h026)
+    post_close = tmp_path / "post_close.jsonl"
+    output_jsonl = tmp_path / "adapter.jsonl"
+    output_text = tmp_path / "adapter.txt"
+    write_post_close(post_close)
 
     result = subprocess.run(
         [
             sys.executable,
             str(SCRIPT_PATH),
-            "--h026-report",
-            str(h026),
+            "--post-close-report",
+            str(post_close),
             "--output-jsonl",
             str(output_jsonl),
             "--output-text",
@@ -162,18 +162,18 @@ def test_cli_writes_jsonl_and_text_outputs(tmp_path: Path) -> None:
     assert "Broker mutation authorized: False" in text
 
 
-def test_cli_returns_nonzero_when_h026_is_unverified(tmp_path: Path) -> None:
-    h026 = tmp_path / "h026.jsonl"
-    output_jsonl = tmp_path / "h027.jsonl"
-    output_text = tmp_path / "h027.txt"
-    write_h026(h026, verdict="FAIL_CLOSED")
+def test_cli_returns_nonzero_when_post_close_state_is_unverified(tmp_path: Path) -> None:
+    post_close = tmp_path / "post_close.jsonl"
+    output_jsonl = tmp_path / "adapter.jsonl"
+    output_text = tmp_path / "adapter.txt"
+    write_post_close(post_close, verdict="FAIL_CLOSED")
 
     result = subprocess.run(
         [
             sys.executable,
             str(SCRIPT_PATH),
-            "--h026-report",
-            str(h026),
+            "--post-close-report",
+            str(post_close),
             "--output-jsonl",
             str(output_jsonl),
             "--output-text",
@@ -193,7 +193,7 @@ def test_cli_returns_nonzero_when_h026_is_unverified(tmp_path: Path) -> None:
     assert packet["broker_mutation_authorized"] is False
 
 
-def test_h027_script_is_read_only_and_contains_no_broker_execution_api() -> None:
+def test_script_is_read_only_and_contains_no_broker_execution_api() -> None:
     source = SCRIPT_PATH.read_text(encoding="utf-8")
 
     forbidden_snippets = [

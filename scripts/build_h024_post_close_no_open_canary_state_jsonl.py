@@ -1,12 +1,9 @@
-﻿"""Build H026/H024-post-close read-only no-open-canary observer state.
+﻿"""Build H024 post-close read-only no-open-canary observer state.
 
-This packet intentionally treats the old H024 canary absence as acceptable only
-when H025 Stage 5 has already verified the exact ticket is closed and there are
-zero H024 positions/orders.
+This packet treats the old H024 canary absence as acceptable only when H025
+Stage 5 has verified the exact ticket is closed and H024 exposure is zero.
 
-This module is read-only. It consumes H025 Stage 5 evidence and writes a local
-operator packet. It uses only local JSON evidence and writes local operator packets. It performs no broker
-mutation.
+This module uses local JSONL evidence and writes local operator packets only.
 """
 
 from __future__ import annotations
@@ -18,8 +15,8 @@ from pathlib import Path
 from typing import Any
 
 
-SCHEMA = "h026_h024_post_close_no_open_canary_state.v1"
-STAGE = "H026_H024_POST_CLOSE_NO_OPEN_CANARY_OBSERVER_STATE"
+SCHEMA = "h024_post_close_no_open_canary_state.v1"
+STAGE = "H024_POST_CLOSE_NO_OPEN_CANARY_OBSERVER_STATE"
 
 ACCOUNT_SERVER = "Exness-MT5Trial6"
 SYMBOL = "XAUUSDm"
@@ -31,8 +28,8 @@ VOLUME = 0.01
 EXPECTED_DASHBOARD_WORDING = "NO OPEN CANARY - INTENTIONALLY CLOSED BY H025"
 
 DEFAULT_STAGE5_REPORT = Path("reports/h025_exact_ticket_canary_post_close_verification.jsonl")
-DEFAULT_OUTPUT_JSONL = Path("reports/h026_h024_post_close_no_open_canary_state.jsonl")
-DEFAULT_OUTPUT_TEXT = Path("reports/h026_h024_post_close_no_open_canary_state.txt")
+DEFAULT_OUTPUT_JSONL = Path("reports/h024_post_close_no_open_canary_state.jsonl")
+DEFAULT_OUTPUT_TEXT = Path("reports/h024_post_close_no_open_canary_state.txt")
 
 
 def utc_now_iso() -> str:
@@ -116,7 +113,7 @@ def build_packet(stage5_report_path: Path) -> dict[str, Any]:
         packet.update(
             {
                 "verdict": "FAIL_CLOSED",
-                "operator_state": "FAIL_CLOSED_H026_STAGE5_POST_CLOSE_EVIDENCE_UNAVAILABLE",
+                "operator_state": "FAIL_CLOSED_H024_STAGE5_POST_CLOSE_EVIDENCE_UNAVAILABLE",
                 "canary_absence_classification": "UNEXPECTED_MISSING_CANARY_OR_STAGE5_UNVERIFIED",
                 "post_close_verified": False,
                 "open_canary_trade_exists": None,
@@ -172,7 +169,7 @@ def build_packet(stage5_report_path: Path) -> dict[str, Any]:
         packet.update(
             {
                 "verdict": "FAIL_CLOSED",
-                "operator_state": "FAIL_CLOSED_H026_NO_OPEN_CANARY_NOT_INTENTIONALLY_VERIFIED",
+                "operator_state": "FAIL_CLOSED_H024_NO_OPEN_CANARY_NOT_INTENTIONALLY_VERIFIED",
                 "canary_absence_classification": "UNEXPECTED_MISSING_CANARY_OR_STAGE5_UNVERIFIED",
                 "violations": violations,
             }
@@ -182,7 +179,7 @@ def build_packet(stage5_report_path: Path) -> dict[str, Any]:
     packet.update(
         {
             "verdict": "PASS",
-            "operator_state": "H026_H024_POST_CLOSE_NO_OPEN_CANARY_INTENTIONALLY_CLOSED_BY_H025",
+            "operator_state": "H024_POST_CLOSE_NO_OPEN_CANARY_INTENTIONALLY_CLOSED_BY_H025",
             "canary_absence_classification": "INTENTIONALLY_CLOSED_BY_H025",
             "h024_observer_state": "POST_CLOSE_NO_OPEN_CANARY_ACCEPTED",
             "dashboard_state": EXPECTED_DASHBOARD_WORDING,
@@ -201,7 +198,7 @@ def write_outputs(packet: dict[str, Any], output_jsonl: Path, output_text: Path)
     output_jsonl.write_text(json.dumps(packet, sort_keys=True) + "\n", encoding="utf-8")
 
     lines = [
-        "H026/H024 post-close no-open-canary observer state",
+        "H024 post-close no-open-canary observer state",
         f"Verdict: {packet.get('verdict')}",
         f"Operator state: {packet.get('operator_state')}",
         f"Canary absence classification: {packet.get('canary_absence_classification')}",
@@ -230,7 +227,7 @@ def main() -> int:
     packet = build_packet(args.stage5_report)
     write_outputs(packet, args.output_jsonl, args.output_text)
 
-    print(f"H026/H024 post-close no-open-canary observer state verdict: {packet['verdict']}")
+    print(f"H024 post-close no-open-canary observer state verdict: {packet['verdict']}")
     print(f"Operator state: {packet['operator_state']}")
     print(f"Canary absence classification: {packet['canary_absence_classification']}")
     print(f"Dashboard wording: {packet['dashboard_wording']}")
@@ -247,4 +244,3 @@ def main() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
-
