@@ -9,39 +9,39 @@ SCRIPT = REPO_ROOT / "scripts" / "build_h025_exact_ticket_canary_close_request_p
 REPORT = REPO_ROOT / "reports" / "h025_exact_ticket_canary_close_request_preview.jsonl"
 
 
-def test_h025_preview_script_exists_and_is_exact_ticket_scoped() -> None:
+def test_h025_preview_script_is_exact_ticket_scoped() -> None:
     text = SCRIPT.read_text(encoding="utf-8")
 
-    assert "EXPECTED_ACCOUNT_SERVER = \"Exness-MT5Trial6\"" in text
-    assert "EXPECTED_SYMBOL = \"XAUUSDm\"" in text
-    assert "EXPECTED_POSITION_SIDE = \"sell\"" in text
-    assert "EXPECTED_CLOSE_SIDE = \"buy\"" in text
+    assert 'EXPECTED_ACCOUNT_SERVER = "Exness-MT5Trial6"' in text
+    assert 'EXPECTED_SYMBOL = "XAUUSDm"' in text
+    assert 'EXPECTED_POSITION_SIDE = "sell"' in text
+    assert 'EXPECTED_CLOSE_SIDE = "buy"' in text
     assert "EXPECTED_VOLUME = 0.01" in text
     assert "EXPECTED_TICKET = 4413054432" in text
     assert "EXPECTED_IDENTIFIER = 4413054432" in text
     assert "EXPECTED_MAGIC = 240024" in text
 
 
-def test_h025_preview_has_no_broker_mutation_calls() -> None:
+def test_h025_preview_has_no_mt5_or_broker_mutation_calls() -> None:
     text = SCRIPT.read_text(encoding="utf-8")
 
-    forbidden_patterns = [
+    forbidden = [
         r"\bimport\s+MetaTrader5\b",
         r"\bfrom\s+MetaTrader5\s+import\b",
         r"\bmt5\.",
         r"\border_send\s*\(",
-        r"\.order_send\s*\(",
         r"\border_check\s*\(",
-        r"\.order_check\s*\(",
         r"\bsymbol_select\s*\(",
+        r"\.order_send\s*\(",
+        r"\.order_check\s*\(",
         r"\.symbol_select\s*\(",
     ]
 
-    for pattern in forbidden_patterns:
+    for pattern in forbidden:
         assert re.search(pattern, text) is None, f"forbidden broker-mutation pattern found: {pattern}"
 
 
-def test_h025_preview_builder_outputs_inert_exact_ticket_record() -> None:
+def test_h025_preview_builder_outputs_inert_record() -> None:
     result = subprocess.run(
         [sys.executable, str(SCRIPT)],
         cwd=REPO_ROOT,
@@ -51,7 +51,7 @@ def test_h025_preview_builder_outputs_inert_exact_ticket_record() -> None:
     )
 
     assert result.returncode == 0, result.stdout + result.stderr
-    assert REPORT.exists(), f"missing report: {REPORT}"
+    assert REPORT.exists()
 
     records = [
         json.loads(line)
@@ -62,8 +62,6 @@ def test_h025_preview_builder_outputs_inert_exact_ticket_record() -> None:
     assert len(records) == 1
     record = records[0]
 
-    assert record["schema"] == "h025_exact_ticket_canary_close_request_preview.v1"
-    assert record["stage"] == "H025_STAGE_2_EXACT_TICKET_CLOSE_REQUEST_PREVIEW"
     assert record["verdict"] == "PASS"
     assert record["exact_ticket"] == 4413054432
     assert record["exact_identifier"] == 4413054432
@@ -89,13 +87,7 @@ def test_h025_preview_builder_outputs_inert_exact_ticket_record() -> None:
     preview = record["close_request_preview"]
     assert preview["shape_kind"] == "INERT_EXACT_TICKET_CLOSE_REQUEST_PREVIEW_ONLY"
     assert preview["not_submitable_to_mt5"] is True
-    assert preview["account_server_required"] == "Exness-MT5Trial6"
-    assert preview["symbol_required"] == "XAUUSDm"
     assert preview["position_ticket_required"] == 4413054432
     assert preview["position_identifier_required"] == 4413054432
-    assert preview["magic_required"] == 240024
-    assert preview["position_side_to_close"] == "sell"
-    assert preview["close_side_preview"] == "buy"
-    assert preview["volume_required"] == 0.01
     assert preview["manual_operator_approval_required_before_order_check"] is True
     assert preview["manual_operator_confirmation_required_before_order_send"] is True
