@@ -1,5 +1,6 @@
 import json
 import re
+from datetime import datetime, timezone
 from importlib.util import module_from_spec, spec_from_file_location
 from pathlib import Path
 
@@ -46,82 +47,71 @@ def test_post_close_verification_is_read_only_no_order_capable_calls() -> None:
         assert re.search(pattern, text) is None, f"forbidden post-close verification pattern found: {pattern}"
 
 
-def test_missing_stage4_report_fails_closed_before_mt5(tmp_path: Path) -> None:
+def test_stage4_runtime_report_is_optional_context_not_hard_gate() -> None:
     module = load_module()
 
-    original_stage4 = module.STAGE4_REPORT_PATH
-    original_jsonl = module.OUTPUT_JSONL_PATH
-    original_text = module.OUTPUT_TEXT_PATH
+    assert module.summarize_stage4_runtime_report(None)["present"] is False
+    assert module.summarize_stage4_runtime_report(None)["usable_pass_evidence"] is False
 
-    module.STAGE4_REPORT_PATH = tmp_path / "missing_stage4.jsonl"
-    module.OUTPUT_JSONL_PATH = tmp_path / "post_close.jsonl"
-    module.OUTPUT_TEXT_PATH = tmp_path / "post_close.txt"
+    failed_stage4 = {
+        "verdict": "FAIL_CLOSED",
+        "stage": "H025_STAGE_4_APPROVAL_VALIDATION",
+        "exact_ticket": 4413054432,
+        "exact_identifier": 4413054432,
+        "order_send_executed": False,
+    }
+    summary = module.summarize_stage4_runtime_report(failed_stage4)
 
-    try:
-        result = module.run_post_close_verification()
-    finally:
-        module.STAGE4_REPORT_PATH = original_stage4
-        module.OUTPUT_JSONL_PATH = original_jsonl
-        module.OUTPUT_TEXT_PATH = original_text
+    assert summary["present"] is True
+    assert summary["usable_pass_evidence"] is False
+    assert summary["verdict"] == "FAIL_CLOSED"
+    assert "volatile runtime context" in summary["note"]
 
-    assert result == 1
 
-    record = json.loads((tmp_path / "post_close.jsonl").read_text(encoding="utf-8").splitlines()[0])
-    assert record["verdict"] == "FAIL_CLOSED"
-    assert record["stage"] == "H025_STAGE_5_STAGE4_REPORT_VALIDATION"
+def test_build_record_passes_on_zero_current_open_exposure_even_if_stage4_context_bad() -> None:
+    module = load_module()
+
+    record = module.build_record(
+        account={"server": "Exness-MT5Trial6"},
+        exact_positions=[],
+        h024_positions=[],
+        h024_orders=[],
+        history_deal_matches=[],
+        stage4_summary={"present": True, "usable_pass_evidence": False},
+        history_start=datetime(2026, 5, 13, tzinfo=timezone.utc),
+        history_end=datetime(2026, 5, 13, tzinfo=timezone.utc),
+    )
+
+    assert record["verdict"] == "PASS"
+    assert record["post_close_verified"] is True
+    assert record["open_canary_trade_exists"] is False
+    assert record["exact_ticket_open"] is False
+    assert record["h024_position_count"] == 0
+    assert record["h024_order_count"] == 0
     assert record["order_check_executed"] is False
     assert record["order_send_executed"] is False
     assert record["broker_mutation_authorized"] is False
-    assert record["post_close_verified"] is False
 
 
-def test_invalid_stage4_report_rejected_before_mt5(tmp_path: Path) -> None:
+def test_build_record_fails_if_exact_ticket_or_h024_exposure_remains() -> None:
     module = load_module()
 
-    stage4 = tmp_path / "stage4.jsonl"
-    stage4.write_text(
-        json.dumps(
-            {
-                "verdict": "FAIL_CLOSED",
-                "stage": "H025_STAGE_4_EXACT_TICKET_CLOSE_ORDER_SEND",
-                "exact_ticket": 4413054432,
-                "exact_identifier": 4413054432,
-                "symbol": "XAUUSDm",
-                "volume": 0.01,
-                "order_check_executed": True,
-                "order_send_executed": False,
-                "post_send_exact_ticket_open": True,
-                "post_send_h024_position_count": 1,
-                "post_send_h024_order_count": 0,
-                "order_send_result": {"retcode": 0},
-            }
-        )
-        + "\n",
-        encoding="utf-8",
+    record = module.build_record(
+        account={"server": "Exness-MT5Trial6"},
+        exact_positions=[{"ticket": 4413054432}],
+        h024_positions=[{"ticket": 4413054432, "magic": 240024}],
+        h024_orders=[{"ticket": 123, "magic": 240024}],
+        history_deal_matches=[],
+        stage4_summary={"present": False, "usable_pass_evidence": False},
+        history_start=datetime(2026, 5, 13, tzinfo=timezone.utc),
+        history_end=datetime(2026, 5, 13, tzinfo=timezone.utc),
     )
 
-    original_stage4 = module.STAGE4_REPORT_PATH
-    original_jsonl = module.OUTPUT_JSONL_PATH
-    original_text = module.OUTPUT_TEXT_PATH
-
-    module.STAGE4_REPORT_PATH = stage4
-    module.OUTPUT_JSONL_PATH = tmp_path / "post_close.jsonl"
-    module.OUTPUT_TEXT_PATH = tmp_path / "post_close.txt"
-
-    try:
-        result = module.run_post_close_verification()
-    finally:
-        module.STAGE4_REPORT_PATH = original_stage4
-        module.OUTPUT_JSONL_PATH = original_jsonl
-        module.OUTPUT_TEXT_PATH = original_text
-
-    assert result == 1
-
-    record = json.loads((tmp_path / "post_close.jsonl").read_text(encoding="utf-8").splitlines()[0])
     assert record["verdict"] == "FAIL_CLOSED"
-    assert record["stage"] == "H025_STAGE_5_STAGE4_REPORT_VALIDATION"
-    assert any(v["code"] == "stage4_verdict_unexpected" for v in record["violations"])
-    assert any(v["code"] == "stage4_order_send_executed_unexpected" for v in record["violations"])
-    assert any(v["code"] == "stage4_post_send_exact_ticket_open_unexpected" for v in record["violations"])
-    assert record["order_check_executed"] is False
-    assert record["order_send_executed"] is False
+    assert record["post_close_verified"] is False
+    assert record["exact_ticket_open"] is True
+    assert record["open_canary_trade_exists"] is True
+    codes = {violation["code"] for violation in record["violations"]}
+    assert "exact_ticket_still_open" in codes
+    assert "h024_positions_remain" in codes
+    assert "h024_orders_remain" in codes
