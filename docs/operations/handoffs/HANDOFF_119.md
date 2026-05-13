@@ -661,3 +661,35 @@ First useful next work is a read-only post-close/no-open-canary observer state s
 
 Keep reports/ untracked.
 
+
+---
+
+## 16. Final completeness fix-forward
+
+After commit `62cdb53`, final `git status --short` still showed:
+
+```text
+?? tests/test_h025_exact_ticket_canary_post_close_verification.py
+
+This meant HANDOFF_119 described the Stage 5 test file, but the repository had not actually tracked it yet.
+
+The final completeness fix-forward commit is:
+
+__9714ef8__
+
+That commit tracks:
+
+tests/test_h025_exact_ticket_canary_post_close_verification.py
+
+It also re-validated:
+
+python -m py_compile scripts\build_h025_exact_ticket_canary_post_close_verification_jsonl.py
+python -m py_compile tests\test_h025_exact_ticket_canary_post_close_verification.py
+python -m pytest tests\test_h025_exact_ticket_canary_post_close_verification.py -q
+python scripts\build_h025_exact_ticket_canary_post_close_verification_jsonl.py
+
+Expected final repository state after this correction:
+
+clean except reports/ untracked
+
+
