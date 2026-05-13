@@ -324,7 +324,7 @@ def run_order_check(approval_path: Path) -> int:
             "price": float(ask),
             "deviation": 50,
             "magic": EXPECTED_MAGIC,
-            "comment": "H025 exact-ticket close order_check only",
+            "comment": "H025_CLOSE_CHECK",
             "type_time": mt5.ORDER_TIME_GTC,
             "type_filling": mt5.ORDER_FILLING_IOC,
         }
@@ -398,3 +398,4 @@ def main() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
+

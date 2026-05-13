@@ -133,3 +133,12 @@ def test_invalid_approval_rejected_without_order_check(tmp_path: Path) -> None:
     assert record["order_send_executed"] is False
     assert any(v["code"] == "approval_operator_approved_unexpected" for v in record["violations"])
     assert any(v["code"] == "approval_order_check_authorized_unexpected" for v in record["violations"])
+
+
+def test_order_check_request_comment_is_short_ascii() -> None:
+    text = SCRIPT.read_text(encoding="utf-8")
+
+    assert '"comment": "H025_CLOSE_CHECK"' in text
+    assert "H025 exact-ticket close order_check only" not in text
+    assert len("H025_CLOSE_CHECK") <= 31
+    assert "H025_CLOSE_CHECK".isascii()
